@@ -728,19 +728,28 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #eef2ff 0%, #f8fafc 40%, #ffffff 100%)',
+      }}
+    >
       <header
         style={{
           position: 'sticky',
           top: 0,
           zIndex: 40,
-          background: '#fff',
+          background: 'rgba(255,255,255,0.9)',
           borderBottom: '1px solid #e5e7eb',
-          padding: '12px 20px',
+          padding: '16px 24px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: 16,
+          boxShadow: '0 10px 30px rgba(15,23,42,0.08)',
+          backdropFilter: 'blur(6px)',
         }}
       >
         <div>
@@ -748,8 +757,8 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           <strong style={{ fontSize: 18 }}>{documentLabel}</strong>
         </div>
       </header>
-      <div style={{ flex: 1, padding: 24, paddingBottom: 140 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, padding: 32, paddingBottom: 160 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) 380px', gap: 28, alignItems: 'flex-start' }}>
           <section
             style={{
               maxHeight: 'calc(100vh - 160px)',
@@ -803,10 +812,22 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   key={page.pageIndex}
                   ref={registerPageRef(page.pageIndex)}
                   data-page-container
-                  style={{ position: 'relative', width: page.width, margin: '0 auto' }}
+                  style={{
+                    position: 'relative',
+                    width: page.width,
+                    margin: '0 auto',
+                    background: '#fff',
+                    borderRadius: 18,
+                    boxShadow: '0 25px 65px rgba(15,23,42,0.18)',
+                    padding: 24,
+                  }}
                   onClick={() => setSelectedFieldId(null)}
                 >
-                  <img src={page.dataUrl} alt={`Page ${page.pageIndex + 1}`} style={{ width: '100%', display: 'block' }} />
+                  <img
+                    src={page.dataUrl}
+                    alt={`Page ${page.pageIndex + 1}`}
+                    style={{ width: '100%', display: 'block', borderRadius: 8 }}
+                  />
                   {fields
                     .filter((field) => field.pageIndex === page.pageIndex)
                     .map((field) => (
@@ -887,7 +908,15 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       </section>
 
       <section style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
-        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, background: '#fff' }}>
+        <div
+          style={{
+            border: '1px solid rgba(148,163,184,0.4)',
+            borderRadius: 18,
+            padding: 20,
+            background: 'linear-gradient(145deg, #ffffff 0%, #f5f8ff 100%)',
+            boxShadow: '0 25px 50px rgba(15,23,42,0.12)',
+          }}
+        >
           <h3>Project</h3>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 12 }}>
             <select
@@ -928,7 +957,18 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           {error && <p style={{ color: 'red', marginTop: 8 }}>{error}</p>}
         </div>
 
-        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, background: '#fff', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div
+          style={{
+            border: '1px solid rgba(148,163,184,0.35)',
+            borderRadius: 18,
+            padding: 20,
+            background: '#fff',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            boxShadow: '0 20px 45px rgba(15,23,42,0.08)',
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h3 style={{ margin: 0 }}>Investors</h3>

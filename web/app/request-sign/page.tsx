@@ -79,6 +79,19 @@ const FIELD_LABELS: Record<FieldType, string> = {
   checkbox: 'Checkbox',
 };
 
+const palette = {
+  pageBackground: 'linear-gradient(130deg, #eef2ff 0%, #f8fafc 50%, #ffffff 100%)',
+  headerBackground: 'rgba(255,255,255,0.92)',
+  headerBorder: '1px solid rgba(148,163,184,0.35)',
+  cardBorder: '1px solid rgba(148,163,184,0.35)',
+  cardShadow: '0 25px 45px rgba(15,23,42,0.12)',
+  cardSurface: 'linear-gradient(145deg, #ffffff 0%, #f5f8ff 100%)',
+  accent: '#2563eb',
+  accentMuted: '#a5b4fc',
+  textSubtle: '#6b7280',
+  textStrong: '#0f172a',
+};
+
 const randomId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -733,7 +746,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #eef2ff 0%, #f8fafc 40%, #ffffff 100%)',
+        background: palette.pageBackground,
       }}
     >
       <header
@@ -741,15 +754,15 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           position: 'sticky',
           top: 0,
           zIndex: 40,
-          background: 'rgba(255,255,255,0.9)',
-          borderBottom: '1px solid #e5e7eb',
-          padding: '16px 24px',
+          background: palette.headerBackground,
+          borderBottom: palette.headerBorder,
+          padding: '16px 28px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: 16,
-          boxShadow: '0 10px 30px rgba(15,23,42,0.08)',
-          backdropFilter: 'blur(6px)',
+          boxShadow: '0 12px 30px rgba(15,23,42,0.08)',
+          backdropFilter: 'blur(10px)',
         }}
       >
         <div>
@@ -818,7 +831,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     margin: '0 auto',
                     background: '#fff',
                     borderRadius: 18,
-                    boxShadow: '0 25px 65px rgba(15,23,42,0.18)',
+                    boxShadow: '0 30px 70px rgba(15,23,42,0.18)',
                     padding: 24,
                   }}
                   onClick={() => setSelectedFieldId(null)}
@@ -910,11 +923,11 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       <section style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div
           style={{
-            border: '1px solid rgba(148,163,184,0.4)',
+            border: palette.cardBorder,
             borderRadius: 18,
             padding: 20,
-            background: 'linear-gradient(145deg, #ffffff 0%, #f5f8ff 100%)',
-            boxShadow: '0 25px 50px rgba(15,23,42,0.12)',
+            background: palette.cardSurface,
+            boxShadow: palette.cardShadow,
           }}
         >
           <h3>Project</h3>
@@ -959,14 +972,14 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
         <div
           style={{
-            border: '1px solid rgba(148,163,184,0.35)',
+            border: palette.cardBorder,
             borderRadius: 18,
             padding: 20,
             background: '#fff',
             display: 'flex',
             flexDirection: 'column',
             gap: 12,
-            boxShadow: '0 20px 45px rgba(15,23,42,0.08)',
+            boxShadow: palette.cardShadow,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

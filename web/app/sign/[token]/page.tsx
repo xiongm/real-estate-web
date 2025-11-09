@@ -337,6 +337,7 @@ function Complete({
   onError: (msg: string) => void;
 }) {
   const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const [sending, setSending] = useState(false);
   const onComplete = async () => {
     const missingRequired = Object.values(values).some((meta: any) => {
       const mustFill =
@@ -349,6 +350,7 @@ function Complete({
       alert('Please fill all required fields before completing.');
       return;
     }
+    setSending(true);
     const payload = { values };
     const r = await fetch(`${base}/api/sign/${token}/complete`, {
       method: 'POST',
@@ -358,6 +360,7 @@ function Complete({
     const j = await r.json();
     if (!r.ok) {
       onError(j?.detail || 'Failed to complete.');
+      setSending(false);
       return;
     }
     let message = 'Completion recorded. We will email the final packet once all signers finish.';
@@ -379,11 +382,12 @@ function Complete({
       sealed: Boolean(j.sealed),
       sha: j.sha256_final,
     });
+    setSending(false);
   };
   return (
       <button
         onClick={onComplete}
-        disabled={disabled}
+        disabled={disabled || sending}
         style={{
           background: '#2563eb',
           color: '#fff',
@@ -392,12 +396,29 @@ function Complete({
           padding: '14px 36px',
           fontSize: 16,
           fontWeight: 600,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.6 : 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          cursor: disabled || sending ? 'not-allowed' : 'pointer',
+          opacity: disabled || sending ? 0.6 : 1,
           width: '100%',
         }}
       >
-        Finish and Sign
+        {sending && (
+          <span
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              border: '2px solid rgba(255,255,255,0.4)',
+              borderTopColor: '#fff',
+              display: 'inline-block',
+              animation: 'spin 0.9s linear infinite',
+            }}
+          />
+        )}
+        {sending ? 'Finishing…' : 'Finish and Sign'}
       </button>
   );
 }

@@ -111,6 +111,9 @@ def load_signing_session(token: str, request: Request, session: Session = Depend
     env = session.get(Envelope, signer.envelope_id)
     if not env:
         raise HTTPException(404, "not found")
+    final_artifact = session.exec(select(FinalArtifact).where(FinalArtifact.envelope_id == env.id)).first()
+    all_signers = session.exec(select(Signer).where(Signer.envelope_id == env.id)).all()
+    waiting_on = len([s for s in all_signers if s.status != "completed" and s.id != signer.id])
     fields = session.exec(select(Field).where(Field.envelope_id==env.id)).all()
     filtered_fields = []
     for field in fields:
@@ -123,6 +126,8 @@ def load_signing_session(token: str, request: Request, session: Session = Depend
     return {
         "envelope": sa_to_dict(env),
         "signer": sa_to_dict(signer),
+        "waiting_on": waiting_on,
+        "final_artifact": sa_to_dict(final_artifact) if final_artifact else None,
         "fields": [sa_to_dict(f) for f in filtered_fields],
     }
 
@@ -139,6 +144,21 @@ def get_original_pdf(token: str, session: Session = Depends(get_session)):
     if not doc:
         raise HTTPException(404, "not found")
     pdf_bytes = get_bytes(doc.s3_key)
+    return Response(content=pdf_bytes, media_type="application/pdf")
+
+@router.get("/{token}/final-pdf")
+def get_final_pdf(token: str, session: Session = Depends(get_session)):
+    data = read_token(token)
+    signer = session.get(Signer, data.get("signer_id"))
+    if not signer:
+        raise HTTPException(404, "not found")
+    env = session.get(Envelope, signer.envelope_id)
+    if not env:
+        raise HTTPException(404, "not found")
+    final_artifact = session.exec(select(FinalArtifact).where(FinalArtifact.envelope_id == env.id)).first()
+    if not final_artifact:
+        raise HTTPException(404, "final artifact not ready")
+    pdf_bytes = get_bytes(final_artifact.s3_key_pdf)
     return Response(content=pdf_bytes, media_type="application/pdf")
 
 @router.post("/{token}/save")
@@ -219,8 +239,11 @@ def complete_signing(token: str, payload: SignSave, session: Session = Depends(g
     filename = doc.filename or f"Envelope {env.id}"
     subject = f"Completed: {filename}"
     sha_line = f"Final SHA256: {sha_final}"
+    invited_by = env.requester_name or "Your team"
+    invited_contact = f"{invited_by}{f' · {env.requester_email}' if env.requester_email else ''}"
     plain_body = (
-        f"All parties have finished signing {filename}.\n\n"
+        f"All parties have finished signing {filename}.\n"
+        f"Requested by: {invited_contact}\n\n"
         f"{sha_line}\n\nA copy of the executed PDF is attached for your records."
     )
     base_name = filename[:-4] if filename.lower().endswith(".pdf") else filename
@@ -232,6 +255,9 @@ def complete_signing(token: str, payload: SignSave, session: Session = Depends(g
       <h2 style="margin-top: 0; font-size: 20px; color: #0f172a;">Completed</h2>
       <p style="font-size: 14px; color: #1e293b; line-height: 1.5;">
         All parties have finished signing <strong>{escape(filename)}</strong>.
+      </p>
+      <p style="font-size: 13px; color: #475569; margin-top: -4px;">
+        Requested by {escape(invited_contact)}
       </p>
       <p style="font-size: 13px; color: #475569; background: #f8fafc; padding: 12px 16px; border-radius: 8px;">
         {escape(sha_line)}

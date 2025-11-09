@@ -93,10 +93,19 @@ def create_envelope(data: EnvelopeCreate, session: Session = Depends(get_session
     return {"id": env.id, "status": env.status}
 
 @router.post("/{envelope_id}/send")
-def send_envelope(envelope_id: int, _: EnvelopeSend, session: Session = Depends(get_session)):
+def send_envelope(envelope_id: int, payload: EnvelopeSend, session: Session = Depends(get_session)):
     env = session.get(Envelope, envelope_id)
     if not env:
         raise HTTPException(404, "envelope not found")
+    if payload:
+        if payload.message is not None:
+            env.message = payload.message
+        if payload.subject:
+            env.subject = payload.subject
+        if payload.requester_name is not None:
+            env.requester_name = payload.requester_name
+        if payload.requester_email is not None:
+            env.requester_email = payload.requester_email
     doc = session.get(Document, env.document_id)
     if not doc:
         raise HTTPException(404, "document not found")
@@ -106,19 +115,33 @@ def send_envelope(envelope_id: int, _: EnvelopeSend, session: Session = Depends(
         select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
     ).all()
     filename = doc.filename or "Document"
-    intro = env.message or "Please review and sign the attached document."
+    requester_name = env.requester_name or "Your contact"
+    requester_email = env.requester_email
+    intro = env.message or f"{requester_name} invited you to review and sign this document."
     for s in signers:
         token = make_token({"signer_id": s.id, "envelope_id": envelope_id})
         link = f"http://localhost:3000/sign/{token}"
-        subject = f"Signature requested: {filename}"
-        text_body = f"{intro}\n\nOpen document: {link}"
+        subject = env.subject or f"Signature requested: {filename}"
+        text_body = f"""{requester_name} sent you a document to review and sign.
+Document: “{filename}”
+
+{intro}
+
+Open document: {link}
+"""
         intro_html = escape(intro)
         link_html = escape(link)
+        requester_html = escape(requester_name)
+        requester_contact = f"{requester_html}{f' · {escape(requester_email)}' if requester_email else ''}"
         html_body = f"""
 <html>
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6f8; padding: 24px;">
     <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 10px 25px rgba(15,23,42,0.08);">
       <h2 style="margin-top: 0; font-size: 20px; color: #0f172a;">Signature requested</h2>
+      <p style="font-size: 13px; color: #475569; margin-bottom: 6px;">{requester_contact}</p>
+      <p style="font-size: 14px; color: #1e293b; line-height: 1.5;">
+        {requester_html} sent you a document to review and sign.
+      </p>
       <p style="font-size: 14px; color: #1e293b; line-height: 1.5;">{intro_html}</p>
       <div style="margin: 24px 0;">
         <a href="{link_html}" style="display: inline-block; background: #2563eb; color: #fff; padding: 12px 24px; border-radius: 999px; text-decoration: none; font-weight: 600;">
@@ -134,6 +157,36 @@ def send_envelope(envelope_id: int, _: EnvelopeSend, session: Session = Depends(
 
     _append_event(session, env.id, "system", "sent", {})
     return {"ok": True}
+
+@router.get("/{envelope_id}")
+def get_envelope(envelope_id: int, session: Session = Depends(get_session)):
+    env = session.get(Envelope, envelope_id)
+    if not env:
+        raise HTTPException(404, "envelope not found")
+    doc = session.get(Document, env.document_id)
+    signers = session.exec(
+        select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
+    ).all()
+    return {
+        "id": env.id,
+        "project_id": env.project_id,
+        "subject": env.subject,
+        "message": env.message,
+        "requester_name": env.requester_name,
+        "requester_email": env.requester_email,
+        "status": env.status,
+        "document": {"id": doc.id, "filename": doc.filename} if doc else None,
+        "signers": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "email": s.email,
+                "role": s.role,
+                "routing_order": s.routing_order,
+            }
+            for s in signers
+        ],
+    }
 
 # Dev helper: get magic links without tailing logs
 @router.get("/{envelope_id}/dev-magic-links")

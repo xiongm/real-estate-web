@@ -37,6 +37,8 @@ class Envelope(SQLModel, table=True):
     message: str = ""
     status: str = "draft"
     expires_at: Optional[datetime] = None
+    requester_name: Optional[str] = None
+    requester_email: Optional[str] = None
     created_at: datetime = ORMField(default_factory=datetime.utcnow)
 
 class Signer(SQLModel, table=True):

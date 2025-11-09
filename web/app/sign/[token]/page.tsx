@@ -81,29 +81,38 @@ export default function SignPage() {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
+    const preferFinal = Boolean((completion && completion.sealed) || data?.final_artifact?.sha256_final);
     setPdfError(null);
     setPdfPages([]);
     setPdfLoading(true);
-    fetch(`${base}/api/sign/${token}/pdf`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`PDF HTTP ${r.status}`);
-        return r.arrayBuffer();
-      })
-      .then(async (buffer) => {
+    const loadPdf = async () => {
+      try {
+        const loadFromEndpoint = async (endpoint: 'pdf' | 'final-pdf') => {
+          const r = await fetch(`${base}/api/sign/${token}/${endpoint}`);
+          return r;
+        };
+        let response = await loadFromEndpoint(preferFinal ? 'final-pdf' : 'pdf');
+        if (preferFinal && response.status === 404) {
+          response = await loadFromEndpoint('pdf');
+        }
+        if (!response.ok) {
+          throw new Error(`PDF HTTP ${response.status}`);
+        }
+        const buffer = await response.arrayBuffer();
         if (cancelled) return;
         const pages = await renderPdfPages(buffer);
         if (!cancelled) setPdfPages(pages);
-      })
-      .catch((e) => {
+      } catch (e) {
         if (!cancelled) setPdfError(String(e));
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setPdfLoading(false);
-      });
+      }
+    };
+    loadPdf();
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, completion?.sealed, data?.final_artifact?.sha256_final]);
 
   const signerRole = data?.signer?.role;
   const signerId = data?.signer?.id;
@@ -133,6 +142,29 @@ export default function SignPage() {
     return Object.fromEntries(entries);
   }, [fieldValues]);
 
+  useEffect(() => {
+    if (!data?.signer?.status) return;
+    if (data.signer.status !== 'completed') return;
+    const finalSha = data.final_artifact?.sha256_final;
+    const waiting = data.waiting_on ?? 0;
+    const sealed = Boolean(finalSha);
+    let message = 'Your signature has been recorded.';
+    if (sealed && finalSha) {
+      message = `All signers complete. Final SHA256: ${finalSha}`;
+    } else if (waiting > 0) {
+      const noun = waiting === 1 ? 'signer' : 'signers';
+      message = `You're all set. Waiting on ${waiting} ${noun} before sealing.`;
+    }
+    setCompletion({
+      message,
+      sealed,
+      waitingOn: waiting,
+      status: sealed ? 'sealed' : waiting > 0 ? 'waiting' : 'completed',
+      sha: finalSha,
+    });
+    setStatusMessage(message);
+  }, [data?.signer?.status, data?.final_artifact?.sha256_final, data?.waiting_on]);
+
   const handleFieldChange = (field: any, value: any) => {
     const key = String(field.id);
     setFieldValues((prev) => ({
@@ -146,6 +178,7 @@ export default function SignPage() {
     data?.envelope?.name ||
     data?.document?.filename ||
     'Document';
+  const showFinalPdf = Boolean((completion && completion.sealed) || data?.final_artifact?.sha256_final);
 
   const hasMissingRequired = useMemo(() => {
     return fields.some((field: any) => {
@@ -167,6 +200,7 @@ export default function SignPage() {
       error={pdfError}
       fields={fields}
       values={fieldValues}
+      renderOverlays={!showFinalPdf}
     />
   ) : (
     <div style={{ flex: 1, padding: 24 }}>
@@ -377,6 +411,7 @@ function PdfSigningSurface({
   values,
   onChange,
   mode = 'edit',
+  renderOverlays = true,
 }: {
   pages: PageRender[];
   loading: boolean;
@@ -385,6 +420,7 @@ function PdfSigningSurface({
   values: Record<string, any>;
   onChange: (field: any, value: any) => void;
   mode?: 'edit' | 'view';
+  renderOverlays?: boolean;
 }) {
   if (error) {
     return <div style={{ marginTop: 16, color: 'red' }}>Failed to load PDF: {error}</div>;
@@ -402,16 +438,17 @@ function PdfSigningSurface({
             style={{ position: 'relative', width: page.width, margin: '0 auto', boxShadow: '0 10px 25px rgba(15,23,42,0.1)' }}
           >
             <img src={page.dataUrl} alt={`Page ${page.pageIndex + 1}`} style={{ width: '100%', display: 'block' }} />
-            {pageFields.map((field) => (
-              <FieldOverlay
-                key={field.id}
-                field={field}
-                pageMeta={page}
-                value={values[String(field.id)]?.value}
-                onChange={onChange}
-                mode={mode}
-              />
-            ))}
+            {renderOverlays &&
+              pageFields.map((field) => (
+                <FieldOverlay
+                  key={field.id}
+                  field={field}
+                  pageMeta={page}
+                  value={values[String(field.id)]?.value}
+                  onChange={onChange}
+                  mode={mode}
+                />
+              ))}
           </div>
         );
       })}
@@ -701,6 +738,7 @@ function CompletionView({
   error,
   fields,
   values,
+  renderOverlays = true,
 }: {
   info: CompletionResult;
   pages: PageRender[];
@@ -708,6 +746,7 @@ function CompletionView({
   error: string | null;
   fields: any[];
   values: Record<string, any>;
+  renderOverlays?: boolean;
 }) {
   return (
     <div style={{ flex: 1, padding: 24 }}>
@@ -729,6 +768,7 @@ function CompletionView({
             values={values}
             onChange={() => {}}
             mode="view"
+            renderOverlays={renderOverlays}
           />
         </section>
         <aside
@@ -747,7 +787,7 @@ function CompletionView({
           <div>
             <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Status</p>
             <strong style={{ fontSize: 18 }}>
-              {info.sealed ? 'All parties signed' : info.status === 'waiting' ? 'Waiting for others' : 'Submitted'}
+              {info.sealed ? 'All parties signed' : info.status === 'waiting' ? 'Waiting for others' : 'Completed'}
             </strong>
           </div>
           <p style={{ fontSize: 14, color: '#0f172a', lineHeight: 1.5 }}>{info.message}</p>

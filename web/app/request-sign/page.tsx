@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, PointerEvent as ReactPointerEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import ProjectsPage from '../projects/page';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
 
@@ -39,12 +40,6 @@ type PageRender = {
   baseHeight: number;
 };
 
-type DevMagicLink = {
-  signer: { id: number; name: string; email: string };
-  link: string;
-  token: string;
-};
-
 type ProjectSummary = {
   id: number;
   name: string;
@@ -57,6 +52,16 @@ type ProjectInvestor = {
   role: string;
   routing_order: number;
   units_invested: number;
+};
+
+type EnvelopeDetail = {
+  id: number;
+  subject: string;
+  message: string;
+  document?: { id: number; filename: string };
+  signers: Array<{ id: number; name: string; email: string; role: string; routing_order: number }>;
+  requester_name?: string | null;
+  requester_email?: string | null;
 };
 
 
@@ -90,6 +95,7 @@ const createSigner = (order: number): SignerForm => ({
 
 export default function RequestSignPage() {
   const baseApi = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const router = useRouter();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
@@ -118,8 +124,17 @@ export default function RequestSignPage() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState<string | null>(null);
-  const [magicLinks, setMagicLinks] = useState<DevMagicLink[]>([]);
+  const [confirmEnvelopeId, setConfirmEnvelopeId] = useState<number | null>(null);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmDrawerOpen, setConfirmDrawerOpen] = useState(false);
+  const [confirmDetail, setConfirmDetail] = useState<EnvelopeDetail | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmSending, setConfirmSending] = useState(false);
+  const [requesterName, setRequesterName] = useState('');
+  const [requesterEmail, setRequesterEmail] = useState('');
+  const readyToReview = Boolean(documentInfo && fields.length > 0);
   const defaultFieldRole = 'Investor';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<null | {
@@ -197,6 +212,45 @@ useEffect(() => {
     setProjectInvestors([]);
   }
 }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (!confirmVisible) {
+      setConfirmDrawerOpen(false);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setConfirmDrawerOpen(true));
+    return () => cancelAnimationFrame(raf);
+  }, [confirmVisible]);
+
+  useEffect(() => {
+    if (!confirmEnvelopeId || !confirmVisible) return;
+    let cancelled = false;
+    setConfirmLoading(true);
+    setConfirmError(null);
+    setConfirmDetail(null);
+    fetch(`${baseApi}/api/envelopes/${confirmEnvelopeId}`)
+      .then((resp) => {
+        if (!resp.ok) throw new Error(`Unable to load envelope (${resp.status})`);
+        return resp.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setConfirmDetail(data);
+        setConfirmMessage(data.message ?? '');
+        setSubject((prev) => (data.subject !== undefined && data.subject !== null ? data.subject : prev));
+        setRequesterName((prev) => (data.requester_name !== undefined && data.requester_name !== null ? data.requester_name : prev));
+        setRequesterEmail((prev) => (data.requester_email !== undefined && data.requester_email !== null ? data.requester_email : prev));
+      })
+      .catch((err) => {
+        if (!cancelled) setConfirmError(err instanceof Error ? err.message : 'Failed to load envelope');
+      })
+      .finally(() => {
+        if (!cancelled) setConfirmLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [confirmEnvelopeId, confirmVisible, baseApi]);
 
   useEffect(() => {
     setFields((prev) => prev.map((field) => ({ ...field, role: field.role || defaultFieldRole })));
@@ -536,6 +590,51 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
   };
 
 
+  const closeConfirmPanel = () => {
+    setConfirmDrawerOpen(false);
+    setTimeout(() => {
+      setConfirmVisible(false);
+      setConfirmEnvelopeId(null);
+      setConfirmDetail(null);
+      setConfirmError(null);
+      setConfirmLoading(false);
+      setConfirmMessage('');
+      setConfirmSending(false);
+    }, 320);
+  };
+
+  const sendConfirmedEnvelope = async () => {
+    if (!confirmEnvelopeId) return;
+    if (!requesterName.trim() || !requesterEmail.trim()) {
+      setConfirmError('Provide your name and email so recipients know who invited them.');
+      return;
+    }
+    setConfirmSending(true);
+    setConfirmError(null);
+    try {
+      const resp = await fetch(`${baseApi}/api/envelopes/${confirmEnvelopeId}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject,
+          message: confirmMessage,
+          requester_name: requesterName.trim(),
+          requester_email: requesterEmail.trim(),
+        }),
+      });
+      if (!resp.ok) {
+        const detail = await safeParseError(resp);
+        throw new Error(detail || 'Failed to send envelope');
+      }
+      closeConfirmPanel();
+      router.push(`/request-sign/sent/${confirmEnvelopeId}`);
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : 'Failed to send envelope');
+    } finally {
+      setConfirmSending(false);
+    }
+  };
+
   const submitEnvelope = async () => {
     const fieldPayload = buildFieldPayload();
     const projectNumeric = selectedProjectId;
@@ -576,9 +675,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       return;
     }
     setSubmitting(true);
-    setSubmissionStatus('Creating envelope…');
     setError(null);
-    setMagicLinks([]);
     try {
       const createResp = await fetch(`${baseApi}/api/envelopes`, {
         method: 'POST',
@@ -604,33 +701,12 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         throw new Error(detail || `Create envelope failed (${createResp.status})`);
       }
       const created = await createResp.json();
-      setSubmissionStatus(`Envelope ${created.id} created. Sending…`);
-
-      const sendResp = await fetch(`${baseApi}/api/envelopes/${created.id}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      if (!sendResp.ok) {
-        const detail = await safeParseError(sendResp);
-        throw new Error(detail || 'Failed to send envelope');
-      }
-
-      const linksResp = await fetch(`${baseApi}/api/envelopes/${created.id}/dev-magic-links`);
-      if (!linksResp.ok) {
-        const detail = await safeParseError(linksResp);
-        throw new Error(detail || 'Failed to fetch magic links');
-      }
-      const linksJson = await linksResp.json();
-      const withToken = (linksJson.links || []).map((entry: DevMagicLink) => {
-        const token = entry.link.split('/').pop() || '';
-        return { ...entry, token };
-      });
-      setMagicLinks(withToken);
-      setSubmissionStatus('Envelope sent. Magic link ready below.');
+      setConfirmEnvelopeId(created.id);
+      setConfirmMessage(message);
+      setConfirmVisible(true);
+      return;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit envelope');
-      setSubmissionStatus(null);
     } finally {
       setSubmitting(false);
     }
@@ -671,12 +747,8 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Active document</p>
           <strong style={{ fontSize: 18 }}>{documentLabel}</strong>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Project</p>
-          <strong style={{ fontSize: 16 }}>{projectLabel(selectedProjectId, projects)}</strong>
-        </div>
       </header>
-      <div style={{ flex: 1, padding: 24 }}>
+      <div style={{ flex: 1, padding: 24, paddingBottom: 140 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, alignItems: 'flex-start' }}>
           <section
             style={{
@@ -816,9 +888,8 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
       <section style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, background: '#fff' }}>
-          <h3>Document setup</h3>
+          <h3>Project</h3>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 12 }}>
-            <span style={{ fontSize: 12 }}>Project</span>
             <select
               value={selectedProjectId ?? ''}
               onChange={(event) => {
@@ -970,66 +1041,44 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           )}
         </div>
 
-        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, background: '#fff', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h3>Envelope settings</h3>
-          <label style={{ display: 'block', fontSize: 12 }}>Subject</label>
-          <input
-            type="text"
-            value={subject}
-            onChange={(event) => setSubject(event.target.value)}
-            style={{ width: '100%', padding: 6 }}
-            placeholder="Subject line (defaults to document name)"
-          />
-          <div>
-            <button type="button" onClick={exportFields} disabled={!fields.length}>
-              Generate JSON
-            </button>
-            <button type="button" onClick={copyExport} disabled={!exportJson} style={{ marginLeft: 8 }}>
-              Copy JSON
-            </button>
-          </div>
-          <pre style={{ marginTop: 4, maxHeight: 200, overflow: 'auto', background: '#f5f5f5', padding: 12 }}>
-            {exportJson || '// Generated field JSON will appear here'}
-          </pre>
-          {submissionStatus && <p style={{ marginTop: 4, color: '#2563eb' }}>{submissionStatus}</p>}
-          {!!magicLinks.length && (
-            <div style={{ marginTop: 4 }}>
-              <p>Magic links (debug only):</p>
-              <ul style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {magicLinks.map((entry) => (
-                  <li key={entry.signer.id} style={{ border: '1px solid #ddd', borderRadius: 6, padding: 8 }}>
-                    <strong>{entry.signer.name}</strong> —{' '}
-                    <a href={entry.link} target="_blank" rel="noreferrer">
-                      {entry.link}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div
-            style={{
-              position: 'sticky',
-              bottom: 16,
-              background: '#fff',
-              paddingTop: 12,
-              borderTop: '1px solid #eee',
-              display: 'flex',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <button
-              type="button"
-              onClick={submitEnvelope}
-              disabled={submitting || !documentInfo || !fields.length}
-              style={{ padding: '10px 20px' }}
-            >
-              {submitting ? 'Submitting…' : 'Finish And Send'}
-            </button>
-          </div>
-        </div>
       </section>
-        </div>
+    </div>
+  </div>
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: 'rgba(248,250,252,0.95)',
+          borderTop: '1px solid #e5e7eb',
+          padding: '16px 32px',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 12,
+          zIndex: 60,
+          backdropFilter: 'blur(4px)',
+        }}
+      >
+        <button
+          type="button"
+          onClick={submitEnvelope}
+          disabled={submitting || !readyToReview}
+          style={{
+            background: submitting || !readyToReview ? '#cbd5f5' : '#2563eb',
+            color: submitting || !readyToReview ? '#64748b' : '#fff',
+            border: 'none',
+            borderRadius: 999,
+            padding: '14px 32px',
+            fontSize: 16,
+            fontWeight: 600,
+            cursor: submitting || !readyToReview ? 'not-allowed' : 'pointer',
+            opacity: submitting ? 0.85 : 1,
+            boxShadow: submitting || !readyToReview ? 'none' : '0 15px 35px rgba(37,99,235,0.35)',
+          }}
+        >
+          {submitting ? 'Preparing…' : 'Review & Send'}
+        </button>
       </div>
       {dragPreview && (
         <div
@@ -1111,6 +1160,239 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           </div>
         </div>
       )}
+      {confirmVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            backdropFilter: 'blur(2px)',
+            zIndex: 120,
+            display: 'flex',
+            justifyContent: 'flex-end',
+          }}
+          onClick={closeConfirmPanel}
+        >
+          <div
+            style={{
+              width: 'min(720px, 50vw)',
+              height: '100%',
+              background: '#f8fafc',
+              boxShadow: '-10px 0 30px rgba(15,23,42,0.25)',
+              transform: confirmDrawerOpen ? 'translateX(0)' : 'translateX(100%)',
+              transition: 'transform 0.35s ease',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header
+              style={{
+                padding: '18px 28px',
+                borderBottom: '1px solid #e5e7eb',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: '#fff',
+              }}
+            >
+              <div>
+                <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Document</p>
+                <strong style={{ fontSize: 20 }}>
+                  {confirmDetail?.document?.filename || documentInfo?.filename || 'Envelope review'}
+                </strong>
+              </div>
+              <button
+                type="button"
+                onClick={closeConfirmPanel}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#6b7280',
+                  fontSize: 24,
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                }}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </header>
+            <div style={{ flex: 1, padding: 28, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {confirmError && (
+                <div style={{ padding: 12, borderRadius: 8, background: '#fee2e2', color: '#991b1b' }}>{confirmError}</div>
+              )}
+              {confirmLoading || !confirmDetail ? (
+                <p>Loading details…</p>
+              ) : (
+                <>
+                  <section
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 12,
+                      padding: 20,
+                      background: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                    }}
+                  >
+                <div>
+                  <label htmlFor="confirm-subject" style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                    Subject
+                  </label>
+                  <input
+                    id="confirm-subject"
+                    type="text"
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    style={{
+                      width: '100%',
+                      border: '1px solid #cbd5f5',
+                      borderRadius: 8,
+                      padding: '8px 10px',
+                      fontSize: 14,
+                    }}
+                    placeholder="Subject line"
+                  />
+                </div>
+                <div>
+                  <p style={{ margin: '8px 0 4px', fontSize: 12, color: '#6b7280' }}>Recipients</p>
+                  <p style={{ fontSize: 13, color: '#475569', margin: '0 0 8px' }}>Please review signers before sending.</p>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {confirmDetail.signers.map((signer) => (
+                          <div
+                            key={signer.id}
+                            style={{
+                              border: '1px solid #e5e7eb',
+                              borderRadius: 10,
+                              padding: 12,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <div>
+                              <strong style={{ display: 'block' }}>{signer.name}</strong>
+                              <span style={{ fontSize: 13, color: '#475569' }}>{signer.email}</span>
+                            </div>
+                            <span style={{ fontSize: 12, color: '#94a3b8' }}>Order {signer.routing_order}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                  <section
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 12,
+                      padding: 20,
+                      background: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 16,
+                    }}
+                  >
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Your name</label>
+                  <input
+                    type="text"
+                    value={requesterName}
+                    onChange={(event) => setRequesterName(event.target.value)}
+                    placeholder="e.g. Alex Chen"
+                    required
+                    style={{
+                      width: '100%',
+                      border: '1px solid #cbd5f5',
+                      borderRadius: 8,
+                      padding: '8px 10px',
+                      marginBottom: 12,
+                      borderColor: !requesterName.trim() ? '#f87171' : '#cbd5f5',
+                    }}
+                  />
+                  <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Your email</label>
+                  <input
+                    type="email"
+                    value={requesterEmail}
+                    onChange={(event) => setRequesterEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    style={{
+                      width: '100%',
+                      border: '1px solid #cbd5f5',
+                      borderRadius: 8,
+                      padding: '8px 10px',
+                      marginBottom: 12,
+                      borderColor: !requesterEmail.trim() ? '#f87171' : '#cbd5f5',
+                    }}
+                  />
+                  <label htmlFor="confirm-message" style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                    Email message
+                  </label>
+                  <textarea
+                    id="confirm-message"
+                        value={confirmMessage}
+                        onChange={(event) => setConfirmMessage(event.target.value)}
+                        rows={6}
+                        style={{
+                          width: '100%',
+                          border: '1px solid #cbd5f5',
+                          borderRadius: 8,
+                          padding: 10,
+                          resize: 'vertical',
+                          background: '#f8fafc',
+                        }}
+                        placeholder="Add a custom note for recipients…"
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                      <button
+                        type="button"
+                        onClick={closeConfirmPanel}
+                        disabled={confirmSending}
+                        style={{
+                          border: '1px solid #cbd5f5',
+                          background: '#fff',
+                          color: '#1f2937',
+                          borderRadius: 999,
+                          padding: '12px 26px',
+                          fontSize: 15,
+                          cursor: confirmSending ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={sendConfirmedEnvelope}
+                        disabled={confirmSending}
+                        style={{
+                          background: '#2563eb',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 999,
+                          padding: '14px 32px',
+                          fontSize: 16,
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          cursor: confirmSending ? 'not-allowed' : 'pointer',
+                          opacity: confirmSending ? 0.7 : 1,
+                        }}
+                      >
+                        {confirmSending && <Spinner />}
+                        {confirmSending ? 'Sending…' : 'Submit'}
+                      </button>
+                    </div>
+                  </section>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1140,4 +1422,28 @@ async function safeParseError(response: Response) {
     // ignore
   }
   return null;
+}
+
+function Spinner() {
+  return (
+    <>
+      <span
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: '50%',
+          border: '2px solid rgba(255,255,255,0.5)',
+          borderTopColor: '#fff',
+          display: 'inline-block',
+          animation: 'spinner-rotate 0.9s linear infinite',
+        }}
+      />
+      <style>{`
+        @keyframes spinner-rotate {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </>
+  );
 }

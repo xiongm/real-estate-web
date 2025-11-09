@@ -18,7 +18,12 @@ type ProjectInvestor = {
   routing_order: number;
 };
 
-export default function ProjectsPage() {
+type ProjectsPageProps = {
+  onAnyChange?: () => void;
+  initialProjectId?: number | null;
+};
+
+export default function ProjectsPage({ onAnyChange, initialProjectId }: ProjectsPageProps) {
   const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -33,6 +38,10 @@ export default function ProjectsPage() {
     refreshProjects();
   }, []);
 
+  const signalChange = () => {
+    onAnyChange?.();
+  };
+
   const refreshProjects = async () => {
     setLoadingProjects(true);
     setError(null);
@@ -41,8 +50,13 @@ export default function ProjectsPage() {
       if (!resp.ok) throw new Error(`Failed to load projects (${resp.status})`);
       const list = await resp.json();
       setProjects(list || []);
-      if (list?.length && !selectedProject) {
-        selectProject(list[0]);
+      if (list?.length) {
+        const match = initialProjectId ? list.find((project) => project.id === initialProjectId) : null;
+        if (match) {
+          selectProject(match);
+        } else if (!selectedProject) {
+          selectProject(list[0]);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load projects');
@@ -84,6 +98,7 @@ export default function ProjectsPage() {
       if (!resp.ok) throw new Error(`Create project failed (${resp.status})`);
       setNewProject({ name: '', tenantId: newProject.tenantId });
       await refreshProjects();
+      signalChange();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project');
     }
@@ -115,12 +130,43 @@ export default function ProjectsPage() {
       }
       setNewInvestor({ name: '', email: '', units: 0 });
       await refreshInvestors(selectedProject.id);
+      signalChange();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create investor');
     } finally {
       setLoadingInvestors(false);
     }
   };
+
+  const handleInvestorDelete = async (investorId: number) => {
+    if (!selectedProject) return;
+    const confirmed = window.confirm('Remove this investor from the project?');
+    if (!confirmed) return;
+    try {
+      setLoadingInvestors(true);
+      const resp = await fetch(`${base}/api/projects/${selectedProject.id}/investors/${investorId}`, {
+        method: 'DELETE',
+      });
+      if (!resp.ok) {
+        const detail = await resp.text();
+        throw new Error(detail || 'Failed to delete investor');
+      }
+      await refreshInvestors(selectedProject.id);
+      signalChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete investor');
+    } finally {
+      setLoadingInvestors(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!initialProjectId || !projects.length) return;
+    const match = projects.find((project) => project.id === initialProjectId);
+    if (match && match.id !== selectedProject?.id) {
+      selectProject(match);
+    }
+  }, [initialProjectId, projects]);
 
   return (
     <main style={{ display: 'flex', gap: 24 }}>
@@ -157,8 +203,6 @@ export default function ProjectsPage() {
                   }}
                 >
                   {project.name}
-                  <br />
-                  <small>Tenant #{project.tenant_id}</small>
                 </button>
               </li>
             ))}
@@ -189,10 +233,11 @@ export default function ProjectsPage() {
               />
               <input
                 type="number"
-                placeholder="Units"
+                placeholder="Units (e.g. 10000)"
                 value={newInvestor.units}
                 onChange={(e) => setNewInvestor((prev) => ({ ...prev, units: Number(e.target.value) }))}
-                style={{ width: 120, padding: 6 }}
+                style={{ width: 120, padding: 6, MozAppearance: 'textfield' }}
+                className="no-spinner"
               />
               <button type="button" onClick={handleInvestorCreate} disabled={loadingInvestors}>
                 + Add investor
@@ -210,6 +255,7 @@ export default function ProjectsPage() {
                     <th>Email</th>
                     <th>Units</th>
                     <th>Role</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -219,6 +265,11 @@ export default function ProjectsPage() {
                       <td>{inv.email}</td>
                       <td>{inv.units_invested}</td>
                       <td>{inv.role}</td>
+                      <td>
+                        <button type="button" onClick={() => handleInvestorDelete(inv.id)} style={{ color: '#b91c1c' }}>
+                          Remove
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -228,6 +279,16 @@ export default function ProjectsPage() {
         )}
       </section>
       {error && <p style={{ color: 'red', position: 'fixed', bottom: 12, right: 24 }}>{error}</p>}
+      <style jsx>{`
+        .no-spinner::-webkit-outer-spin-button,
+        .no-spinner::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .no-spinner {
+          -moz-appearance: textfield;
+        }
+      `}</style>
     </main>
   );
 }

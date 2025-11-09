@@ -24,3 +24,9 @@ def get_bytes(key: str) -> bytes:
     resp.close()
     resp.release_conn()
     return data
+
+def delete_object(key: str):
+    try:
+        _client.remove_object(MINIO_BUCKET, key)
+    except Exception:
+        pass

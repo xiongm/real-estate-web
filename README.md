@@ -28,14 +28,24 @@ Services:
 - MinIO: http://localhost:9001 (console; user/pass from .env)
 - Postgres: localhost:5432
 - Redis: localhost:6379
+- Tests: `docker compose run --rm api-tests`
 
 ## Workflow
-1. **Manage projects:** Use the API (`/api/projects`) or the web UI at `http://localhost:3000/projects` to create projects. This page also lets you manage each project’s investors (name, email, units invested, routing order, etc.).
+1. **Manage projects:** Use the Admin sidebar inside the web app or the API (`/api/projects`) to create projects. Investor management now lives exclusively in Admin; the request-sign builder is read-only and simply reflects the investors tied to the currently selected project.
 2. **Upload documents:** Call `POST /api/projects/{id}/documents` (or use whatever admin UI you build) to upload PDFs into MinIO for that project.
 3. **Design envelopes:** Open `http://localhost:3000/request-sign`, select a project, and the builder will pull its investors. Upload/preview the PDF, drag fields onto the document, and assign each field to one of the project investors. The tool auto-builds the signer list from those assignments—no need to re-enter emails per envelope.
 4. **Send envelopes:** From the request-sign page, hit “Submit envelope & send.” This creates the envelope, sends the magic links (currently logged in the API), and shows you the links for debugging.
 5. **Sign:** Investors use `http://localhost:3000/sign/<token>`. They must check the consent box, fill the assigned fields only, and submit. The backend stores each signer’s data and seals the PDF once everyone finishes.
 6. **Retrieve final PDFs:** Download the sealed PDF and audit JSON via `GET /api/envelopes/{id}/artifact` (or directly from MinIO). The worker stamps each investor’s fields and appends the certificate page summarizing the audit trail.
+
+## Testing (Docker workflow)
+Run the API test suite inside the same image the service uses:
+
+```bash
+docker compose run --rm api-tests
+```
+
+This spins up the API image, runs `pytest`, and exits. The tests mock MinIO and use an isolated SQLite DB, so nothing persists between runs.
 
 ## Python stamper
 We use `reportlab` to paint visible content (text/checkbox/signature PNG) onto a PDF page overlay, then `pypdf` to merge with the original. Certificate page is generated via `reportlab` and appended.

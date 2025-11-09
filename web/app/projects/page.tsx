@@ -31,7 +31,6 @@ export default function ProjectsPage({ onAnyChange, initialProjectId }: Projects
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingInvestors, setLoadingInvestors] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [newProject, setNewProject] = useState({ name: '', tenantId: 1 });
   const [newInvestor, setNewInvestor] = useState({ name: '', email: '', units: 0 });
 
   useEffect(() => {
@@ -82,25 +81,6 @@ export default function ProjectsPage({ onAnyChange, initialProjectId }: Projects
       setError(err instanceof Error ? err.message : 'Failed to load investors');
     } finally {
       setLoadingInvestors(false);
-    }
-  };
-
-  const handleProjectCreate = async () => {
-    if (!newProject.name.trim()) {
-      setError('Project name required');
-      return;
-    }
-    setError(null);
-    try {
-      const resp = await fetch(`${base}/api/projects?name=${encodeURIComponent(newProject.name)}&tenant_id=${newProject.tenantId}`, {
-        method: 'POST',
-      });
-      if (!resp.ok) throw new Error(`Create project failed (${resp.status})`);
-      setNewProject({ name: '', tenantId: newProject.tenantId });
-      await refreshProjects();
-      signalChange();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create project');
     }
   };
 
@@ -171,43 +151,21 @@ export default function ProjectsPage({ onAnyChange, initialProjectId }: Projects
   return (
     <main style={{ display: 'flex', gap: 24 }}>
       <section style={{ flex: '0 0 280px', borderRight: '1px solid #eee', paddingRight: 16 }}>
-        <h2>Projects</h2>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <input
-            type="text"
-            placeholder="Project name"
-            value={newProject.name}
-            onChange={(e) => setNewProject((prev) => ({ ...prev, name: e.target.value }))}
-            style={{ flex: '1 1 auto', padding: 6 }}
-          />
-          <button type="button" onClick={handleProjectCreate}>
-            + Create
-          </button>
-        </div>
+        <h2>Project</h2>
         {loadingProjects ? (
-          <p>Loading projects…</p>
+          <p>Loading project…</p>
+        ) : selectedProject ? (
+          <div style={{ lineHeight: 1.6 }}>
+            <p style={{ margin: 0 }}><strong>Name:</strong> {selectedProject.name}</p>
+            <p style={{ margin: 0 }}><strong>ID:</strong> #{selectedProject.id}</p>
+            {selectedProject.status && <p style={{ margin: 0 }}><strong>Status:</strong> {selectedProject.status}</p>}
+          </div>
         ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {projects.map((project) => (
-              <li key={project.id} style={{ marginBottom: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => selectProject(project)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: selectedProject?.id === project.id ? '2px solid #2563eb' : '1px solid #ccc',
-                    borderRadius: 6,
-                    background: selectedProject?.id === project.id ? '#e0e7ff' : '#fff',
-                  }}
-                >
-                  {project.name}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <p>No project selected.</p>
         )}
+        <p style={{ marginTop: 16, fontSize: 13, color: '#606060' }}>
+          Projects are managed in Admin. This panel only shows investors for the active project.
+        </p>
       </section>
 
       <section style={{ flex: '1 1 auto' }}>

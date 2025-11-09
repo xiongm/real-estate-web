@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, PointerEvent as ReactPointerEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import ProjectsPage from '../projects/page';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
 
@@ -80,16 +80,16 @@ const FIELD_LABELS: Record<FieldType, string> = {
 };
 
 const palette = {
-  pageBackground: 'linear-gradient(130deg, #eef2ff 0%, #f8fafc 50%, #ffffff 100%)',
-  headerBackground: 'rgba(255,255,255,0.92)',
+  pageBackground: 'linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #111827 100%)',
+  headerBackground: 'rgba(15,23,42,0.95)',
   headerBorder: '1px solid rgba(148,163,184,0.35)',
-  cardBorder: '1px solid rgba(148,163,184,0.35)',
-  cardShadow: '0 25px 45px rgba(15,23,42,0.12)',
-  cardSurface: 'linear-gradient(145deg, #ffffff 0%, #f5f8ff 100%)',
-  accent: '#2563eb',
-  accentMuted: '#a5b4fc',
-  textSubtle: '#6b7280',
-  textStrong: '#0f172a',
+  cardBorder: '1px solid rgba(248,250,252,0.08)',
+  cardShadow: '0 25px 45px rgba(0,0,0,0.35)',
+  cardSurface: 'rgba(15,23,42,0.85)',
+  accent: '#38bdf8',
+  accentMuted: '#94a3b8',
+  textSubtle: '#cbd5f5',
+  textStrong: '#f8fafc',
 };
 
 const randomId = () =>
@@ -109,9 +109,10 @@ const createSigner = (order: number): SignerForm => ({
 export default function RequestSignPage() {
   const baseApi = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [projectParamError, setProjectParamError] = useState<string | null>(null);
   const [projectInvestors, setProjectInvestors] = useState<ProjectInvestor[]>([]);
   const [investorsLoading, setInvestorsLoading] = useState(false);
   const [documentInfo, setDocumentInfo] = useState<{ id: number; filename: string } | null>(null);
@@ -148,6 +149,9 @@ export default function RequestSignPage() {
   const [requesterName, setRequesterName] = useState('');
   const [requesterEmail, setRequesterEmail] = useState('');
   const readyToReview = Boolean(documentInfo && fields.length > 0);
+  const activeProject = selectedProjectId ? projects.find((project) => project.id === selectedProjectId) ?? null : null;
+  const activeProjectName = activeProject?.name || (selectedProjectId ? `Project #${selectedProjectId}` : 'No project selected');
+  const canUploadDocument = Boolean(selectedProjectId && !projectParamError);
   const defaultFieldRole = 'Investor';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<null | {
@@ -180,27 +184,39 @@ export default function RequestSignPage() {
     };
   }, []);
 
-const refreshProjects = async () => {
-  setProjectsLoading(true);
-  try {
-    const resp = await fetch(`${baseApi}/api/projects`);
-    if (!resp.ok) throw new Error(`Failed to load projects (${resp.status})`);
+  const refreshProjects = async () => {
+    try {
+      const resp = await fetch(`${baseApi}/api/projects`);
+      if (!resp.ok) throw new Error(`Failed to load projects (${resp.status})`);
       const list = await resp.json();
       setProjects(list || []);
-      if (list?.length && !selectedProjectId) {
-        setSelectedProjectId(list[0].id);
-      }
     } catch (err) {
       console.warn('project load failed', err);
       setError(err instanceof Error ? err.message : 'Failed to load projects');
-    } finally {
-      setProjectsLoading(false);
-  }
-};
+    }
+  };
 
-useEffect(() => {
-  refreshProjects();
-}, [baseApi]);
+  useEffect(() => {
+    refreshProjects();
+  }, [baseApi]);
+
+  const projectParam = searchParams.get('project');
+
+  useEffect(() => {
+    if (!projectParam) {
+      setProjectParamError('Open Request Sign using a project link from Admin (missing ?project=ID).');
+      setSelectedProjectId(null);
+      return;
+    }
+    const numeric = Number(projectParam);
+    if (Number.isNaN(numeric)) {
+      setProjectParamError('Invalid project id provided in the URL.');
+      setSelectedProjectId(null);
+      return;
+    }
+    setProjectParamError(null);
+    setSelectedProjectId((prev) => (prev === numeric ? prev : numeric));
+  }, [projectParam]);
 
 const refreshInvestors = async (projectId: number) => {
   if (!projectId) return;
@@ -391,7 +407,7 @@ useEffect(() => {
   const uploadDocumentToProject = async (file: File) => {
     const projectNumeric = selectedProjectId;
     if (!projectNumeric) {
-      setError('Select a project before uploading a PDF.');
+      setError('Open Request Sign from Admin so a project is selected before uploading.');
       throw new Error('Missing project id');
     }
     setUploadingDoc(true);
@@ -431,7 +447,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
   const handleCreateInvestor = async () => {
     if (!selectedProjectId) {
-      setError('Select a project before adding investors.');
+      setError('Open Request Sign from Admin so a project is selected before adding investors.');
       return;
     }
     if (!investorForm.name.trim() || !investorForm.email.trim()) {
@@ -672,7 +688,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       })
       .filter(Boolean);
     if (!projectNumeric) {
-      setError('Select a project.');
+      setError('Open Request Sign from Admin so a project is selected.');
       return;
     }
     if (!documentInfo) {
@@ -747,6 +763,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         flexDirection: 'column',
         minHeight: '100vh',
         background: palette.pageBackground,
+        color: palette.textStrong,
       }}
     >
       <header
@@ -766,8 +783,34 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         }}
       >
         <div>
-          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Active document</p>
-          <strong style={{ fontSize: 18 }}>{documentLabel}</strong>
+          <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Active document</p>
+          <strong style={{ fontSize: 18, color: palette.textStrong }}>{documentLabel}</strong>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Project</p>
+            <strong style={{ fontSize: 18, color: palette.textStrong }}>{activeProjectName}</strong>
+            {selectedProjectId && (
+              <span style={{ display: 'block', fontSize: 12, color: palette.accentMuted }}>ID #{selectedProjectId}</span>
+            )}
+            {projectParamError && (
+              <span style={{ display: 'block', fontSize: 12, color: '#ef4444', marginTop: 4 }}>{projectParamError}</span>
+            )}
+          </div>
+          <a
+            href="/admin"
+            style={{
+              borderRadius: 999,
+              border: `1px solid ${palette.accent}`,
+              color: palette.accent,
+              padding: '8px 18px',
+              textDecoration: 'none',
+              fontWeight: 600,
+              background: 'transparent',
+            }}
+          >
+            ← Back to Admin
+          </a>
         </div>
       </header>
       <div style={{ flex: 1, padding: 32, paddingBottom: 160 }}>
@@ -786,7 +829,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           type="file"
           accept="application/pdf"
           onChange={handleFileChange}
-          disabled={!selectedProjectId || uploadingDoc}
+          disabled={!canUploadDocument || uploadingDoc}
           style={{ display: 'none' }}
         />
         {!documentInfo ? (
@@ -794,20 +837,30 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
             style={{
               marginTop: 24,
               padding: 32,
-              border: '2px dashed #cbd5ff',
-              borderRadius: 12,
+              border: `2px dashed ${palette.accent}`,
+              borderRadius: 16,
               textAlign: 'center',
-              background: '#f8fbff',
+              background: 'rgba(15,23,42,0.65)',
+              boxShadow: '0 25px 45px rgba(0,0,0,0.25)',
             }}
           >
-            <p style={{ marginBottom: 12, color: '#555' }}>
-              {selectedProjectId ? 'Upload a PDF to begin placing fields.' : 'Select a project before uploading a PDF.'}
+            <p style={{ marginBottom: 12, color: palette.accentMuted }}>
+              {projectParamError || 'Upload a PDF to begin placing fields.'}
             </p>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={!selectedProjectId || uploadingDoc}
-              style={{ padding: '10px 18px' }}
+              disabled={!canUploadDocument || uploadingDoc}
+              style={{
+                padding: '10px 22px',
+                borderRadius: 999,
+                border: 'none',
+                background: canUploadDocument ? palette.accent : 'rgba(148,163,184,0.4)',
+                color: canUploadDocument ? '#0f172a' : '#111827',
+                fontWeight: 600,
+                cursor: !canUploadDocument || uploadingDoc ? 'not-allowed' : 'pointer',
+                boxShadow: canUploadDocument ? '0 15px 35px rgba(56,189,248,0.35)' : 'none',
+              }}
             >
               {uploadingDoc ? 'Uploading…' : 'Upload PDF'}
             </button>
@@ -857,14 +910,19 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           top: field.y,
                           width: field.width,
                           height: field.height,
-                          border: field.id === selectedFieldId ? '2px solid #2563eb' : '1px solid #111',
-                          background: 'rgba(37,99,235,0.1)',
+                          border: field.id === selectedFieldId ? `2px solid ${palette.accent}` : '1px solid rgba(17,24,39,0.6)',
+                          background: 'rgba(56,189,248,0.18)',
+                          color: '#0f172a',
                           fontSize: 12,
+                          fontWeight: 600,
+                          letterSpacing: 0.2,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'move',
                           userSelect: 'none',
+                          borderRadius: 6,
+                          boxShadow: '0 6px 18px rgba(15,23,42,0.15)',
                         }}
                       >
                         <span>{field.name || FIELD_LABELS[field.type]}</span>
@@ -924,79 +982,28 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         <div
           style={{
             border: palette.cardBorder,
-            borderRadius: 18,
-            padding: 20,
+            borderRadius: 24,
+            padding: 24,
             background: palette.cardSurface,
-            boxShadow: palette.cardShadow,
-          }}
-        >
-          <h3>Project</h3>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 12 }}>
-            <select
-              value={selectedProjectId ?? ''}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value === '__add__') {
-                  setShowProjectsModal(true);
-                  event.currentTarget.value = selectedProjectId?.toString() ?? '';
-                  return;
-                }
-                setSelectedProjectId(value ? Number(value) : null);
-              }}
-              style={{ padding: 6 }}
-            >
-              <option value="" disabled>
-                {projectsLoading ? 'Loading projects…' : 'Select a project'}
-              </option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name} (#{project.id})
-                </option>
-              ))}
-              <option value="__add__" style={{ fontStyle: 'italic', fontWeight: 'bold' }}>
-                ➕ Add new project…
-              </option>
-            </select>
-          </label>
-          <p style={{ marginTop: 12, fontSize: 13, color: '#555' }}>
-            PDFs upload into <strong>{projectLabel(selectedProjectId, projects)}</strong>. Use the button in the canvas to pick a file.
-          </p>
-          {documentInfo && (
-            <p style={{ marginTop: 4, fontSize: 13 }}>
-              Active document: <strong>{documentInfo.filename}</strong> (id {documentInfo.id})
-            </p>
-          )}
-          {(loadingPdf || uploadingDoc) && <p style={{ color: '#2563eb', marginTop: 8 }}>Processing PDF…</p>}
-          {error && <p style={{ color: 'red', marginTop: 8 }}>{error}</p>}
-        </div>
-
-        <div
-          style={{
-            border: palette.cardBorder,
-            borderRadius: 18,
-            padding: 20,
-            background: '#fff',
             display: 'flex',
             flexDirection: 'column',
-            gap: 12,
+            gap: 16,
             boxShadow: palette.cardShadow,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h3 style={{ margin: 0 }}>Investors</h3>
-              <p style={{ fontSize: 12, color: '#777', margin: 4 }}>Drag a signer’s field onto the PDF to place it.</p>
+              <h3 style={{ margin: 0, color: palette.textStrong }}>Investors</h3>
+              <p style={{ fontSize: 12, color: palette.accentMuted, margin: 4 }}>
+                Drag a signer’s field onto the PDF to place it.
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowProjectsModal(true)}
-              style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}
-            >
-              Add Investor
-            </button>
           </div>
+          <p style={{ fontSize: 12, color: palette.accentMuted, margin: '0 0 8px' }}>
+            Add or edit investors from the Admin → Projects page.
+          </p>
           {!projectInvestors.length ? (
-            <p style={{ fontSize: 13, color: '#555' }}>Add investors to this project before placing any fields.</p>
+            <p style={{ fontSize: 13, color: palette.accentMuted }}>Add investors to this project before placing any fields.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {projectInvestors.map((investor) => {
@@ -1010,52 +1017,52 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   <div
                     key={investor.id}
                     style={{
-                      border: `1px dashed ${isSelectedInvestor ? '#2563eb' : '#e5e7eb'}`,
-                      borderRadius: 8,
-                      padding: 12,
-                      background: isSelectedInvestor ? 'rgba(37,99,235,0.05)' : '#fff',
+                      border: isSelectedInvestor ? `1px solid ${palette.accent}` : '1px solid rgba(148,163,184,0.3)',
+                      borderRadius: 14,
+                      padding: 14,
+                      background: isSelectedInvestor ? 'rgba(56,189,248,0.08)' : 'rgba(15,23,42,0.6)',
                       transition: 'border-color 0.2s ease, background 0.2s ease',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span
                           style={{
-                            width: 28,
-                            height: 28,
+                            width: 32,
+                            height: 32,
                             borderRadius: '50%',
-                          background: '#e0e7ff',
-                          color: '#1e3a8a',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 600,
-                          fontSize: 13,
-                        }}
-                      >
-                        {avatarLetter}
-                      </span>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <strong style={{ fontSize: 13 }}>{investor.name}</strong>
-                        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280' }}>
-                          {investor.email}
-                          {typeof investor.units_invested === 'number' && (
-                            <span style={{ marginLeft: 6, fontSize: 12, color: '#94a3b8' }}>
-                              · {investor.units_invested} units
-                            </span>
-                          )}
-                        </p>
+                            background: 'rgba(56,189,248,0.15)',
+                            color: palette.accent,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 600,
+                            fontSize: 14,
+                          }}
+                        >
+                          {avatarLetter}
+                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <strong style={{ fontSize: 14, color: palette.textStrong }}>{investor.name}</strong>
+                          <p style={{ margin: '2px 0 0', fontSize: 12, color: palette.accentMuted }}>
+                            {investor.email}
+                            {typeof investor.units_invested === 'number' && (
+                              <span style={{ marginLeft: 6, fontSize: 12, color: palette.accentMuted }}>
+                                · {investor.units_invested} units
+                              </span>
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </div>
                       <button
                         type="button"
                         onClick={() => toggleInvestorExpansion(investor.id)}
                         style={{
-                          border: '1px solid #cbd5f5',
-                          background: '#f1f5ff',
-                          color: '#1d4ed8',
-                          borderRadius: 6,
-                          padding: '4px 10px',
+                          border: '1px solid rgba(148,163,184,0.4)',
+                          background: 'rgba(148,163,184,0.15)',
+                          color: palette.textStrong,
+                          borderRadius: 999,
+                          padding: '4px 12px',
                           fontSize: 12,
                           cursor: 'pointer',
                         }}
@@ -1074,10 +1081,11 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                               type="button"
                               onPointerDown={(event) => beginToolDrag(event, value as FieldType, investor)}
                               style={{
-                                padding: '6px 10px',
-                                borderRadius: 6,
-                                border: isActive ? '2px solid #2563eb' : '1px solid #ccc',
-                                background: isActive ? '#e0e7ff' : '#fff',
+                                padding: '6px 12px',
+                                borderRadius: 999,
+                                border: isActive ? `2px solid ${palette.accent}` : '1px solid rgba(148,163,184,0.4)',
+                                background: isActive ? 'rgba(56,189,248,0.15)' : 'transparent',
+                                color: palette.textStrong,
                                 cursor: isActive ? 'grabbing' : 'grab',
                               }}
                             >
@@ -1093,6 +1101,21 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
             </div>
           )}
         </div>
+
+        {error && (
+          <div
+            style={{
+              border: '1px solid rgba(248,113,113,0.5)',
+              borderRadius: 16,
+              padding: 16,
+              background: 'rgba(185,28,28,0.12)',
+              color: '#fecaca',
+              boxShadow: '0 15px 25px rgba(185,28,28,0.25)',
+            }}
+          >
+            {error}
+          </div>
+        )}
 
       </section>
     </div>
@@ -1454,12 +1477,6 @@ function clamp(value: number, min: number, max: number) {
   if (value < min) return min;
   if (value > max) return max;
   return value;
-}
-
-function projectLabel(id: number | null, projects: ProjectSummary[]) {
-  if (!id) return 'no project selected';
-  const project = projects.find((p) => p.id === id);
-  return project ? `${project.name} (#${project.id})` : `Project #${id}`;
 }
 
 async function safeParseError(response: Response) {

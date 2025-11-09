@@ -1,4 +1,5 @@
 from datetime import datetime
+from html import escape
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlmodel import Session, select, delete
 from sqlalchemy.inspection import inspect as sa_inspect
@@ -7,6 +8,7 @@ from ..models import Signer, Envelope, Field, Event, Document, FinalArtifact, Si
 from ..schemas import SignSave, ConsentAccept
 from ..utils import read_token, canonical_json, sha256_bytes
 from ..storage import get_bytes, put_bytes
+from ..email import send_email
 import json
 
 router = APIRouter()
@@ -211,4 +213,40 @@ def complete_signing(token: str, payload: SignSave, session: Session = Depends(g
     _append_event(session, env.id, "system", "sealed", {"sha256_final": sha_final})
     response["sha256_final"] = sha_final
     response["sealed"] = True
+
+    # Notify all parties with the executed PDF attached
+    signers = session.exec(select(Signer).where(Signer.envelope_id == env.id)).all()
+    filename = doc.filename or f"Envelope {env.id}"
+    subject = f"Completed: {filename}"
+    sha_line = f"Final SHA256: {sha_final}"
+    plain_body = (
+        f"All parties have finished signing {filename}.\n\n"
+        f"{sha_line}\n\nA copy of the executed PDF is attached for your records."
+    )
+    base_name = filename[:-4] if filename.lower().endswith(".pdf") else filename
+    attachment_name = f"{base_name} - executed.pdf"
+    html_body = f"""
+<html>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6f8; padding: 24px;">
+    <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 10px 25px rgba(15,23,42,0.08);">
+      <h2 style="margin-top: 0; font-size: 20px; color: #0f172a;">Completed</h2>
+      <p style="font-size: 14px; color: #1e293b; line-height: 1.5;">
+        All parties have finished signing <strong>{escape(filename)}</strong>.
+      </p>
+      <p style="font-size: 13px; color: #475569; background: #f8fafc; padding: 12px 16px; border-radius: 8px;">
+        {escape(sha_line)}
+      </p>
+      <p style="font-size: 13px; color: #475569;">A copy of the executed PDF is attached for your records.</p>
+    </div>
+  </body>
+</html>
+"""
+    attachments = [{
+        "filename": attachment_name,
+        "content": final_pdf,
+        "maintype": "application",
+        "subtype": "pdf",
+    }]
+    for s in signers:
+        send_email(s.email, subject, plain_body, html_body=html_body, attachments=attachments)
     return response

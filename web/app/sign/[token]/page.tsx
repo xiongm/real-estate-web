@@ -1,19 +1,43 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { PointerEvent as ReactPointerEvent, CSSProperties } from 'react';
+import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
 import { useParams } from 'next/navigation';
 
+type PageRender = {
+  pageIndex: number;
+  dataUrl: string;
+  width: number;
+  height: number;
+  scale: number;
+  baseWidth: number;
+  baseHeight: number;
+};
+
+type CompletionResult = {
+  message: string;
+  sealed?: boolean;
+  waitingOn?: number;
+  status?: string;
+  sha?: string;
+};
+
 export default function SignPage() {
+  if (typeof window !== 'undefined') {
+    GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  }
   const params = useParams<{ token: string }>();
   const token = params?.token;
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfPages, setPdfPages] = useState<PageRender[]>([]);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
-  const [completeStatus, setCompleteStatus] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
+  const [completion, setCompletion] = useState<CompletionResult | null>(null);
   const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 
   useEffect(() => {
@@ -56,29 +80,28 @@ export default function SignPage() {
 
   useEffect(() => {
     if (!token) return;
-    let active = true;
+    let cancelled = false;
     setPdfError(null);
-    setPdfUrl(null);
+    setPdfPages([]);
+    setPdfLoading(true);
     fetch(`${base}/api/sign/${token}/pdf`)
       .then((r) => {
         if (!r.ok) throw new Error(`PDF HTTP ${r.status}`);
-        return r.blob();
+        return r.arrayBuffer();
       })
-      .then((blob) => {
-        if (!active) return;
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
+      .then(async (buffer) => {
+        if (cancelled) return;
+        const pages = await renderPdfPages(buffer);
+        if (!cancelled) setPdfPages(pages);
       })
       .catch((e) => {
-        if (!active) return;
-        setPdfError(String(e));
+        if (!cancelled) setPdfError(String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setPdfLoading(false);
       });
     return () => {
-      active = false;
-      setPdfUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      cancelled = true;
     };
   }, [token]);
 
@@ -104,14 +127,11 @@ export default function SignPage() {
         w: meta.w,
         h: meta.h,
         value: meta.value,
+        required: meta.required,
       },
     ]);
     return Object.fromEntries(entries);
   }, [fieldValues]);
-
-  if (!token) return <div>Missing token in URL.</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!data) return <div>Loading…</div>;
 
   const handleFieldChange = (field: any, value: any) => {
     const key = String(field.id);
@@ -121,21 +141,123 @@ export default function SignPage() {
     }));
   };
 
+  const documentLabel =
+    data?.envelope?.subject ||
+    data?.envelope?.name ||
+    data?.document?.filename ||
+    'Document';
+
+  const hasMissingRequired = useMemo(() => {
+    return fields.some((field: any) => {
+      const mustFill =
+        Boolean(field?.required) || field.type === 'signature' || field.type === 'initials';
+      if (!mustFill) return false;
+      const meta = fieldValues[String(field.id)];
+      if (!meta) return true;
+      if (field.type === 'checkbox') return meta.value !== true;
+      return !meta.value;
+    });
+  }, [fields, fieldValues]);
+
+  const mainContent = completion ? (
+    <CompletionView
+      info={completion}
+      pages={pdfPages}
+      loading={pdfLoading}
+      error={pdfError}
+      fields={fields}
+      values={fieldValues}
+    />
+  ) : (
+    <div style={{ flex: 1, padding: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 320px', gap: 24, alignItems: 'flex-start' }}>
+        <section
+          style={{
+            maxHeight: 'calc(100vh - 160px)',
+            minHeight: 'calc(100vh - 160px)',
+            overflowY: 'auto',
+            paddingRight: 8,
+            paddingBottom: 32,
+          }}
+        >
+          <PdfSigningSurface
+            pages={pdfPages}
+            loading={pdfLoading}
+            error={pdfError}
+            fields={fields}
+            values={fieldValues}
+            onChange={handleFieldChange}
+          />
+        </section>
+        <aside style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div
+            style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              padding: '24px 28px',
+              background: '#fff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 24,
+            }}
+          >
+            <Consent token={token} consented={consented} onToggle={setConsented} />
+            <div style={{ paddingTop: 4 }}>
+              <Complete
+                token={token}
+                values={payloadValues}
+                disabled={!consented || hasMissingRequired}
+                onSuccess={(info) => {
+                  setStatusMessage(info.message);
+                  setCompletion(info);
+                }}
+                onError={(msg) => setStatusMessage(msg)}
+              />
+            </div>
+          </div>
+          {!completion && statusMessage && <p style={{ marginTop: 8, color: '#2563eb' }}>{statusMessage}</p>}
+        </aside>
+      </div>
+    </div>
+  );
+
+  if (!token) {
+    return <div>Missing token in URL.</div>;
+  }
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+  if (!data) {
+    return <div>Loading…</div>;
+  }
+
   return (
-    <main>
-      <h2>Sign: {data.envelope?.subject}</h2>
-      <p>Signer: {data.signer?.name} ({data.signer?.email})</p>
-      <Consent token={token} consented={consented} onToggle={setConsented} />
-      <FieldInputs fields={fields} values={fieldValues} onChange={handleFieldChange} />
-      <PdfViewer pdfUrl={pdfUrl} error={pdfError} />
-      <Complete
-        token={token}
-        values={payloadValues}
-        disabled={!consented}
-        onResult={setCompleteStatus}
-      />
-      {completeStatus && <p style={{ marginTop: 12 }}>{completeStatus}</p>}
-    </main>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <header
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          background: '#fff',
+          borderBottom: '1px solid #e5e7eb',
+          padding: '12px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <div>
+          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Document</p>
+          <strong style={{ fontSize: 18 }}>{documentLabel}</strong>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Signer</p>
+          <strong style={{ fontSize: 16 }}>{data.signer?.name}</strong>
+          <div style={{ fontSize: 12, color: '#6b7280' }}>{data.signer?.email}</div>
+        </div>
+      </header>
+      {mainContent}
+    </div>
   );
 }
 
@@ -155,9 +277,14 @@ function Consent({ token, consented, onToggle }: { token: string; consented: boo
     onToggle(true);
   };
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-      <input type="checkbox" checked={consented} onChange={onChange} />
-      <span>I agree to use electronic records & signatures</span>
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+      <input
+        type="checkbox"
+        checked={consented}
+        onChange={onChange}
+        style={{ width: 20, height: 20, marginTop: 2 }}
+      />
+      <span style={{ fontSize: 14, lineHeight: 1.4 }}>I agree to use electronic records & signatures</span>
     </label>
   );
 }
@@ -166,17 +293,21 @@ function Complete({
   token,
   values,
   disabled,
-  onResult,
+  onSuccess,
+  onError,
 }: {
   token: string;
   values: Record<string, any>;
   disabled: boolean;
-  onResult: (msg: string) => void;
+  onSuccess: (info: CompletionResult) => void;
+  onError: (msg: string) => void;
 }) {
   const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
   const onComplete = async () => {
     const missingRequired = Object.values(values).some((meta: any) => {
-      if (!meta?.required) return false;
+      const mustFill =
+        Boolean(meta?.required) || meta.type === 'signature' || meta.type === 'initials';
+      if (!mustFill) return false;
       if (meta.type === 'checkbox') return meta.value !== true;
       return !meta.value;
     });
@@ -192,68 +323,95 @@ function Complete({
     });
     const j = await r.json();
     if (!r.ok) {
-      onResult(j?.detail || 'Failed to complete.');
+      onError(j?.detail || 'Failed to complete.');
       return;
     }
+    let message = 'Completion recorded. We will email the final packet once all signers finish.';
     if (j.sealed && j.sha256_final) {
-      onResult(`All signers complete. Final SHA256: ${j.sha256_final}`);
+      message = `All signers complete. Final SHA256: ${j.sha256_final}`;
     } else if (j.status === 'waiting') {
       const remaining =
         typeof j.waiting_on === 'number' ? `${j.waiting_on} signer(s)` : 'other signers';
-      onResult(`Thanks! Waiting on ${remaining} before sealing.`);
+      message = `Thanks! Waiting on ${remaining} before sealing.`;
     } else if (j.sha256_final) {
-      onResult(`Document sealed. SHA256: ${j.sha256_final}`);
-    } else {
-      onResult('Completion recorded. We will email the final packet once all signers finish.');
+      message = `Document sealed. SHA256: ${j.sha256_final}`;
+    } else if (j.status === 'completed') {
+      message = 'Your signature has been recorded.';
     }
+    onSuccess({
+      message,
+      status: j.status || (j.sealed ? 'sealed' : undefined),
+      waitingOn: j.waiting_on,
+      sealed: Boolean(j.sealed),
+      sha: j.sha256_final,
+    });
   };
   return (
-    <button style={{ marginTop: 12 }} onClick={onComplete} disabled={disabled}>
-      Complete
-    </button>
+      <button
+        onClick={onComplete}
+        disabled={disabled}
+        style={{
+          background: '#2563eb',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          padding: '14px 36px',
+          fontSize: 16,
+          fontWeight: 600,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.6 : 1,
+          width: '100%',
+        }}
+      >
+        Finish and Sign
+      </button>
   );
 }
 
-function PdfViewer({ pdfUrl, error }: { pdfUrl: string | null; error: string | null }) {
-  if (error) {
-    return <div style={{ marginTop: 16, color: 'red' }}>Failed to load PDF: {error}</div>;
-  }
-  if (!pdfUrl) {
-    return <div style={{ marginTop: 16 }}>Loading PDF…</div>;
-  }
-  return (
-    <iframe
-      title="Document preview"
-      src={pdfUrl}
-      style={{ marginTop: 16, width: '100%', height: 600, border: '1px solid #ccc' }}
-    />
-  );
-}
 
-function FieldInputs({
+function PdfSigningSurface({
+  pages,
+  loading,
+  error,
   fields,
   values,
   onChange,
+  mode = 'edit',
 }: {
+  pages: PageRender[];
+  loading: boolean;
+  error: string | null;
   fields: any[];
   values: Record<string, any>;
   onChange: (field: any, value: any) => void;
+  mode?: 'edit' | 'view';
 }) {
-  if (!fields.length) {
-    return <p style={{ marginTop: 16 }}>No signing fields configured.</p>;
+  if (error) {
+    return <div style={{ marginTop: 16, color: 'red' }}>Failed to load PDF: {error}</div>;
+  }
+  if (loading || !pages.length) {
+    return <div style={{ marginTop: 16 }}>Loading PDF…</div>;
   }
   return (
-    <section style={{ marginTop: 16 }}>
-      <h3>Fields</h3>
-      {fields.map((field) => {
-        const key = String(field.id);
-        const current = values[key]?.value;
+    <section style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 32 }}>
+      {pages.map((page) => {
+        const pageFields = fields.filter((field) => (field.page || 1) === page.pageIndex + 1);
         return (
-          <div key={key} style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontWeight: 600 }}>
-              {field.name || field.type} {field.required ? '*' : ''}
-            </label>
-            <FieldInput field={field} value={current} onChange={(val) => onChange(field, val)} />
+          <div
+            key={page.pageIndex}
+            style={{ position: 'relative', width: page.width, margin: '0 auto', boxShadow: '0 10px 25px rgba(15,23,42,0.1)' }}
+          >
+            <img src={page.dataUrl} alt={`Page ${page.pageIndex + 1}`} style={{ width: '100%', display: 'block' }} />
+            {pageFields.map((field) => (
+              <FieldOverlay
+                key={field.id}
+                field={field}
+                pageMeta={page}
+                value={values[String(field.id)]?.value}
+                onChange={onChange}
+                mode={mode}
+              />
+            ))}
           </div>
         );
       })}
@@ -261,53 +419,201 @@ function FieldInputs({
   );
 }
 
-function FieldInput({ field, value, onChange }: { field: any; value: any; onChange: (val: any) => void }) {
+function FieldOverlay({
+  field,
+  pageMeta,
+  value,
+  onChange,
+  mode,
+}: {
+  field: any;
+  pageMeta: PageRender;
+  value: any;
+  onChange: (field: any, value: any) => void;
+  mode: 'edit' | 'view';
+}) {
+  const screenWidth = field.w * pageMeta.scale;
+  const screenHeight = field.h * pageMeta.scale;
+  const screenX = field.x * pageMeta.scale;
+  const screenY = (pageMeta.baseHeight - (field.y + field.h)) * pageMeta.scale;
+  const baseStyle = {
+    position: 'absolute' as const,
+    left: screenX,
+    top: screenY,
+    width: screenWidth,
+    height: screenHeight,
+    pointerEvents: mode === 'view' ? 'none' : ('auto' as const),
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
   if (field.type === 'text') {
+    if (mode === 'view') {
+      return (
+        <div
+          style={{
+            ...baseStyle,
+            border: '1px solid #cbd5f5',
+            borderRadius: 4,
+            background: 'rgba(255,255,255,0.9)',
+            justifyContent: 'flex-start',
+            padding: '0 6px',
+          }}
+        >
+          <span style={{ fontSize: 12, color: '#0f172a' }}>{value || ''}</span>
+        </div>
+      );
+    }
     return (
-      <input
-        type="text"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ width: '100%', padding: 6 }}
-      />
+      <div style={baseStyle}>
+        <input
+          type="text"
+          value={value ?? ''}
+          onChange={(e) => onChange(field, e.target.value)}
+          style={{
+            width: '100%',
+            height: '100%',
+            padding: 6,
+            background: 'rgba(255,255,255,0.9)',
+            border: '1px solid #94a3b8',
+            borderRadius: 4,
+            fontSize: 14,
+          }}
+        />
+      </div>
     );
   }
   if (field.type === 'date') {
+    if (mode === 'view') {
+      return (
+        <div
+          style={{
+            ...baseStyle,
+            border: '1px solid #cbd5f5',
+            borderRadius: 4,
+            background: 'rgba(255,255,255,0.9)',
+            justifyContent: 'flex-start',
+            padding: '0 6px',
+          }}
+        >
+          <span style={{ fontSize: 12, color: '#0f172a' }}>{value || ''}</span>
+        </div>
+      );
+    }
     return (
-      <input
-        type="date"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ padding: 6 }}
-      />
+      <div style={baseStyle}>
+        <input
+          type="date"
+          value={value ?? ''}
+          onChange={(e) => onChange(field, e.target.value)}
+          style={{
+            width: '100%',
+            height: '100%',
+            padding: 6,
+            background: 'rgba(255,255,255,0.9)',
+            border: '1px solid #94a3b8',
+            borderRadius: 4,
+          }}
+        />
+      </div>
     );
   }
   if (field.type === 'checkbox') {
+    if (mode === 'view') {
+      return (
+        <div
+          style={{
+            ...baseStyle,
+            border: '2px solid #94a3b8',
+            borderRadius: 4,
+            background: 'rgba(255,255,255,0.9)',
+          }}
+        >
+          {value ? <span style={{ fontSize: 16, color: '#0f172a' }}>✔</span> : null}
+        </div>
+      );
+    }
     return (
-      <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
-        <span>Check to confirm</span>
-      </label>
+      <div style={{ ...baseStyle, border: '2px solid #94a3b8', borderRadius: 4, background: 'rgba(255,255,255,0.9)' }}>
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={(e) => onChange(field, e.target.checked)}
+          style={{ width: 20, height: 20 }}
+        />
+      </div>
     );
   }
   if (field.type === 'signature' || field.type === 'initials') {
-    return <SignaturePad value={value} onChange={onChange} />;
+    if (mode === 'view') {
+      return (
+        <div
+          style={{
+            ...baseStyle,
+            border: '2px solid #2563eb',
+            borderRadius: 6,
+            background: 'rgba(255,255,255,0.9)',
+          }}
+        >
+          {value ? (
+            <img
+              src={`data:image/png;base64,${value}`}
+              alt="Signature"
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
+          ) : (
+            <span style={{ fontSize: 12, color: '#64748b' }}>Signature</span>
+          )}
+        </div>
+      );
+    }
+    return (
+      <SignatureFieldCanvas
+        style={baseStyle}
+        width={screenWidth}
+        height={screenHeight}
+        value={value}
+        onChange={(val) => onChange(field, val)}
+      />
+    );
   }
-  return (
-    <input
-      type="text"
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value)}
-      style={{ width: '100%', padding: 6 }}
-    />
-  );
+  return null;
 }
 
-function SignaturePad({ value, onChange }: { value: string | null; onChange: (val: string | null) => void }) {
+function SignatureFieldCanvas({
+  style,
+  width,
+  height,
+  value,
+  onChange,
+}: {
+  style: CSSProperties;
+  width: number;
+  height: number;
+  value: string | null;
+  onChange: (val: string | null) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const drawing = useRef(false);
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctxRef.current = ctx;
+    canvas.width = width;
+    canvas.height = height;
+    ctx.clearRect(0, 0, width, height);
+    if (value) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, width, height);
+      img.src = `data:image/png;base64,${value}`;
+    }
+  }, [width, height, value]);
 
   const getPoint = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -318,29 +624,6 @@ function SignaturePad({ value, onChange }: { value: string | null; onChange: (va
       y: event.clientY - rect.top,
     };
   };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctxRef.current = ctx;
-    const handleResize = () => {
-      const width = canvas.clientWidth;
-      const height = canvas.clientHeight;
-      canvas.width = width;
-      canvas.height = height;
-      ctxRef.current?.clearRect(0, 0, width, height);
-      if (value) {
-        const img = new Image();
-        img.onload = () => ctxRef.current?.drawImage(img, 0, 0, width, height);
-        img.src = `data:image/png;base64,${value}`;
-      }
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [value]);
 
   const startDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     event.preventDefault();
@@ -356,7 +639,7 @@ function SignaturePad({ value, onChange }: { value: string | null; onChange: (va
     if (!ctx || !lastPoint.current) return;
     const point = getPoint(event);
     ctx.strokeStyle = '#111';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
@@ -385,38 +668,136 @@ function SignaturePad({ value, onChange }: { value: string | null; onChange: (va
   };
 
   return (
-    <div style={{ border: '1px solid #ccc', padding: 8 }}>
-      <div
-        style={{
-          marginBottom: 8,
-          fontSize: 12,
-          color: '#555',
-        }}
-      >
-        Draw with your mouse or finger. Your strokes are captured as you release.
-      </div>
+    <div
+      style={{
+        ...style,
+        border: '2px dashed #2563eb',
+        borderRadius: 6,
+        background: 'rgba(255,255,255,0.85)',
+        flexDirection: 'column',
+        gap: 4,
+        padding: 4,
+      }}
+    >
       <canvas
         ref={canvasRef}
-        style={{ width: '100%', height: 220, border: '1px solid #ddd', touchAction: 'none' }}
+        style={{ width: '100%', height: '100%', border: '1px solid #ddd', touchAction: 'none' }}
         onPointerDown={startDrawing}
         onPointerMove={draw}
         onPointerUp={stopDrawing}
         onPointerLeave={stopDrawing}
       />
-      <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-        <button type="button" onClick={clear}>
-          Clear
-        </button>
-        <span style={{ fontSize: 12, color: '#777' }}>Signature preview updates when you lift your finger/mouse.</span>
-      </div>
-      {value ? (
-        <div style={{ marginTop: 8 }}>
-          <small>Captured</small>
-          <img src={`data:image/png;base64,${value}`} alt="Signature preview" style={{ display: 'block', marginTop: 4 }} />
-        </div>
-      ) : (
-        <small>Draw your signature above.</small>
-      )}
+      <button type="button" onClick={clear} style={{ alignSelf: 'flex-end', fontSize: 12 }}>
+        Clear
+      </button>
     </div>
   );
+}
+
+function CompletionView({
+  info,
+  pages,
+  loading,
+  error,
+  fields,
+  values,
+}: {
+  info: CompletionResult;
+  pages: PageRender[];
+  loading: boolean;
+  error: string | null;
+  fields: any[];
+  values: Record<string, any>;
+}) {
+  return (
+    <div style={{ flex: 1, padding: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 320px', gap: 24, alignItems: 'flex-start' }}>
+        <section
+          style={{
+            maxHeight: 'calc(100vh - 160px)',
+            minHeight: 'calc(100vh - 160px)',
+            overflowY: 'auto',
+            paddingRight: 8,
+            paddingBottom: 32,
+          }}
+        >
+          <PdfSigningSurface
+            pages={pages}
+            loading={loading}
+            error={error}
+            fields={fields}
+            values={values}
+            onChange={() => {}}
+            mode="view"
+          />
+        </section>
+        <aside
+          style={{
+            position: 'sticky',
+            top: 24,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            border: '1px solid #e5e7eb',
+            borderRadius: 12,
+            padding: '24px 28px',
+            background: '#fff',
+          }}
+        >
+          <div>
+            <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Status</p>
+            <strong style={{ fontSize: 18 }}>
+              {info.sealed ? 'All parties signed' : info.status === 'waiting' ? 'Waiting for others' : 'Submitted'}
+            </strong>
+          </div>
+          <p style={{ fontSize: 14, color: '#0f172a', lineHeight: 1.5 }}>{info.message}</p>
+          {typeof info.waitingOn === 'number' && info.waitingOn > 0 && (
+            <p style={{ fontSize: 13, color: '#6b7280' }}>
+              Still awaiting {info.waitingOn} signer{info.waitingOn === 1 ? '' : 's'}.
+            </p>
+          )}
+          {info.sha && (
+            <div style={{ fontSize: 12, color: '#475569' }}>
+              Final SHA256:
+              <br />
+              <code style={{ fontSize: 12 }}>{info.sha}</code>
+            </div>
+          )}
+          <p style={{ fontSize: 13, color: '#6b7280' }}>
+            We&apos;ll email a copy of the final PDF as soon as all parties finish.
+          </p>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+async function renderPdfPages(buffer: ArrayBuffer): Promise<PageRender[]> {
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf');
+  const typedArray = new Uint8Array(buffer);
+  const pdf = await pdfjs.getDocument({ data: typedArray }).promise;
+  const pages: PageRender[] = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const maxWidth = Math.min(900, typeof window !== 'undefined' ? window.innerWidth - 80 : 900);
+    const scale = Math.min(2, maxWidth / baseViewport.width);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Unable to render PDF page');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    pages.push({
+      pageIndex: pageNumber - 1,
+      dataUrl: canvas.toDataURL(),
+      width: viewport.width,
+      height: viewport.height,
+      scale,
+      baseWidth: baseViewport.width,
+      baseHeight: baseViewport.height,
+    });
+  }
+  return pages;
 }

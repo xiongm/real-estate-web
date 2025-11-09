@@ -1,3 +1,4 @@
+from html import escape
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from ..db import get_session
@@ -96,15 +97,40 @@ def send_envelope(envelope_id: int, _: EnvelopeSend, session: Session = Depends(
     env = session.get(Envelope, envelope_id)
     if not env:
         raise HTTPException(404, "envelope not found")
+    doc = session.get(Document, env.document_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
     env.status = "sent"; session.add(env); session.commit()
 
     signers = session.exec(
         select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
     ).all()
+    filename = doc.filename or "Document"
+    intro = env.message or "Please review and sign the attached document."
     for s in signers:
         token = make_token({"signer_id": s.id, "envelope_id": envelope_id})
         link = f"http://localhost:3000/sign/{token}"
-        send_email(s.email, env.subject, f"{env.message}\\n\\nSign here: {link}")
+        subject = f"Signature requested: {filename}"
+        text_body = f"{intro}\n\nOpen document: {link}"
+        intro_html = escape(intro)
+        link_html = escape(link)
+        html_body = f"""
+<html>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6f8; padding: 24px;">
+    <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 10px 25px rgba(15,23,42,0.08);">
+      <h2 style="margin-top: 0; font-size: 20px; color: #0f172a;">Signature requested</h2>
+      <p style="font-size: 14px; color: #1e293b; line-height: 1.5;">{intro_html}</p>
+      <div style="margin: 24px 0;">
+        <a href="{link_html}" style="display: inline-block; background: #2563eb; color: #fff; padding: 12px 24px; border-radius: 999px; text-decoration: none; font-weight: 600;">
+          Review &amp; Sign
+        </a>
+      </div>
+      <p style="font-size: 12px; color: #64748b;">If the button doesn&apos;t work, copy this link into your browser:<br /><a href="{link_html}">{link_html}</a></p>
+    </div>
+  </body>
+</html>
+"""
+        send_email(s.email, subject, text_body, html_body=html_body)
 
     _append_event(session, env.id, "system", "sent", {})
     return {"ok": True}

@@ -1,0 +1,8 @@
+.env
+**/__pycache__/
+**/*.pyc
+node_modules/
+web/node_modules/
+web/.next/
+web/tsconfig.json
+web/next-env.d.ts

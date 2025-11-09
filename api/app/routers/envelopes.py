@@ -1,0 +1,128 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, select
+from ..db import get_session
+from ..models import Envelope, Signer, Field, Document, Event, ProjectInvestor
+from ..schemas import EnvelopeCreate, EnvelopeSend
+from ..email import send_email
+from ..utils import canonical_json, sha256_bytes, make_token
+
+router = APIRouter()
+
+def _append_event(session: Session, env_id: int, actor: str, type_: str, meta: dict, ip=None, ua=None):
+    last = session.exec(
+        select(Event).where(Event.envelope_id == env_id).order_by(Event.id.desc())
+    ).first()
+    prev_hash = last.hash if last else "0" * 64
+    payload = {"actor": actor, "type": type_, "meta": meta}
+    event = Event(
+        envelope_id=env_id,
+        actor=actor,
+        type=type_,
+        meta_json=canonical_json(payload),
+        prev_hash=prev_hash,
+        ip=ip,
+        ua=ua,
+    )
+    event.hash = sha256_bytes((prev_hash + event.meta_json).encode())
+    session.add(event)
+    session.commit()
+
+@router.post("")
+def create_envelope(data: EnvelopeCreate, session: Session = Depends(get_session)):
+    doc = session.get(Document, data.document_id)
+    if not doc or doc.project_id != data.project_id:
+        raise HTTPException(400, "document mismatch")
+    env = Envelope(
+        project_id=data.project_id,
+        document_id=data.document_id,
+        subject=data.subject,
+        message=data.message,
+        status="draft",
+    )
+    session.add(env); session.commit(); session.refresh(env)
+
+    signer_key_map = {}
+    signer_role_map = {}
+    for idx, s in enumerate(data.signers):
+        project_investor = None
+        if s.project_investor_id:
+            project_investor = session.get(ProjectInvestor, s.project_investor_id)
+            if not project_investor or project_investor.project_id != data.project_id:
+                raise HTTPException(400, f"project investor {s.project_investor_id} invalid")
+        resolved_name = s.name or (project_investor.name if project_investor else None)
+        resolved_email = s.email or (project_investor.email if project_investor else None)
+        if not resolved_name or not resolved_email:
+            raise HTTPException(400, "Signer name/email required (supply or link to investor with values)")
+        signer = Signer(
+            envelope_id=env.id,
+            name=resolved_name,
+            email=resolved_email,
+            role=s.role or (project_investor.role if project_investor else "Investor"),
+            routing_order=s.routing_order or (project_investor.routing_order if project_investor else idx + 1),
+        )
+        session.add(signer)
+        session.flush()
+        key = s.client_id or s.email or f"signer-{idx}"
+        signer_key_map[key] = signer.id
+        if project_investor:
+            signer_key_map[str(project_investor.id)] = signer.id
+        signer_role_map[signer.id] = signer.role
+    for f in data.fields:
+        target_signer_id = None
+        if f.signer_key:
+            target_signer_id = signer_key_map.get(f.signer_key)
+        assigned_role = f.role or (signer_role_map.get(target_signer_id) if target_signer_id else None)
+        session.add(Field(
+            envelope_id=env.id,
+            page=f.page,
+            x=f.x,
+            y=f.y,
+            w=f.w,
+            h=f.h,
+            type=f.type,
+            required=f.required,
+            role=assigned_role or "Signer",
+            name=f.name,
+            signer_id=target_signer_id,
+        ))
+    session.commit()
+    _append_event(session, env.id, "system", "created", {"envelope_id": env.id})
+
+    # Return a small, explicit body so curl shows it
+    return {"id": env.id, "status": env.status}
+
+@router.post("/{envelope_id}/send")
+def send_envelope(envelope_id: int, _: EnvelopeSend, session: Session = Depends(get_session)):
+    env = session.get(Envelope, envelope_id)
+    if not env:
+        raise HTTPException(404, "envelope not found")
+    env.status = "sent"; session.add(env); session.commit()
+
+    signers = session.exec(
+        select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
+    ).all()
+    for s in signers:
+        token = make_token({"signer_id": s.id, "envelope_id": envelope_id})
+        link = f"http://localhost:3000/sign/{token}"
+        send_email(s.email, env.subject, f"{env.message}\\n\\nSign here: {link}")
+
+    _append_event(session, env.id, "system", "sent", {})
+    return {"ok": True}
+
+# Dev helper: get magic links without tailing logs
+@router.get("/{envelope_id}/dev-magic-links")
+def dev_magic_links(envelope_id: int, session: Session = Depends(get_session)):
+    env = session.get(Envelope, envelope_id)
+    if not env:
+        raise HTTPException(404, "envelope not found")
+    signers = session.exec(
+        select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
+    ).all()
+    links = []
+    for s in signers:
+        token = make_token({"signer_id": s.id, "envelope_id": envelope_id})
+        links.append({
+            "signer": {"id": s.id, "name": s.name, "email": s.email},
+            "link": f"http://localhost:3000/sign/{token}"
+        })
+    return {"envelope_id": envelope_id, "links": links}

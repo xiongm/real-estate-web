@@ -6,6 +6,7 @@ from ..models import Envelope, Signer, Field, Document, Event, ProjectInvestor
 from ..schemas import EnvelopeCreate, EnvelopeSend
 from ..email import send_email
 from ..utils import canonical_json, sha256_bytes, make_token
+from ..auth import require_admin_access
 
 router = APIRouter()
 
@@ -29,7 +30,11 @@ def _append_event(session: Session, env_id: int, actor: str, type_: str, meta: d
     session.commit()
 
 @router.post("")
-def create_envelope(data: EnvelopeCreate, session: Session = Depends(get_session)):
+def create_envelope(
+    data: EnvelopeCreate,
+    session: Session = Depends(get_session),
+    ctx=Depends(require_admin_access),
+):
     doc = session.get(Document, data.document_id)
     if not doc or doc.project_id != data.project_id:
         raise HTTPException(400, "document mismatch")
@@ -93,7 +98,12 @@ def create_envelope(data: EnvelopeCreate, session: Session = Depends(get_session
     return {"id": env.id, "status": env.status}
 
 @router.post("/{envelope_id}/send")
-def send_envelope(envelope_id: int, payload: EnvelopeSend, session: Session = Depends(get_session)):
+def send_envelope(
+    envelope_id: int,
+    payload: EnvelopeSend,
+    session: Session = Depends(get_session),
+    ctx=Depends(require_admin_access),
+):
     env = session.get(Envelope, envelope_id)
     if not env:
         raise HTTPException(404, "envelope not found")
@@ -159,7 +169,11 @@ Open document: {link}
     return {"ok": True}
 
 @router.get("/{envelope_id}")
-def get_envelope(envelope_id: int, session: Session = Depends(get_session)):
+def get_envelope(
+    envelope_id: int,
+    session: Session = Depends(get_session),
+    ctx=Depends(require_admin_access),
+):
     env = session.get(Envelope, envelope_id)
     if not env:
         raise HTTPException(404, "envelope not found")
@@ -190,7 +204,11 @@ def get_envelope(envelope_id: int, session: Session = Depends(get_session)):
 
 # Dev helper: get magic links without tailing logs
 @router.get("/{envelope_id}/dev-magic-links")
-def dev_magic_links(envelope_id: int, session: Session = Depends(get_session)):
+def dev_magic_links(
+    envelope_id: int,
+    session: Session = Depends(get_session),
+    ctx=Depends(require_admin_access),
+):
     env = session.get(Envelope, envelope_id)
     if not env:
         raise HTTPException(404, "envelope not found")

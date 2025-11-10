@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, PointerEvent as ReactPointerEvent, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import ProjectsPage from '../projects/page';
+import InvestorsPage from '../investors/page';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
+import { theme } from '../../lib/theme';
 
 if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -80,16 +81,17 @@ const FIELD_LABELS: Record<FieldType, string> = {
 };
 
 const palette = {
-  pageBackground: 'linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #111827 100%)',
-  headerBackground: 'rgba(15,23,42,0.95)',
-  headerBorder: '1px solid rgba(148,163,184,0.35)',
-  cardBorder: '1px solid rgba(248,250,252,0.08)',
-  cardShadow: '0 25px 45px rgba(0,0,0,0.35)',
-  cardSurface: 'rgba(15,23,42,0.85)',
-  accent: '#38bdf8',
-  accentMuted: '#94a3b8',
-  textSubtle: '#cbd5f5',
-  textStrong: '#f8fafc',
+  pageBackground: theme.colors.gradient,
+  headerBackground: theme.colors.surface,
+  headerBorder: `1px solid ${theme.colors.border}`,
+  cardBorder: `1px solid ${theme.colors.border}`,
+  cardShadow: theme.shadows.card,
+  cardSurface: theme.colors.panel,
+  accent: theme.colors.accent,
+  accentMuted: theme.colors.textMuted,
+  textSubtle: theme.colors.textMuted,
+  textStrong: theme.colors.text,
+  chip: theme.colors.accentSoft,
 };
 
 const randomId = () =>
@@ -148,6 +150,11 @@ export default function RequestSignPage() {
   const [confirmSending, setConfirmSending] = useState(false);
   const [requesterName, setRequesterName] = useState('');
   const [requesterEmail, setRequesterEmail] = useState('');
+  const [adminToken, setAdminToken] = useState('');
+  const [adminVerified, setAdminVerified] = useState(false);
+  const [adminTokenLoading, setAdminTokenLoading] = useState(true);
+  const [adminTokenError, setAdminTokenError] = useState<string | null>(null);
+  const [tokenInput, setTokenInput] = useState('');
   const readyToReview = Boolean(documentInfo && fields.length > 0);
   const activeProject = selectedProjectId ? projects.find((project) => project.id === selectedProjectId) ?? null : null;
   const activeProjectName = activeProject?.name || (selectedProjectId ? `Project #${selectedProjectId}` : 'No project selected');
@@ -184,9 +191,62 @@ export default function RequestSignPage() {
     };
   }, []);
 
+  const verifyAdminToken = useCallback(
+    async (candidate: string) => {
+      setAdminTokenLoading(true);
+      setAdminTokenError(null);
+      try {
+        const resp = await fetch(`${baseApi}/api/projects`, {
+          headers: { 'X-Access-Token': candidate },
+        });
+        if (!resp.ok) throw new Error('Invalid token');
+        setAdminToken(candidate);
+        setAdminVerified(true);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('adminAccessToken', candidate);
+        }
+      } catch (err) {
+        setAdminToken('');
+        setAdminVerified(false);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('adminAccessToken');
+        }
+        setAdminTokenError(err instanceof Error ? err.message : 'Invalid token');
+      } finally {
+        setAdminTokenLoading(false);
+      }
+    },
+    [baseApi],
+  );
+
+  const logout = useCallback(() => {
+    setAdminToken('');
+    setAdminVerified(false);
+    setAdminTokenError(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('adminAccessToken');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setAdminTokenLoading(false);
+      return;
+    }
+    const saved = localStorage.getItem('adminAccessToken');
+    if (saved) {
+      verifyAdminToken(saved);
+    } else {
+      setAdminTokenLoading(false);
+    }
+  }, [verifyAdminToken]);
+
   const refreshProjects = async () => {
+    if (!adminToken) return;
     try {
-      const resp = await fetch(`${baseApi}/api/projects`);
+      const resp = await fetch(`${baseApi}/api/projects`, {
+        headers: { 'X-Access-Token': adminToken },
+      });
       if (!resp.ok) throw new Error(`Failed to load projects (${resp.status})`);
       const list = await resp.json();
       setProjects(list || []);
@@ -197,50 +257,72 @@ export default function RequestSignPage() {
   };
 
   useEffect(() => {
+    if (!adminVerified || !adminToken) return;
     refreshProjects();
-  }, [baseApi]);
+  }, [adminVerified, adminToken]);
 
   const projectParam = searchParams.get('project');
 
   useEffect(() => {
+    const numeric = projectParam ? Number(projectParam) : NaN;
+    if (projectParam && !Number.isNaN(numeric)) {
+      setProjectParamError(null);
+      setSelectedProjectId((prev) => (prev === numeric ? prev : numeric));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('requestSignProject', String(numeric));
+      }
+      return;
+    }
     if (!projectParam) {
-      setProjectParamError('Open Request Sign using a project link from Admin (missing ?project=ID).');
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('requestSignProject');
+        if (stored) {
+          const storedId = Number(stored);
+          if (!Number.isNaN(storedId)) {
+            setProjectParamError(null);
+            setSelectedProjectId((prev) => (prev === storedId ? prev : storedId));
+            return;
+          }
+        }
+      }
+      setProjectParamError(null);
       setSelectedProjectId(null);
       return;
     }
-    const numeric = Number(projectParam);
     if (Number.isNaN(numeric)) {
       setProjectParamError('Invalid project id provided in the URL.');
       setSelectedProjectId(null);
-      return;
     }
-    setProjectParamError(null);
-    setSelectedProjectId((prev) => (prev === numeric ? prev : numeric));
   }, [projectParam]);
 
-const refreshInvestors = async (projectId: number) => {
-  if (!projectId) return;
-  setInvestorsLoading(true);
-  try {
-    const resp = await fetch(`${baseApi}/api/projects/${projectId}/investors`);
-    if (!resp.ok) throw new Error(`Failed to load investors (${resp.status})`);
-    const list = await resp.json();
-    setProjectInvestors(list || []);
-  } catch (err) {
-    console.warn('investor load failed', err);
-    setError(err instanceof Error ? err.message : 'Failed to load investors');
-  } finally {
-    setInvestorsLoading(false);
-  }
-};
+  const refreshInvestors = useCallback(
+    async (projectId: number) => {
+      if (!projectId || !adminToken) return;
+      setInvestorsLoading(true);
+      try {
+        const resp = await fetch(`${baseApi}/api/projects/${projectId}/investors`, {
+          headers: { 'X-Access-Token': adminToken },
+        });
+        if (!resp.ok) throw new Error(`Failed to load investors (${resp.status})`);
+        const list = await resp.json();
+        setProjectInvestors(list || []);
+      } catch (err) {
+        console.warn('investor load failed', err);
+        setError(err instanceof Error ? err.message : 'Failed to load investors');
+      } finally {
+        setInvestorsLoading(false);
+      }
+    },
+    [adminToken, baseApi],
+  );
 
-useEffect(() => {
-  if (selectedProjectId) {
-    refreshInvestors(selectedProjectId);
-  } else {
-    setProjectInvestors([]);
-  }
-}, [selectedProjectId]);
+  useEffect(() => {
+    if (selectedProjectId && adminToken) {
+      refreshInvestors(selectedProjectId);
+    } else if (!selectedProjectId) {
+      setProjectInvestors([]);
+    }
+  }, [selectedProjectId, adminToken, refreshInvestors]);
 
   useEffect(() => {
     if (!confirmVisible) {
@@ -252,12 +334,14 @@ useEffect(() => {
   }, [confirmVisible]);
 
   useEffect(() => {
-    if (!confirmEnvelopeId || !confirmVisible) return;
+    if (!confirmEnvelopeId || !confirmVisible || !adminToken) return;
     let cancelled = false;
     setConfirmLoading(true);
     setConfirmError(null);
     setConfirmDetail(null);
-    fetch(`${baseApi}/api/envelopes/${confirmEnvelopeId}`)
+    fetch(`${baseApi}/api/envelopes/${confirmEnvelopeId}`, {
+      headers: { 'X-Access-Token': adminToken ?? '' },
+    })
       .then((resp) => {
         if (!resp.ok) throw new Error(`Unable to load envelope (${resp.status})`);
         return resp.json();
@@ -279,7 +363,7 @@ useEffect(() => {
     return () => {
       cancelled = true;
     };
-  }, [confirmEnvelopeId, confirmVisible, baseApi]);
+  }, [confirmEnvelopeId, confirmVisible, baseApi, adminToken]);
 
   useEffect(() => {
     setFields((prev) => prev.map((field) => ({ ...field, role: field.role || defaultFieldRole })));
@@ -410,6 +494,10 @@ useEffect(() => {
       setError('Open Request Sign from Admin so a project is selected before uploading.');
       throw new Error('Missing project id');
     }
+    if (!adminToken) {
+      setError('Admin token required before uploading.');
+      throw new Error('Missing admin token');
+    }
     setUploadingDoc(true);
     setError(null);
     try {
@@ -417,6 +505,7 @@ useEffect(() => {
       form.append('file', file);
       const response = await fetch(`${baseApi}/api/projects/${projectNumeric}/documents`, {
         method: 'POST',
+        headers: { 'X-Access-Token': adminToken ?? '' },
         body: form,
       });
       if (!response.ok) {
@@ -450,6 +539,10 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       setError('Open Request Sign from Admin so a project is selected before adding investors.');
       return;
     }
+    if (!adminToken) {
+      setError('Admin token required to create investors.');
+      return;
+    }
     if (!investorForm.name.trim() || !investorForm.email.trim()) {
       setError('Investor name and email are required.');
       return;
@@ -458,7 +551,10 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       setInvestorsLoading(true);
       const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/investors`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Token': adminToken ?? '',
+        },
         body: JSON.stringify({
           name: investorForm.name,
           email: investorForm.email,
@@ -638,12 +734,19 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       setConfirmError('Provide your name and email so recipients know who invited them.');
       return;
     }
+    if (!adminToken) {
+      setConfirmError('Admin token required to send envelopes.');
+      return;
+    }
     setConfirmSending(true);
     setConfirmError(null);
     try {
       const resp = await fetch(`${baseApi}/api/envelopes/${confirmEnvelopeId}/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Token': adminToken ?? '',
+        },
         body: JSON.stringify({
           subject,
           message: confirmMessage,
@@ -703,12 +806,19 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       setError('Assign each field to a project investor.');
       return;
     }
+    if (!adminToken) {
+      setError('Admin token required to submit envelope.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const createResp = await fetch(`${baseApi}/api/envelopes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Token': adminToken,
+        },
         body: JSON.stringify({
           project_id: projectNumeric,
           document_id: documentInfo.id,
@@ -740,6 +850,75 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       setSubmitting(false);
     }
   };
+
+  const handleAdminTokenSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const candidate = tokenInput.trim();
+    if (!candidate) return;
+    await verifyAdminToken(candidate);
+    setTokenInput('');
+  };
+
+  if (adminTokenLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: palette.pageBackground }}>
+        <p>Verifying admin access…</p>
+      </div>
+    );
+  }
+
+  if (!adminVerified) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: palette.pageBackground }}>
+        <form
+          onSubmit={handleAdminTokenSubmit}
+          style={{
+            background: '#fff',
+            padding: 32,
+            borderRadius: 20,
+            boxShadow: theme.shadows.card,
+            width: 'min(360px, 90vw)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            color: theme.colors.text,
+            border: `1px solid ${theme.colors.border}`,
+          }}
+        >
+          <h2 style={{ margin: 0, color: palette.accent }}>Admin Access</h2>
+          <p style={{ margin: 0, fontSize: 14, color: palette.accentMuted }}>Enter the admin access token to configure envelopes.</p>
+          <input
+            type="password"
+            value={tokenInput}
+            onChange={(event) => setTokenInput(event.target.value)}
+            placeholder="Admin token"
+            style={{
+              padding: 10,
+              borderRadius: 10,
+              border: `1px solid ${theme.colors.border}`,
+              background: '#fff',
+              color: theme.colors.text,
+            }}
+          />
+          {adminTokenError && <p style={{ color: '#f87171', margin: 0 }}>{adminTokenError}</p>}
+          <button
+            type="submit"
+            style={{
+              border: 'none',
+              borderRadius: 8,
+              padding: '10px 12px',
+              background: palette.accent,
+              color: '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Continue
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   const documentLabel = documentInfo ? documentInfo.filename : 'No document uploaded yet';
   const selectedSignerId =
@@ -811,6 +990,21 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           >
             ← Back to Admin
           </a>
+          <button
+            type="button"
+            onClick={logout}
+            style={{
+              border: '1px solid rgba(148,163,184,0.5)',
+              background: 'transparent',
+              color: '#e2e8f0',
+              borderRadius: 999,
+              padding: '6px 12px',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            Sign out
+          </button>
         </div>
       </header>
       <div style={{ flex: 1, padding: 32, paddingBottom: 160 }}>
@@ -838,10 +1032,10 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               marginTop: 24,
               padding: 32,
               border: `2px dashed ${palette.accent}`,
-              borderRadius: 16,
+              borderRadius: 20,
               textAlign: 'center',
-              background: 'rgba(15,23,42,0.65)',
-              boxShadow: '0 25px 45px rgba(0,0,0,0.25)',
+              background: '#fff',
+              boxShadow: theme.shadows.card,
             }}
           >
             <p style={{ marginBottom: 12, color: palette.accentMuted }}>
@@ -855,11 +1049,11 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                 padding: '10px 22px',
                 borderRadius: 999,
                 border: 'none',
-                background: canUploadDocument ? palette.accent : 'rgba(148,163,184,0.4)',
-                color: canUploadDocument ? '#0f172a' : '#111827',
+                background: canUploadDocument ? palette.accent : theme.colors.border,
+                color: canUploadDocument ? '#fff' : palette.accentMuted,
                 fontWeight: 600,
                 cursor: !canUploadDocument || uploadingDoc ? 'not-allowed' : 'pointer',
-                boxShadow: canUploadDocument ? '0 15px 35px rgba(56,189,248,0.35)' : 'none',
+                boxShadow: canUploadDocument ? theme.shadows.pill : 'none',
               }}
             >
               {uploadingDoc ? 'Uploading…' : 'Upload PDF'}
@@ -912,7 +1106,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           height: field.height,
                           border: field.id === selectedFieldId ? `2px solid ${palette.accent}` : '1px solid rgba(17,24,39,0.6)',
                           background: 'rgba(56,189,248,0.18)',
-                          color: '#0f172a',
+                          color: theme.colors.text,
                           fontSize: 12,
                           fontWeight: 600,
                           letterSpacing: 0.2,
@@ -1017,11 +1211,12 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   <div
                     key={investor.id}
                     style={{
-                      border: isSelectedInvestor ? `1px solid ${palette.accent}` : '1px solid rgba(148,163,184,0.3)',
-                      borderRadius: 14,
-                      padding: 14,
-                      background: isSelectedInvestor ? 'rgba(56,189,248,0.08)' : 'rgba(15,23,42,0.6)',
+                      border: isSelectedInvestor ? `1px solid ${palette.accent}` : `1px solid ${palette.cardBorder}`,
+                      borderRadius: 16,
+                      padding: 16,
+                      background: isSelectedInvestor ? palette.chip || theme.colors.accentSoft : '#fff',
                       transition: 'border-color 0.2s ease, background 0.2s ease',
+                      boxShadow: isSelectedInvestor ? theme.shadows.card : '0 6px 16px rgba(15,23,42,0.06)',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 12 }}>
@@ -1031,7 +1226,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                             width: 32,
                             height: 32,
                             borderRadius: '50%',
-                            background: 'rgba(56,189,248,0.15)',
+                            background: palette.chip,
                             color: palette.accent,
                             display: 'flex',
                             alignItems: 'center',
@@ -1058,8 +1253,8 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         type="button"
                         onClick={() => toggleInvestorExpansion(investor.id)}
                         style={{
-                          border: '1px solid rgba(148,163,184,0.4)',
-                          background: 'rgba(148,163,184,0.15)',
+                          border: `1px solid ${palette.cardBorder}`,
+                          background: '#fff',
                           color: palette.textStrong,
                           borderRadius: 999,
                           padding: '4px 12px',
@@ -1184,7 +1379,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15,23,42,0.6)',
+            background: theme.colors.overlay,
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'flex-start',
@@ -1193,9 +1388,9 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
             overflowY: 'auto',
           }}
         >
-          <div style={{ width: 'min(1200px, 100%)', background: '#fff', borderRadius: 12, boxShadow: '0 20px 45px rgba(15,23,42,0.35)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: 'min(1200px, 100%)', background: '#fff', borderRadius: 12, boxShadow: theme.shadows.modal, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Projects & Investors</h3>
+              <h3 style={{ margin: 0 }}>Investors</h3>
               <button
                 type="button"
                 onClick={closeProjectsModal}
@@ -1213,7 +1408,13 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               </button>
             </div>
             <div style={{ padding: '24px 24px 12px', overflowY: 'auto' }}>
-              <ProjectsPage onAnyChange={handleProjectsChange} initialProjectId={selectedProjectId ?? undefined} />
+              {adminToken && (
+                <InvestorsPage
+                  onAnyChange={handleProjectsChange}
+                  initialProjectId={selectedProjectId ?? undefined}
+                  accessToken={adminToken}
+                />
+              )}
             </div>
             <div style={{ padding: '12px 24px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end' }}>
               <button
@@ -1241,7 +1442,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15,23,42,0.45)',
+            background: theme.colors.overlay,
             backdropFilter: 'blur(2px)',
             zIndex: 120,
             display: 'flex',
@@ -1254,7 +1455,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               width: 'min(720px, 50vw)',
               height: '100%',
               background: '#f8fafc',
-              boxShadow: '-10px 0 30px rgba(15,23,42,0.25)',
+              boxShadow: theme.shadows.modal,
               transform: confirmDrawerOpen ? 'translateX(0)' : 'translateX(100%)',
               transition: 'transform 0.35s ease',
               display: 'flex',

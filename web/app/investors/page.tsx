@@ -18,12 +18,13 @@ type ProjectInvestor = {
   routing_order: number;
 };
 
-type ProjectsPageProps = {
+type InvestorsPageProps = {
   onAnyChange?: () => void;
   initialProjectId?: number | null;
+  accessToken: string;
 };
 
-export default function ProjectsPage({ onAnyChange, initialProjectId }: ProjectsPageProps) {
+export default function InvestorsPage({ onAnyChange, initialProjectId, accessToken }: InvestorsPageProps) {
   const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -34,18 +35,22 @@ export default function ProjectsPage({ onAnyChange, initialProjectId }: Projects
   const [newInvestor, setNewInvestor] = useState({ name: '', email: '', units: 0 });
 
   useEffect(() => {
+    if (!accessToken) return;
     refreshProjects();
-  }, []);
+  }, [accessToken]);
 
   const signalChange = () => {
     onAnyChange?.();
   };
 
   const refreshProjects = async () => {
+    if (!accessToken) return;
     setLoadingProjects(true);
     setError(null);
     try {
-      const resp = await fetch(`${base}/api/projects`);
+      const resp = await fetch(`${base}/api/projects`, {
+        headers: { 'X-Access-Token': accessToken },
+      });
       if (!resp.ok) throw new Error(`Failed to load projects (${resp.status})`);
       const list = await resp.json();
       setProjects(list || []);
@@ -70,10 +75,13 @@ export default function ProjectsPage({ onAnyChange, initialProjectId }: Projects
   };
 
   const refreshInvestors = async (projectId: number) => {
+    if (!accessToken) return;
     setLoadingInvestors(true);
     setError(null);
     try {
-      const resp = await fetch(`${base}/api/projects/${projectId}/investors`);
+      const resp = await fetch(`${base}/api/projects/${projectId}/investors`, {
+        headers: { 'X-Access-Token': accessToken },
+      });
       if (!resp.ok) throw new Error(`Failed to load investors (${resp.status})`);
       const list = await resp.json();
       setInvestors(list || []);
@@ -97,7 +105,10 @@ export default function ProjectsPage({ onAnyChange, initialProjectId }: Projects
       setLoadingInvestors(true);
       const resp = await fetch(`${base}/api/projects/${selectedProject.id}/investors`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Token': accessToken,
+        },
         body: JSON.stringify({
           name: newInvestor.name,
           email: newInvestor.email,
@@ -126,6 +137,7 @@ export default function ProjectsPage({ onAnyChange, initialProjectId }: Projects
       setLoadingInvestors(true);
       const resp = await fetch(`${base}/api/projects/${selectedProject.id}/investors/${investorId}`, {
         method: 'DELETE',
+        headers: { 'X-Access-Token': accessToken },
       });
       if (!resp.ok) {
         const detail = await resp.text();
@@ -171,7 +183,7 @@ export default function ProjectsPage({ onAnyChange, initialProjectId }: Projects
       <section style={{ flex: '1 1 auto' }}>
         <h2>Investors</h2>
         {!selectedProject ? (
-          <p>Select a project to view investors.</p>
+          <p>{accessToken ? 'Select a project to view investors.' : 'Admin token required.'}</p>
         ) : (
           <>
             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>

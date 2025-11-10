@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 type EnvelopeSummary = {
@@ -18,13 +18,45 @@ export default function EnvelopeSentPage() {
   const [summary, setSummary] = useState<EnvelopeSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [adminToken, setAdminToken] = useState('');
+  const [needsToken, setNeedsToken] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [tokenError, setTokenError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('adminAccessToken');
+    if (saved) {
+      setAdminToken(saved);
+    }
+  }, []);
 
   useEffect(() => {
     if (!envelopeId) return;
+    if (!adminToken) {
+      setNeedsToken(true);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
-    fetch(`${baseApi}/api/envelopes/${envelopeId}`)
+    setNeedsToken(false);
+    fetch(`${baseApi}/api/envelopes/${envelopeId}`, {
+      headers: { 'X-Access-Token': adminToken },
+    })
       .then((resp) => {
+        if (resp.status === 401 || resp.status === 403) {
+          if (!cancelled) {
+            setNeedsToken(true);
+            setTokenError('Access token required.');
+            setSummary(null);
+            setAdminToken('');
+            if (typeof window !== 'undefined') {
+              window.localStorage.removeItem('adminAccessToken');
+            }
+          }
+          throw new Error('Access token required');
+        }
         if (!resp.ok) throw new Error(`Unable to load envelope (${resp.status})`);
         return resp.json();
       })
@@ -42,9 +74,24 @@ export default function EnvelopeSentPage() {
     return () => {
       cancelled = true;
     };
-  }, [envelopeId, baseApi]);
+  }, [envelopeId, baseApi, adminToken]);
 
-  const goBack = () => router.replace('/request-sign');
+  const submitToken = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const candidate = tokenInput.trim();
+    if (!candidate) {
+      setTokenError('Token required');
+      return;
+    }
+    setAdminToken(candidate);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('adminAccessToken', candidate);
+    }
+    setTokenError(null);
+    setTokenInput('');
+  };
+
+  const goBack = () => router.replace('/admin');
 
   if (!envelopeId) {
     return <div style={{ padding: 32 }}>Missing envelope ID.</div>;
@@ -87,7 +134,40 @@ export default function EnvelopeSentPage() {
             textAlign: 'center',
           }}
         >
-          {error ? (
+          {needsToken ? (
+            <form onSubmit={submitToken} style={{ display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
+              <h2 style={{ margin: 0 }}>Admin access required</h2>
+              <p style={{ fontSize: 14, color: '#475569' }}>Enter the admin access token to view this envelope summary.</p>
+              <input
+                type="password"
+                value={tokenInput}
+                onChange={(event) => setTokenInput(event.target.value)}
+                placeholder="Admin token"
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #d1d5db',
+                }}
+              />
+              {tokenError && <span style={{ color: '#b91c1c', fontSize: 13 }}>{tokenError}</span>}
+              <button
+                type="submit"
+                style={{
+                  alignSelf: 'flex-start',
+                  background: '#2563eb',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '10px 20px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Continue
+              </button>
+            </form>
+          ) : error ? (
             <p style={{ color: '#b91c1c' }}>{error}</p>
           ) : loading ? (
             <p>Loading summary…</p>
@@ -133,7 +213,7 @@ export default function EnvelopeSentPage() {
               cursor: 'pointer',
             }}
           >
-            Back to Request Sign
+            Back to Admin
           </button>
         </div>
       </div>

@@ -1,18 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState, MouseEvent } from 'react';
-import ProjectsPage from '../projects/page';
+import { useCallback, useEffect, useMemo, useState, MouseEvent, FormEvent } from 'react';
+import InvestorsPage from '../investors/page';
+import { theme } from '../../lib/theme';
 
 type Project = {
   id: number;
   name: string;
   status: string;
-};
-
-type Document = {
-  id: number;
-  filename: string;
-  created_at: string;
+  access_token?: string | null;
 };
 
 type FinalArtifact = {
@@ -21,6 +17,17 @@ type FinalArtifact = {
   document_name: string;
   completed_at: string;
   sha256_final: string;
+};
+
+type EnvelopeSummary = {
+  id: number;
+  subject: string;
+  status: string;
+  created_at: string;
+  document?: { id: number | null; filename: string | null };
+  total_signers: number;
+  completed_signers: number;
+  signers: Array<{ id: number; name: string; email: string; status: string; role: string; routing_order: number; magic_link?: string | null }>;
 };
 
 type Investor = {
@@ -32,48 +39,114 @@ type Investor = {
 };
 
 const palette = {
-  bg: 'linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #111827 100%)',
-  panel: 'rgba(15,23,42,0.8)',
-  accent: '#38bdf8',
-  accentMuted: '#94a3b8',
+  bg: theme.colors.page,
+  panel: theme.colors.panel,
+  accent: theme.colors.accent,
+  accentMuted: theme.colors.textMuted,
+  text: theme.colors.text,
+  border: theme.colors.border,
+  chip: theme.colors.chip,
+  overlay: theme.colors.overlay,
+  code: theme.colors.code,
 };
-
-const baseApi = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+const shadows = theme.shadows;
 
 export default function AdminPage() {
+  const baseApi = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const [adminToken, setAdminToken] = useState('');
+  const [adminVerified, setAdminVerified] = useState(false);
+  const [adminTokenLoading, setAdminTokenLoading] = useState(true);
+  const [adminTokenError, setAdminTokenError] = useState<string | null>(null);
+  const [tokenInput, setTokenInput] = useState('');
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [documents, setDocuments] = useState<Document[]>([]);
   const [finals, setFinals] = useState<FinalArtifact[]>([]);
+  const [envelopes, setEnvelopes] = useState<EnvelopeSummary[]>([]);
+  const [expandedEnvelopes, setExpandedEnvelopes] = useState<Record<number, boolean>>({});
+  const [expandedFinals, setExpandedFinals] = useState<Record<number, boolean>>({});
+  const [revokingEnvelopeId, setRevokingEnvelopeId] = useState<number | null>(null);
   const [investors, setInvestors] = useState<Investor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [selectedDocIds, setSelectedDocIds] = useState<number[]>([]);
   const [selectedFinalIds, setSelectedFinalIds] = useState<number[]>([]);
   const [loadingInvestors, setLoadingInvestors] = useState(false);
   const [showInvestorModal, setShowInvestorModal] = useState(false);
   const [investorsDirty, setInvestorsDirty] = useState(false);
   const [manageSignedMode, setManageSignedMode] = useState(false);
-  const [manageUploadsMode, setManageUploadsMode] = useState(false);
+  const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
   const [hoveredFinalId, setHoveredFinalId] = useState<number | null>(null);
-  const [hoveredDocId, setHoveredDocId] = useState<number | null>(null);
   const [newProjectName, setNewProjectName] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [manageProjectsMode, setManageProjectsMode] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
+  const [centerTab, setCenterTab] = useState<'documents' | 'share'>('documents');
+
+  const verifyAdminToken = useCallback(
+    async (candidate: string) => {
+      setAdminTokenLoading(true);
+      setAdminTokenError(null);
+      try {
+        const resp = await fetch(`${baseApi}/api/projects`, {
+          headers: { 'X-Access-Token': candidate },
+        });
+        if (!resp.ok) throw new Error('Invalid token');
+        setAdminToken(candidate);
+        setAdminVerified(true);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('adminAccessToken', candidate);
+        }
+      } catch (err) {
+        setAdminToken('');
+        setAdminVerified(false);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('adminAccessToken');
+        }
+        setAdminTokenError(err instanceof Error ? err.message : 'Invalid token');
+      } finally {
+        setAdminTokenLoading(false);
+      }
+    },
+    [baseApi],
+  );
+
+  const logout = useCallback(() => {
+    setAdminToken('');
+    setAdminVerified(false);
+    setAdminTokenError(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('adminAccessToken');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setAdminTokenLoading(false);
+      return;
+    }
+    const saved = localStorage.getItem('adminAccessToken');
+    if (saved) {
+      verifyAdminToken(saved);
+    } else {
+      setAdminTokenLoading(false);
+    }
+  }, [verifyAdminToken]);
 
   const loadProjects = async (focusId?: number) => {
+    if (!adminToken) return;
     try {
-      const resp = await fetch(`${baseApi}/api/projects`);
+      const resp = await fetch(`${baseApi}/api/projects`, {
+        headers: { 'X-Access-Token': adminToken },
+      });
       if (!resp.ok) throw new Error(`Failed to load projects (${resp.status})`);
       const data = await resp.json();
-      setProjects(data || []);
-      if (focusId) {
+      const sorted = Array.isArray(data) ? [...data].sort((a, b) => (a?.id ?? 0) - (b?.id ?? 0)) : [];
+      setProjects(sorted);
+      if (typeof focusId === 'number') {
         setSelectedProjectId(focusId);
-      } else if (data?.length && !selectedProjectId) {
-        setSelectedProjectId(data[0].id);
+      } else if (sorted.length && !selectedProjectId) {
+        setSelectedProjectId(sorted[0].id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load projects');
@@ -81,32 +154,44 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    if (!adminVerified || !adminToken) return;
     loadProjects();
-  }, []);
+  }, [adminVerified, adminToken]);
 
   useEffect(() => {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId || !adminToken) return;
     setLoading(true);
     setError(null);
     Promise.all([
-      fetch(`${baseApi}/api/projects/${selectedProjectId}/documents`).then((r) => r.json()),
-      fetch(`${baseApi}/api/projects/${selectedProjectId}/final-artifacts`).then((r) => r.json()),
+      fetch(`${baseApi}/api/projects/${selectedProjectId}/final-artifacts`, {
+        headers: { 'X-Access-Token': adminToken },
+      }).then((r) => r.json()),
+      fetch(`${baseApi}/api/projects/${selectedProjectId}/envelopes`, {
+        headers: { 'X-Access-Token': adminToken },
+      }).then((r) => r.json()),
     ])
-      .then(([docs, finalsData]) => {
-        setDocuments(docs || []);
+      .then(([finalsData, envelopesData]) => {
         setFinals(finalsData || []);
-        setSelectedDocIds([]);
+        setEnvelopes(envelopesData || []);
         setSelectedFinalIds([]);
+        setExpandedEnvelopes({});
         loadInvestors(selectedProjectId);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load project details'))
       .finally(() => setLoading(false));
+  }, [selectedProjectId, adminToken]);
+
+  useEffect(() => {
+    setCenterTab('documents');
   }, [selectedProjectId]);
 
   const loadInvestors = async (projectId: number) => {
+    if (!adminToken) return;
     setLoadingInvestors(true);
     try {
-      const resp = await fetch(`${baseApi}/api/projects/${projectId}/investors`);
+      const resp = await fetch(`${baseApi}/api/projects/${projectId}/investors`, {
+        headers: { 'X-Access-Token': adminToken },
+      });
       if (!resp.ok) throw new Error(`Failed to load investors (${resp.status})`);
       const list = await resp.json();
       setInvestors(list || []);
@@ -117,14 +202,33 @@ export default function AdminPage() {
     }
   };
 
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId),
-    [projects, selectedProjectId],
-  );
-
-  const toggleDocumentSelection = (id: number) => {
-    setSelectedDocIds((prev) => (prev.includes(id) ? prev.filter((docId) => docId !== id) : [...prev, id]));
-  };
+  const selectedProject = useMemo(() => {
+    const project = projects.find((p) => p.id === selectedProjectId) || null;
+    // Reset manage modes when switching projects so states don't leak.
+    setManageSignedMode(false);
+    setManageEnvelopesMode(false);
+    setSelectedFinalIds([]);
+    setExpandedEnvelopes({});
+    setExpandedFinals({});
+    return project;
+  }, [projects, selectedProjectId]);
+  const selectedProjectToken = selectedProject?.access_token ?? null;
+  const outstandingEnvelopes = useMemo(() => envelopes.filter((env) => env.status !== 'completed'), [envelopes]);
+  const envelopeMap = useMemo(() => {
+    const map: Record<number, EnvelopeSummary> = {};
+    envelopes.forEach((env) => {
+      map[env.id] = env;
+    });
+    return map;
+  }, [envelopes]);
+  const tokenParam = adminToken ? `?token=${encodeURIComponent(adminToken)}` : '';
+  const shareLink = useMemo(() => {
+    if (!selectedProject || !selectedProjectToken) return '';
+    const origin =
+      typeof window !== 'undefined' && window.location?.origin ? window.location.origin : process.env.NEXT_PUBLIC_WEB_BASE;
+    const base = origin || 'http://localhost:3000';
+    return `${base}/projects/${selectedProject.id}/${selectedProjectToken}`;
+  }, [selectedProject, selectedProjectToken]);
 
   const toggleFinalSelection = (id: number) => {
     setSelectedFinalIds((prev) => (prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]));
@@ -146,24 +250,33 @@ export default function AdminPage() {
     setInvestorsDirty(true);
   };
 
-  const deleteSelectedDocuments = async () => {
-    if (!selectedProjectId || !selectedDocIds.length) return;
-    const confirmRemove = window.confirm(`Delete ${selectedDocIds.length} uploaded PDF(s)? This cannot be undone.`);
-    if (!confirmRemove) return;
-    setActionLoading(true);
-    try {
-      for (const id of selectedDocIds) {
-        const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/documents/${id}`, { method: 'DELETE' });
-        if (!resp.ok) throw new Error(`Delete failed (${resp.status})`);
+  const revokeEnvelope = useCallback(
+    async (envelopeId: number) => {
+      if (!selectedProjectId) return;
+      const confirmRemove = window.confirm('Revoke this envelope and remove all pending magic links?');
+      if (!confirmRemove) return;
+      setRevokingEnvelopeId(envelopeId);
+      try {
+        const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/envelopes/${envelopeId}`, {
+          method: 'DELETE',
+          headers: { 'X-Access-Token': adminToken ?? '' },
+        });
+        if (!resp.ok) throw new Error(`Failed to revoke envelope (${resp.status})`);
+        setEnvelopes((prev) => prev.filter((env) => env.id !== envelopeId));
+        setSelectedFinalIds((prev) => prev.filter((id) => id !== envelopeId));
+        setExpandedEnvelopes((prev) => {
+          const next = { ...prev };
+          delete next[envelopeId];
+          return next;
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to revoke envelope');
+      } finally {
+        setRevokingEnvelopeId(null);
       }
-      setDocuments((prev) => prev.filter((doc) => !selectedDocIds.includes(doc.id)));
-      setSelectedDocIds([]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete documents');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    },
+    [selectedProjectId, baseApi, adminToken],
+  );
 
   const toggleSignedManage = () => {
     setManageSignedMode((prev) => {
@@ -172,11 +285,11 @@ export default function AdminPage() {
     });
   };
 
-  const toggleUploadManage = () => {
-    setManageUploadsMode((prev) => {
-      if (prev) setSelectedDocIds([]);
-      return !prev;
-    });
+  const toggleEnvelopeManage = () => {
+    setManageEnvelopesMode((prev) => !prev);
+    if (revokingEnvelopeId) {
+      setRevokingEnvelopeId(null);
+    }
   };
 
   const deleteSelectedFinals = async () => {
@@ -186,7 +299,10 @@ export default function AdminPage() {
     setActionLoading(true);
     try {
       for (const id of selectedFinalIds) {
-        const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${id}`, { method: 'DELETE' });
+        const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${id}`, {
+          method: 'DELETE',
+          headers: { 'X-Access-Token': adminToken ?? '' },
+        });
         if (!resp.ok) throw new Error(`Delete failed (${resp.status})`);
       }
       setFinals((prev) => prev.filter((item) => !selectedFinalIds.includes(item.envelope_id)));
@@ -205,6 +321,7 @@ export default function AdminPage() {
   };
 
   const createProject = async () => {
+    if (!adminToken) return;
     const name = newProjectName.trim();
     if (!name) {
       setError('Project name required');
@@ -213,7 +330,10 @@ export default function AdminPage() {
     setCreatingProject(true);
     setError(null);
     try {
-      const resp = await fetch(`${baseApi}/api/projects?name=${encodeURIComponent(name)}`, { method: 'POST' });
+      const resp = await fetch(`${baseApi}/api/projects?name=${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { 'X-Access-Token': adminToken },
+      });
       if (!resp.ok) throw new Error(`Failed to create project (${resp.status})`);
       const project = await resp.json();
       setNewProjectName('');
@@ -246,7 +366,10 @@ export default function AdminPage() {
     setActionLoading(true);
     try {
       for (const projectId of selectedProjectIds) {
-        const resp = await fetch(`${baseApi}/api/projects/${projectId}`, { method: 'DELETE' });
+        const resp = await fetch(`${baseApi}/api/projects/${projectId}`, {
+          method: 'DELETE',
+          headers: { 'X-Access-Token': adminToken ?? '' },
+        });
         if (!resp.ok) throw new Error(`Failed to delete project (${resp.status})`);
         if (projectId === selectedProjectId) {
           setSelectedProjectId(null);
@@ -262,33 +385,128 @@ export default function AdminPage() {
     }
   };
 
+  const regenerateProjectToken = async (projectId: number) => {
+    if (!adminToken) return;
+    try {
+      const resp = await fetch(`${baseApi}/api/projects/${projectId}/access-token`, {
+        method: 'POST',
+        headers: { 'X-Access-Token': adminToken },
+      });
+      if (!resp.ok) throw new Error(`Failed to regenerate token (${resp.status})`);
+      await loadProjects(projectId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to regenerate token');
+    }
+  };
+
+  const copyProjectToken = async (token?: string | null) => {
+    if (!token) return;
+    try {
+      await navigator.clipboard.writeText(token);
+      alert('Token copied to clipboard.');
+    } catch {
+      alert('Unable to copy token automatically.');
+    }
+  };
+
+  const handleTokenSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const candidate = tokenInput.trim();
+    if (!candidate) return;
+    await verifyAdminToken(candidate);
+    setTokenInput('');
+  };
+
+  if (adminTokenLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: palette.bg }}>
+        <p>Verifying access…</p>
+      </div>
+    );
+  }
+
+  if (!adminVerified) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: palette.bg }}>
+        <form
+          onSubmit={handleTokenSubmit}
+          style={{
+            background: '#fff',
+            padding: 32,
+            borderRadius: 20,
+            boxShadow: '0 30px 60px rgba(15,23,42,0.12)',
+            width: 'min(360px, 90vw)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            border: `1px solid ${palette.border}`,
+          }}
+        >
+          <h2 style={{ margin: 0, color: palette.text }}>Admin Access</h2>
+          <p style={{ margin: 0, fontSize: 14, color: palette.accentMuted }}>Enter the admin access token to continue.</p>
+          <input
+            type="password"
+            value={tokenInput}
+            onChange={(event) => setTokenInput(event.target.value)}
+            placeholder="Admin token"
+            style={{
+              padding: 10,
+              borderRadius: 8,
+              border: `1px solid ${palette.border}`,
+              background: '#fff',
+              color: palette.text,
+            }}
+          />
+          {adminTokenError && <p style={{ color: '#f87171', margin: 0 }}>{adminTokenError}</p>}
+          <button
+            type="submit"
+            style={{
+              border: 'none',
+              borderRadius: 999,
+              padding: '10px 16px',
+              background: palette.accent,
+              color: '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 12px 25px rgba(108,92,231,0.35)',
+            }}
+          >
+            Continue
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: palette.bg, color: '#f8fafc' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', background: palette.bg, color: palette.text }}>
       <aside
         style={{
           width: 260,
           padding: 24,
-          borderRight: '1px solid rgba(148,163,184,0.35)',
-          background: 'rgba(15,23,42,0.9)',
+          borderRight: `1px solid ${palette.border}`,
+          background: '#fff',
           display: 'flex',
           flexDirection: 'column',
           gap: 16,
+          boxShadow: '0 10px 30px rgba(17, 24, 39, 0.05)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 20, color: palette.accent }}>Projects</h2>
+          <h2 style={{ margin: 0, fontSize: 20, color: palette.text }}>Projects</h2>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button
               type="button"
               onClick={toggleProjectManage}
               style={{
-                border: '1px solid rgba(148,163,184,0.5)',
-                background: 'transparent',
-                color: '#e2e8f0',
+                border: `1px solid ${palette.border}`,
+                background: manageProjectsMode ? palette.accent : '#fff',
+                color: manageProjectsMode ? '#fff' : palette.text,
                 borderRadius: 999,
                 padding: '4px 10px',
                 fontSize: 12,
                 cursor: 'pointer',
+                boxShadow: manageProjectsMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
               }}
             >
               {manageProjectsMode ? 'Done' : 'Manage'}
@@ -299,14 +517,15 @@ export default function AdminPage() {
                 onClick={deleteSelectedProjects}
                 disabled={!selectedProjectIds.length || actionLoading}
                 style={{
-                  border: '1px solid rgba(248,113,113,0.8)',
-                  color: '#fca5a5',
-                  background: 'transparent',
+                  border: '1px solid #dc2626',
+                  color: '#fff',
+                  background: '#dc2626',
                   borderRadius: 999,
                   padding: '4px 10px',
                   fontSize: 12,
                   cursor: !selectedProjectIds.length || actionLoading ? 'not-allowed' : 'pointer',
                   opacity: !selectedProjectIds.length || actionLoading ? 0.5 : 1,
+                  boxShadow: !selectedProjectIds.length || actionLoading ? 'none' : '0 10px 18px rgba(220,38,38,0.25)',
                 }}
               >
                 Delete
@@ -315,39 +534,45 @@ export default function AdminPage() {
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
-          {projects.map((project, idx) => {
-            const active = project.id === selectedProjectId;
-            return (
-              <button
-                key={`project-${project.id ?? idx}`}
-                onClick={() => setSelectedProjectId(project.id)}
-                style={{
-                  textAlign: 'left',
-                  padding: '10px 12px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: active ? palette.accent : 'rgba(248,250,252,0.08)',
-                  color: active ? '#0f172a' : '#e2e8f0',
-                  cursor: 'pointer',
-                  fontWeight: active ? 600 : 400,
-                }}
+            {projects.map((project, idx) => {
+              const active = project.id === selectedProjectId;
+              return (
+                <button
+                  key={`project-${project.id ?? idx}`}
+                  onClick={() => setSelectedProjectId(project.id)}
+                  style={{
+                    textAlign: 'left',
+                    padding: '12px 14px',
+                    borderRadius: 14,
+                    border: `1px solid ${active ? palette.accent : palette.border}`,
+                    background: active ? 'linear-gradient(135deg,#6c5ce7,#7f6bff)' : '#fff',
+                    color: active ? '#fff' : palette.text,
+                    cursor: 'pointer',
+                    fontWeight: active ? 600 : 500,
+                    boxShadow: active ? '0 12px 24px rgba(108,92,231,0.25)' : '0 4px 12px rgba(15,23,42,0.05)',
+                  }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {manageProjectsMode && (
-                      <input
-                        type="checkbox"
-                        checked={selectedProjectIds.includes(project.id)}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={() => toggleProjectSelection(project.id)}
-                      />
-                    )}
-                    <span>{project.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {manageProjectsMode && (
+                        <input
+                          type="checkbox"
+                          checked={selectedProjectIds.includes(project.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => toggleProjectSelection(project.id)}
+                        />
+                      )}
+                      <div>
+                        <strong>{project.name}</strong>
+                        <p style={{ margin: 0, fontSize: 12, color: active ? 'rgba(255,255,255,0.8)' : palette.accentMuted }}>#{project.id}</p>
+                      </div>
+                    </div>
                   </div>
                 </button>
-            );
-          })}
+              );
+            })}
           {manageProjectsMode && (
-            <div style={{ borderTop: '1px solid rgba(148,163,184,0.2)', paddingTop: 12, marginTop: 4 }}>
+            <div style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 12, marginTop: 4 }}>
               {!showProjectForm ? (
                 <button
                   type="button"
@@ -372,11 +597,11 @@ export default function AdminPage() {
                     onChange={(event) => setNewProjectName(event.target.value)}
                     placeholder="Project name"
                     style={{
-                      padding: 8,
-                      borderRadius: 8,
-                      border: '1px solid rgba(148,163,184,0.4)',
-                      background: 'rgba(15,23,42,0.6)',
-                      color: '#f8fafc',
+                      padding: 10,
+                      borderRadius: 10,
+                      border: `1px solid ${palette.border}`,
+                      background: '#fff',
+                      color: palette.text,
                     }}
                   />
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -386,13 +611,14 @@ export default function AdminPage() {
                       disabled={creatingProject}
                       style={{
                         flex: 1,
-                        borderRadius: 8,
+                        borderRadius: 999,
                         border: 'none',
-                        padding: '8px 12px',
-                        background: creatingProject ? 'rgba(56,189,248,0.3)' : palette.accent,
-                        color: '#0f172a',
+                        padding: '10px 14px',
+                        background: creatingProject ? 'rgba(108,92,231,0.3)' : palette.accent,
+                        color: '#fff',
                         fontWeight: 600,
                         cursor: creatingProject ? 'not-allowed' : 'pointer',
+                        boxShadow: creatingProject ? 'none' : '0 12px 24px rgba(108,92,231,0.25)',
                       }}
                     >
                       {creatingProject ? 'Adding…' : 'Add'}
@@ -406,7 +632,7 @@ export default function AdminPage() {
                       style={{
                         border: 'none',
                         background: 'transparent',
-                        color: '#e2e8f0',
+                        color: palette.accentMuted,
                         cursor: 'pointer',
                         fontSize: 12,
                       }}
@@ -419,6 +645,23 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+        <button
+          type="button"
+          onClick={logout}
+          style={{
+            marginTop: 8,
+            border: `1px solid ${palette.accent}`,
+            background: '#fff',
+            color: palette.accent,
+            borderRadius: 999,
+            padding: '6px 12px',
+            fontSize: 12,
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          Sign out
+        </button>
       </aside>
       <main style={{ flex: 1, display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24, padding: 32 }}>
         <section
@@ -426,7 +669,7 @@ export default function AdminPage() {
             borderRadius: 24,
             background: palette.panel,
             padding: 24,
-            boxShadow: '0 25px 45px rgba(0,0,0,0.35)',
+            boxShadow: '0 20px 40px rgba(15,23,42,0.08)',
             display: 'flex',
             flexDirection: 'column',
             gap: 16,
@@ -434,188 +677,590 @@ export default function AdminPage() {
         >
           <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Documents</p>
+              <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Project</p>
               <h3 style={{ margin: 0 }}>{selectedProject?.name || 'Select a project'}</h3>
             </div>
             {loading && <span style={{ fontSize: 12 }}>Loading…</span>}
           </header>
           {error && <div style={{ color: '#fca5a5' }}>{error}</div>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <h4 style={{ margin: 0 }}>Signed Documents</h4>
+          <div
+            style={{
+              display: 'flex',
+              gap: 18,
+              borderBottom: '1px solid rgba(148,163,184,0.35)',
+              paddingBottom: 4,
+            }}
+          >
+            {(
+              [
+                { id: 'documents', label: 'Documents', icon: '📄' },
+                { id: 'share', label: 'Share', icon: '🔐' },
+              ] as Array<{ id: 'documents' | 'share'; label: string; icon: string }>
+            ).map((tab) => {
+              const active = centerTab === tab.id;
+              return (
                 <button
+                  key={tab.id}
                   type="button"
-                  onClick={toggleSignedManage}
+                  onClick={() => setCenterTab(tab.id)}
                   style={{
-                    border: '1px solid rgba(148,163,184,0.5)',
+                    border: 'none',
                     background: 'transparent',
-                    color: '#e2e8f0',
-                    borderRadius: 999,
-                    padding: '4px 10px',
-                    fontSize: 12,
+                    color: active ? palette.accent : '#cbd5f5',
+                    fontSize: 14,
+                    fontWeight: active ? 600 : 500,
+                    padding: '6px 0',
+                    borderBottom: active ? `3px solid ${palette.accent}` : '3px solid transparent',
                     cursor: 'pointer',
-                    opacity: finals.length ? 1 : 0.4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
                   }}
-                  disabled={!finals.length}
                 >
-                  {manageSignedMode ? 'Done' : 'Manage'}
+                  <span aria-hidden="true">{tab.icon}</span>
+                  {tab.label}
                 </button>
+              );
+            })}
+          </div>
+          {centerTab === 'documents' && selectedProject && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <h4 style={{ margin: 0 }}>Signed Documents</h4>
+                  <button
+                    type="button"
+                    onClick={toggleSignedManage}
+                    style={{
+                      border: `1px solid ${palette.border}`,
+                      background: manageSignedMode ? palette.accent : '#fff',
+                      color: manageSignedMode ? '#fff' : palette.text,
+                      borderRadius: 999,
+                      padding: '4px 12px',
+                      fontSize: 12,
+                      cursor: finals.length ? 'pointer' : 'not-allowed',
+                      opacity: finals.length ? 1 : 0.4,
+                      boxShadow: manageSignedMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
+                    }}
+                    disabled={!finals.length}
+                  >
+                    {manageSignedMode ? 'Done' : 'Manage'}
+                  </button>
+                </div>
+                {manageSignedMode && (
+                  <button
+                    type="button"
+                    onClick={deleteSelectedFinals}
+                    disabled={!selectedFinalIds.length || actionLoading}
+                    style={{
+                      border: '1px solid rgba(248,113,113,0.8)',
+                      color: '#fca5a5',
+                      background: 'transparent',
+                      borderRadius: 999,
+                      padding: '6px 12px',
+                      fontSize: 13,
+                      cursor: !selectedFinalIds.length || actionLoading ? 'not-allowed' : 'pointer',
+                      opacity: !selectedFinalIds.length || actionLoading ? 0.5 : 1,
+                    }}
+                  >
+                    Delete Selected
+                  </button>
+                )}
               </div>
-              {manageSignedMode && (
-                <button
-                  type="button"
-                  onClick={deleteSelectedFinals}
-                  disabled={!selectedFinalIds.length || actionLoading}
-                  style={{
-                    border: '1px solid rgba(248,113,113,0.8)',
-                    color: '#fca5a5',
-                    background: 'transparent',
-                    borderRadius: 999,
-                    padding: '6px 12px',
-                    fontSize: 13,
-                    cursor: !selectedFinalIds.length || actionLoading ? 'not-allowed' : 'pointer',
-                    opacity: !selectedFinalIds.length || actionLoading ? 0.5 : 1,
-                  }}
-                >
-                  Delete Selected
-                </button>
-              )}
-            </div>
             <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {finals.length === 0 && <p style={{ color: palette.accentMuted }}>No signed documents yet.</p>}
               {finals.map((item, idx) => {
-                const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${item.envelope_id}/pdf`;
+                const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${item.envelope_id}/pdf${tokenParam}`;
+                const finalEnvelope = envelopeMap[item.envelope_id];
+                const signerList = finalEnvelope?.signers ?? [];
+                const expanded = expandedFinals[item.envelope_id] ?? false;
+                const hasSigners = signerList.length > 0;
                 return (
-                  <div
-                    key={`final-${selectedProjectId}-${item.envelope_id ?? `idx-${idx}`}-${item.sha256_final ?? 'na'}`}
-                    onClick={(event) => handleCardDownload(event, downloadUrl)}
-                    onMouseEnter={() => setHoveredFinalId(item.envelope_id)}
-                    onMouseLeave={() => setHoveredFinalId((prev) => (prev === item.envelope_id ? null : prev))}
-                    style={{
-                      background:
-                        selectedFinalIds.includes(item.envelope_id) && hoveredFinalId === item.envelope_id
-                          ? 'rgba(56,189,248,0.25)'
-                          : selectedFinalIds.includes(item.envelope_id)
-                          ? 'rgba(56,189,248,0.12)'
-                          : hoveredFinalId === item.envelope_id
-                          ? 'rgba(248,250,252,0.08)'
-                          : 'rgba(248,250,252,0.05)',
-                    borderRadius: 12,
-                    padding: 12,
-                    display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      {manageSignedMode && (
-                        <input
-                          type="checkbox"
-                          checked={selectedFinalIds.includes(item.envelope_id)}
-                          onChange={() => toggleFinalSelection(item.envelope_id)}
-                        />
-                      )}
-                      <div>
-                        <strong>{item.document_name}</strong>
-                        <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
-                          Completed {new Date(item.completed_at).toLocaleString()}
-                        </p>
+                  <div key={`final-${selectedProjectId}-${item.envelope_id ?? `idx-${idx}`}-${item.sha256_final ?? 'na'}`}>
+                    <div
+                      onClick={(event) => handleCardDownload(event, downloadUrl)}
+                      onMouseEnter={() => setHoveredFinalId(item.envelope_id)}
+                      onMouseLeave={() => setHoveredFinalId((prev) => (prev === item.envelope_id ? null : prev))}
+                      style={{
+                        background:
+                          selectedFinalIds.includes(item.envelope_id) && hoveredFinalId === item.envelope_id
+                            ? '#e4ddff'
+                            : selectedFinalIds.includes(item.envelope_id)
+                            ? '#ede9ff'
+                            : hoveredFinalId === item.envelope_id
+                            ? '#f5f2ff'
+                            : '#fbfbfe',
+                        borderRadius: 12,
+                        padding: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        cursor: 'pointer',
+                        border: selectedFinalIds.includes(item.envelope_id)
+                          ? `1px solid ${palette.accent}`
+                          : `1px solid ${palette.border}`,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {manageSignedMode && (
+                          <input
+                            type="checkbox"
+                            checked={selectedFinalIds.includes(item.envelope_id)}
+                            onChange={() => toggleFinalSelection(item.envelope_id)}
+                          />
+                        )}
+                        <div>
+                          <strong>{item.document_name}</strong>
+                          <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
+                            Completed {new Date(item.completed_at).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
+                      {hasSigners && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setExpandedFinals((prev) => ({
+                              ...prev,
+                              [item.envelope_id]: !expanded,
+                            }));
+                          }}
+                          style={{
+                            border: `1px solid ${palette.border}`,
+                            borderRadius: 999,
+                            padding: '4px 12px',
+                            background: '#fff',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                          }}
+                        >
+                          {expanded ? 'Hide signees' : 'Signees'}
+                        </button>
+                      )}
                     </div>
+                    {expanded && hasSigners && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          marginLeft: manageSignedMode ? 32 : 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                        }}
+                      >
+                        {signerList.map((signer) => {
+                          const completed = signer.status === 'completed';
+                          return (
+                            <div
+                              key={`final-signer-${item.envelope_id}-${signer.id}`}
+                              style={{
+                                padding: 12,
+                                borderRadius: 12,
+                                border: `1px solid ${palette.border}`,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                background: '#fff',
+                              }}
+                            >
+                              <div>
+                                <strong>{signer.name}</strong>
+                                <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
+                              </div>
+                              <span
+                                style={{
+                                  borderRadius: 999,
+                                  padding: '4px 10px',
+                                  fontSize: 12,
+                                  color: completed ? '#065f46' : '#92400e',
+                                  background: completed ? '#dcfce7' : '#fffbeb',
+                                  border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                                }}
+                              >
+                                {completed ? 'Signed' : 'Pending'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <h4 style={{ margin: 0 }}>Uploaded PDFs</h4>
+            <div style={{ marginTop: 28 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div>
+                  <h4 style={{ margin: 0 }}>Out for Signature</h4>
+                  <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                    {outstandingEnvelopes.length} open envelopes
+                  </span>
+                </div>
                 <button
                   type="button"
-                  onClick={toggleUploadManage}
+                  onClick={toggleEnvelopeManage}
                   style={{
-                    border: '1px solid rgba(148,163,184,0.5)',
-                    background: 'transparent',
-                    color: '#e2e8f0',
+                    border: `1px solid ${palette.border}`,
+                    background: manageEnvelopesMode ? palette.accent : '#fff',
+                    color: manageEnvelopesMode ? '#fff' : palette.text,
                     borderRadius: 999,
                     padding: '4px 10px',
                     fontSize: 12,
                     cursor: 'pointer',
-                    opacity: documents.length ? 1 : 0.4,
+                    boxShadow: manageEnvelopesMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
                   }}
-                  disabled={!documents.length}
                 >
-                  {manageUploadsMode ? 'Done' : 'Manage'}
+                  {manageEnvelopesMode ? 'Done' : 'Manage'}
                 </button>
               </div>
-              {manageUploadsMode && (
-                <button
-                  type="button"
-                  onClick={deleteSelectedDocuments}
-                  disabled={!selectedDocIds.length || actionLoading}
-                  style={{
-                    border: '1px solid rgba(248,113,113,0.8)',
-                    color: '#fca5a5',
-                    background: 'transparent',
-                    borderRadius: 999,
-                    padding: '6px 12px',
-                    fontSize: 13,
-                    cursor: !selectedDocIds.length || actionLoading ? 'not-allowed' : 'pointer',
-                    opacity: !selectedDocIds.length || actionLoading ? 0.5 : 1,
-                  }}
-                >
-                  Delete Selected
-                </button>
-              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+                {outstandingEnvelopes.length === 0 && (
+                  <p style={{ color: palette.accentMuted }}>No outstanding envelopes.</p>
+                )}
+                {outstandingEnvelopes.map((env) => {
+                    const expanded = expandedEnvelopes[env.id] ?? false;
+                    const hasSigners = env.total_signers > 0;
+                    const progressLabel = hasSigners
+                      ? `${env.completed_signers}/${env.total_signers} signed`
+                      : 'Incomplete setup';
+                    const buttonLabel = expanded ? 'Hide signees' : progressLabel;
+                    const documentUrl =
+                      selectedProjectId && env.document?.id
+                        ? `${baseApi}/api/projects/${selectedProjectId}/documents/${env.document.id}/pdf${tokenParam}`
+                        : null;
+                    const fileLabel = env.document?.filename || 'Untitled PDF';
+                    return (
+                      <div
+                        key={`env-${env.id}`}
+                        onClick={(event) => documentUrl && handleCardDownload(event, documentUrl)}
+                        style={{
+                          border: `1px solid ${palette.border}`,
+                          borderRadius: 18,
+                          padding: 16,
+                          background: '#fff',
+                          boxShadow: '0 10px 24px rgba(15,23,42,0.08)',
+                          cursor: documentUrl ? 'pointer' : 'default',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                          <div>
+                            <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
+                            {env.subject && (
+                              <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>{env.subject}</p>
+                            )}
+                            {documentUrl && (
+                              <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
+                                Click to download the original upload
+                              </p>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedEnvelopes((prev) => ({
+                                  ...prev,
+                                  [env.id]: !expanded,
+                                }))
+                              }
+                              style={{
+                                border: `1px solid ${palette.border}`,
+                                borderRadius: 999,
+                                padding: '4px 12px',
+                                background: '#fff',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                              }}
+                            >
+                              {buttonLabel}
+                            </button>
+                            {manageEnvelopesMode && (
+                              <button
+                                type="button"
+                                onClick={() => revokeEnvelope(env.id)}
+                                disabled={revokingEnvelopeId === env.id}
+                                style={{
+                                  border: '1px solid #dc2626',
+                                  borderRadius: 999,
+                                  padding: '4px 10px',
+                                  background: '#fff',
+                                  color: '#dc2626',
+                                  cursor: revokingEnvelopeId === env.id ? 'wait' : 'pointer',
+                                  fontSize: 12,
+                                }}
+                              >
+                                {revokingEnvelopeId === env.id ? 'Revoking…' : 'Revoke'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {expanded && (
+                          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {env.signers.map((signer) => {
+                              const completed = signer.status === 'completed';
+                              return (
+                                <div
+                                  key={signer.id}
+                                  style={{
+                                    padding: 12,
+                                    borderRadius: 12,
+                                    border: `1px solid ${palette.border}`,
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <div>
+                                    <strong>{signer.name}</strong>
+                                    <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
+                                  </div>
+                                  <span
+                                    style={{
+                                      borderRadius: 999,
+                                      padding: '4px 10px',
+                                      fontSize: 12,
+                                      color: completed ? '#065f46' : '#92400e',
+                                      background: completed ? '#dcfce7' : '#fffbeb',
+                                      border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                                    }}
+                                  >
+                                    {completed ? 'Signed' : 'Pending'}
+                                  </span>
+                                  {signer.magic_link && (
+                                    <button
+                                      type="button"
+                                      onClick={() => navigator.clipboard.writeText(signer.magic_link)}
+                                      style={{
+                                        border: `1px solid ${palette.border}`,
+                                        borderRadius: 999,
+                                        padding: '4px 10px',
+                                        fontSize: 12,
+                                        cursor: 'pointer',
+                                        background: '#fff',
+                                        marginLeft: 8,
+                                      }}
+                                    >
+                                      Copy link
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
-            <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {documents.length === 0 && <p style={{ color: palette.accentMuted }}>No uploads yet.</p>}
-              {documents.map((doc, idx) => {
-                const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/documents/${doc.id}/pdf`;
-                const selected = selectedDocIds.includes(doc.id);
-                const hovered = hoveredDocId === doc.id;
-                return (
+            </div>
+          )}
+          {centerTab === 'documents' && !selectedProject && (
+            <div
+              style={{
+                padding: 32,
+                border: '1px dashed rgba(148,163,184,0.4)',
+                borderRadius: 16,
+                textAlign: 'center',
+                color: palette.accentMuted,
+              }}
+            >
+              Select a project on the left to review its uploaded PDFs and signed packets.
+            </div>
+          )}
+          {centerTab === 'share' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {selectedProject ? (
+                <>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Project</p>
+                    <h3 style={{ margin: '4px 0 0' }}>{selectedProject.name}</h3>
+                  </div>
                   <div
-                    key={`doc-${doc.id ?? idx}`}
-                    onClick={(event) => handleCardDownload(event, downloadUrl)}
-                    onMouseEnter={() => setHoveredDocId(doc.id)}
-                    onMouseLeave={() => setHoveredDocId((prev) => (prev === doc.id ? null : prev))}
                     style={{
-                      background: selected && hovered ? 'rgba(56,189,248,0.25)' : selected ? 'rgba(56,189,248,0.12)' : hovered ? 'rgba(248,250,252,0.08)' : 'rgba(248,250,252,0.04)',
-                      borderRadius: 12,
-                      padding: 12,
+                      borderRadius: 16,
+                      border: `1px solid ${palette.border}`,
+                      padding: 20,
+                      background: '#ffffff',
                       display: 'flex',
-                      alignItems: 'center',
+                      flexDirection: 'column',
                       gap: 12,
-                      cursor: 'pointer',
+                      boxShadow: '0 15px 30px rgba(15,23,42,0.08)',
                     }}
                   >
-                    {manageUploadsMode && (
-                      <input
-                        type="checkbox"
-                        checked={selectedDocIds.includes(doc.id)}
-                        onChange={() => toggleDocumentSelection(doc.id)}
-                      />
-                    )}
                     <div>
-                      <strong>{doc.filename}</strong>
-                      <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
-                        Uploaded {new Date(doc.created_at).toLocaleString()}
-                      </p>
+                      <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Project access token</p>
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: '10px 14px',
+                          borderRadius: 10,
+                          background: '#f4f5fb',
+                          fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                          fontSize: 13,
+                          color: palette.text,
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {selectedProjectToken || 'Not generated yet'}
+                      </div>
                     </div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => copyProjectToken(selectedProjectToken)}
+                        disabled={!selectedProjectToken}
+                        style={{
+                          borderRadius: 999,
+                          border: `1px solid ${palette.accent}`,
+                          background: selectedProjectToken ? '#ede9ff' : '#f4f4f5',
+                          color: selectedProjectToken ? palette.accent : palette.accentMuted,
+                          padding: '6px 14px',
+                          fontSize: 13,
+                          cursor: selectedProjectToken ? 'pointer' : 'not-allowed',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Copy token
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => selectedProjectId && regenerateProjectToken(selectedProjectId)}
+                        style={{
+                          borderRadius: 999,
+                          border: '1px solid rgba(248,113,113,0.4)',
+                          background: '#fff4f4',
+                          color: '#e11d48',
+                          padding: '6px 14px',
+                          fontSize: 13,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Regenerate token
+                      </button>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>
+                      Share this token with trusted investors for read-only access. Rotating it immediately revokes older tokens.
+                    </p>
                   </div>
-                );
-              })}
+                  <div
+                    style={{
+                      borderRadius: 16,
+                      border: `1px solid ${palette.border}`,
+                      padding: 20,
+                      background: '#ffffff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      boxShadow: '0 15px 30px rgba(15,23,42,0.08)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                      <div>
+                        <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Investor link</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 13 }}>
+                          Anyone with this link can view the project dashboard in read-only mode.
+                        </p>
+                      </div>
+                      {shareLink && (
+                        <button
+                          type="button"
+                          onClick={() => copyProjectToken(shareLink)}
+                          style={{
+                            borderRadius: 999,
+                            border: `1px solid ${palette.accent}`,
+                            background: '#ede9ff',
+                            color: palette.accent,
+                            padding: '6px 12px',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Copy link
+                        </button>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 4,
+                        padding: '12px 14px',
+                        borderRadius: 10,
+                        background: '#f4f5fb',
+                        fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                        fontSize: 13,
+                        color: palette.text,
+                        wordBreak: 'break-all',
+                      }}
+                    >
+                      {shareLink || 'Select a project with an access token.'}
+                    </div>
+                    {shareLink && (
+                      <a
+                        href={shareLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: palette.accent, fontSize: 13 }}
+                      >
+                        Open viewer ↗
+                      </a>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      borderRadius: 16,
+                      border: `1px solid ${palette.border}`,
+                      padding: 20,
+                      background: '#ffffff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      boxShadow: '0 15px 30px rgba(15,23,42,0.08)',
+                    }}
+                  >
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>API example</p>
+                      <pre
+                        style={{
+                          marginTop: 8,
+                          padding: 16,
+                          borderRadius: 12,
+                          background: '#f4f5fb',
+                          fontSize: 13,
+                          overflowX: 'auto',
+                        }}
+                      >{`curl -H "X-Access-Token: ${selectedProjectToken || '<token>'}" \\\n  ${baseApi}/api/projects/${selectedProjectId}/documents`}</pre>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>
+                      Investors can use the token to download documents or monitor signing status via the API. Admins should keep
+                      their global token private; only share project tokens with stakeholders who should see this project.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div
+                  style={{
+                    padding: 32,
+                    border: '1px dashed rgba(148,163,184,0.4)',
+                    borderRadius: 16,
+                    textAlign: 'center',
+                    color: palette.accentMuted,
+                  }}
+                >
+                  Select a project to view and manage its project access token.
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </section>
         <section
           style={{
             borderRadius: 24,
             background: palette.panel,
             padding: 24,
-            boxShadow: '0 25px 45px rgba(0,0,0,0.35)',
+            boxShadow: '0 20px 40px rgba(15,23,42,0.08)',
             display: 'flex',
             flexDirection: 'column',
             gap: 14,
@@ -645,19 +1290,19 @@ export default function AdminPage() {
                   >
                     Add Investor
                   </button>
-                <a
-                  href={`/request-sign?project=${selectedProjectId}`}
-                  style={{
-                    border: `1px solid ${palette.accent}`,
-                    color: palette.accent,
-                    borderRadius: 999,
-                    padding: '6px 12px',
-                    fontSize: 12,
-                    textDecoration: 'none',
-                  }}
-                >
-                  Request Signatures
-                </a>
+                  <a
+                    href={`/request-sign?project=${selectedProjectId}`}
+                    style={{
+                      border: `1px solid ${palette.accent}`,
+                      color: palette.accent,
+                      borderRadius: 999,
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Request Signatures
+                  </a>
                 </>
               )}
             </div>
@@ -669,7 +1314,8 @@ export default function AdminPage() {
                 key={`investor-${investor.id ?? idx}`}
                 style={{
                   borderRadius: 12,
-                  background: 'rgba(248,250,252,0.05)',
+                  background: '#fff',
+                  border: `1px solid ${palette.border}`,
                   padding: 12,
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -694,7 +1340,7 @@ export default function AdminPage() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15,23,42,0.6)',
+            background: 'rgba(15,23,42,0.25)',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'flex-start',
@@ -708,7 +1354,7 @@ export default function AdminPage() {
               width: 'min(1200px, 100%)',
               background: '#fff',
               borderRadius: 12,
-              boxShadow: '0 25px 55px rgba(15,23,42,0.45)',
+              boxShadow: '0 30px 60px rgba(15,23,42,0.15)',
               maxHeight: '90vh',
               display: 'flex',
               flexDirection: 'column',
@@ -724,7 +1370,7 @@ export default function AdminPage() {
                 alignItems: 'center',
               }}
             >
-              <h3 style={{ margin: 0 }}>Projects & Investors</h3>
+              <h3 style={{ margin: 0 }}>Investors</h3>
               <button
                 type="button"
                 onClick={closeInvestorModal}
@@ -742,7 +1388,13 @@ export default function AdminPage() {
               </button>
             </div>
             <div style={{ padding: '24px 24px 12px', overflowY: 'auto' }}>
-              <ProjectsPage onAnyChange={handleProjectsChange} initialProjectId={selectedProjectId ?? undefined} />
+              {adminToken && (
+                <InvestorsPage
+                  onAnyChange={handleProjectsChange}
+                  initialProjectId={selectedProjectId ?? undefined}
+                  accessToken={adminToken}
+                />
+              )}
             </div>
             <div
               style={{
@@ -777,4 +1429,5 @@ export default function AdminPage() {
       )}
     </div>
   );
+
 }

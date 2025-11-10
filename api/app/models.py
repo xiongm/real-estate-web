@@ -2,6 +2,7 @@
 from typing import Optional
 from datetime import datetime
 from sqlmodel import SQLModel, Field as ORMField
+from sqlalchemy import UniqueConstraint
 
 class Tenant(SQLModel, table=True):
     id: Optional[int] = ORMField(default=None, primary_key=True)
@@ -15,10 +16,12 @@ class User(SQLModel, table=True):
     role: str = "member"
 
 class Project(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("name", name="uq_project_name"),)
     id: Optional[int] = ORMField(default=None, primary_key=True)
     tenant_id: int
     name: str
     status: str = "active"
+    access_token: Optional[str] = ORMField(default=None, index=True)
 
 class Document(SQLModel, table=True):
     id: Optional[int] = ORMField(default=None, primary_key=True)

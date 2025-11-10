@@ -44,6 +44,7 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - REDIS_URL=redis://redis:6379/0
       - WORKER_QUEUE=signing
+      - ADMIN_ACCESS_TOKEN=${ADMIN_ACCESS_TOKEN}
     depends_on:
       - db
       - minio
@@ -62,6 +63,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - WORKER_QUEUE=signing
       - SECRET_KEY=${SECRET_KEY}
+      - ADMIN_ACCESS_TOKEN=${ADMIN_ACCESS_TOKEN}
     depends_on:
       - api
       - db
@@ -72,6 +74,7 @@ services:
     build: ./web
     environment:
       - NEXT_PUBLIC_API_BASE=http://localhost:8000
+      - NEXT_PUBLIC_ADMIN_TOKEN_PLACEHOLDER=${ADMIN_ACCESS_TOKEN}
     ports:
       - "3000:3000"
     depends_on:

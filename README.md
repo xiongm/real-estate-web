@@ -31,12 +31,23 @@ Services:
 - Tests: `docker compose run --rm api-tests`
 
 ## Workflow
-1. **Manage projects:** Use the Admin sidebar inside the web app or the API (`/api/projects`) to create projects. Investor management now lives exclusively in Admin; the request-sign builder is read-only and simply reflects the investors tied to the currently selected project.
+1. **Manage projects:** Use the Admin sidebar inside the web app (you'll be prompted for the admin access token) to create projects. Investor management now lives exclusively in Admin; the request-sign builder is read-only and simply reflects the investors tied to the currently selected project. Each project automatically gets its own access token, visible inside the **Share** tab in the center pane—share that token with investors when you want to grant read-only API access.
 2. **Upload documents:** Call `POST /api/projects/{id}/documents` (or use whatever admin UI you build) to upload PDFs into MinIO for that project.
 3. **Design envelopes:** Open `http://localhost:3000/request-sign`, select a project, and the builder will pull its investors. Upload/preview the PDF, drag fields onto the document, and assign each field to one of the project investors. The tool auto-builds the signer list from those assignments—no need to re-enter emails per envelope.
 4. **Send envelopes:** From the request-sign page, hit “Submit envelope & send.” This creates the envelope, sends the magic links (currently logged in the API), and shows you the links for debugging.
 5. **Sign:** Investors use `http://localhost:3000/sign/<token>`. They must check the consent box, fill the assigned fields only, and submit. The backend stores each signer’s data and seals the PDF once everyone finishes.
 6. **Retrieve final PDFs:** Download the sealed PDF and audit JSON via `GET /api/envelopes/{id}/artifact` (or directly from MinIO). The worker stamps each investor’s fields and appends the certificate page summarizing the audit trail.
+7. **Investor portal:** Share the auto-generated viewer link (see the Share tab). Investors who have the project token can open `http://localhost:3000/projects/<id>/<token>` to see the project summary plus document downloads in read-only mode.
+
+## Access control
+- Set `ADMIN_ACCESS_TOKEN` in your `.env` file. This token gates the Admin UI and every privileged API route.
+- All admin/API requests must include `X-Access-Token: <admin token>` in the headers (the web UI handles this after you sign in via the prompt).
+- Every project now has a dedicated `access_token` stored in the DB. Admins can view/regenerate it from the **Share** tab for the selected project. The same tab also shows a ready-to-share link (`/projects/<id>?token=<token>`) that boots the read-only investor dashboard.
+- API endpoints that return project data accept either the admin token or the matching project token. Mutating endpoints (create/delete/upload/send) still require the admin token.
+
+### New investor summary endpoint
+
+`GET /api/projects/{id}/summary` returns the project metadata, uploaded PDFs, completed final packets, and investor roster. It requires either the admin token or that project’s token via `X-Access-Token` header (or a `?token=` query parameter, which is what the investor portal uses).
 
 ## Testing (Docker workflow)
 Run the API test suite inside the same image the service uses:

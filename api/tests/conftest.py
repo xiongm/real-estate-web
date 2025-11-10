@@ -7,6 +7,7 @@ from minio.error import S3Error
 from sqlmodel import SQLModel, Session, create_engine
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ.setdefault("ADMIN_ACCESS_TOKEN", "admin-test-token")
 
 from app.main import app  # noqa: E402
 from app import db as db_module  # noqa: E402

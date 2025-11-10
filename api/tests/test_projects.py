@@ -1,3 +1,4 @@
+import os
 from sqlmodel import Session, select
 
 from app.models import (
@@ -31,28 +32,74 @@ SIMPLE_PDF = (
 
 SIMPLE_SIGNATURE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/Pf8icQAAAABJRU5ErkJggg=="
 
+ADMIN_HEADERS = {"X-Access-Token": os.getenv("ADMIN_ACCESS_TOKEN", "admin-test-token")}
+
 
 def create_project(client, name="Alpha Project"):
-    response = client.post(f"/api/projects?name={name}")
+    response = client.post(f"/api/projects?name={name}", headers=ADMIN_HEADERS)
     assert response.status_code == 200
     data = response.json()
-    return data["id"]
+    return data["id"], data.get("access_token")
+
+
+def test_project_name_unique_constraint(client):
+    first_id, _ = create_project(client, "Houston Tower")
+    assert first_id
+    duplicate_resp = client.post("/api/projects?name=Houston Tower", headers=ADMIN_HEADERS)
+    assert duplicate_resp.status_code == 409
+    assert "already exists" in duplicate_resp.text
 
 
 def upload_document(client, project_id, filename="sample.pdf", content=b"%PDF-1.4 test"):
     response = client.post(
         f"/api/projects/{project_id}/documents",
         files={"file": (filename, content, "application/pdf")},
+        headers=ADMIN_HEADERS,
     )
     assert response.status_code == 200
     return response.json()
 
 
+def test_project_summary_with_project_token(client):
+    project_id, token = create_project(client, "Investor Pack")
+    assert token
+    document = upload_document(client, project_id, filename="pack.pdf", content=b"bytes")
+    inv_response = client.post(
+        f"/api/projects/{project_id}/investors",
+        json={"name": "Investor 1", "email": "investor1@example.com", "units_invested": 100},
+        headers=ADMIN_HEADERS,
+    )
+    assert inv_response.status_code == 201
+
+    summary_resp = client.get(
+        f"/api/projects/{project_id}/summary",
+        headers={"X-Access-Token": token},
+    )
+    assert summary_resp.status_code == 200
+    body = summary_resp.json()
+    assert body["project"]["name"] == "Investor Pack"
+    assert any(doc["id"] == document["id"] for doc in body["documents"])
+    assert len(body["investors"]) == 1
+
+
+def test_document_download_allows_query_token(client, mock_storage):
+    project_id, token = create_project(client, "Query Access")
+    document = upload_document(client, project_id, filename="query.pdf", content=b"doc-bytes")
+    resp = client.get(
+        f"/api/projects/{project_id}/documents/{document['id']}/pdf?token={token}",
+    )
+    assert resp.status_code == 200
+    assert resp.content == b"doc-bytes"
+
+
 def test_document_download_returns_original_file(client, mock_storage):
-    project_id = create_project(client)
+    project_id, _ = create_project(client)
     document = upload_document(client, project_id, filename="investor-pack.pdf", content=b"pdf-bytes")
 
-    response = client.get(f"/api/projects/{project_id}/documents/{document['id']}/pdf")
+    response = client.get(
+        f"/api/projects/{project_id}/documents/{document['id']}/pdf",
+        headers=ADMIN_HEADERS,
+    )
 
     assert response.status_code == 200
     assert response.content == b"pdf-bytes"
@@ -60,11 +107,15 @@ def test_document_download_returns_original_file(client, mock_storage):
 
 
 def test_project_delete_cascades_all_records(client, test_engine, mock_storage):
-    project_id = create_project(client)
+    project_id, _ = create_project(client)
     document = upload_document(client, project_id, filename="deal.pdf", content=b"deal-data")
 
     investor_payload = {"name": "Alex", "email": "alex@example.com", "units_invested": 1000}
-    inv_response = client.post(f"/api/projects/{project_id}/investors", json=investor_payload)
+    inv_response = client.post(
+        f"/api/projects/{project_id}/investors",
+        json=investor_payload,
+        headers=ADMIN_HEADERS,
+    )
     assert inv_response.status_code == 201
 
     with Session(test_engine) as session:
@@ -104,7 +155,7 @@ def test_project_delete_cascades_all_records(client, test_engine, mock_storage):
         mock_storage[final_pdf_key] = b"final"
         mock_storage[final_audit_key] = b"audit"
 
-    delete_response = client.delete(f"/api/projects/{project_id}")
+    delete_response = client.delete(f"/api/projects/{project_id}", headers=ADMIN_HEADERS)
     assert delete_response.status_code == 204
 
     with Session(test_engine) as session:
@@ -116,9 +167,13 @@ def test_project_delete_cascades_all_records(client, test_engine, mock_storage):
 
 
 def test_envelope_send_and_sign_flow(client, test_engine, mock_storage, sent_emails):
-    project_id = create_project(client, "Beta Project")
+    project_id, project_token = create_project(client, "Beta Project")
     investor_payload = {"name": "Jamie Investor", "email": "jamie@example.com", "units_invested": 2500}
-    inv_response = client.post(f"/api/projects/{project_id}/investors", json=investor_payload)
+    inv_response = client.post(
+        f"/api/projects/{project_id}/investors",
+        json=investor_payload,
+        headers=ADMIN_HEADERS,
+    )
     assert inv_response.status_code == 201
     investor_id = inv_response.json()["id"]
 
@@ -149,11 +204,15 @@ def test_envelope_send_and_sign_flow(client, test_engine, mock_storage, sent_ema
             }
         ],
     }
-    create_env_resp = client.post("/api/envelopes", json=envelope_payload)
+    create_env_resp = client.post("/api/envelopes", json=envelope_payload, headers=ADMIN_HEADERS)
     assert create_env_resp.status_code == 200
     envelope_id = create_env_resp.json()["id"]
 
-    send_resp = client.post(f"/api/envelopes/{envelope_id}/send", json={"requester_name": "Admin User"})
+    send_resp = client.post(
+        f"/api/envelopes/{envelope_id}/send",
+        json={"requester_name": "Admin User"},
+        headers=ADMIN_HEADERS,
+    )
     assert send_resp.status_code == 200
     assert sent_emails, "Expected at least one email to be queued"
 

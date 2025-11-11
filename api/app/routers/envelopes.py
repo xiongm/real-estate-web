@@ -131,7 +131,9 @@ def send_envelope(
     for s in signers:
         token = make_token({"signer_id": s.id, "envelope_id": envelope_id})
         link = f"http://localhost:3000/sign/{token}"
-        subject = env.subject or f"Signature requested: {filename}"
+        custom_subject = env.subject.strip() if env.subject else None
+        subject_core = custom_subject or filename
+        subject = f"Signature Requested: {subject_core}"
         text_body = f"""{requester_name} sent you a document to review and sign.
 Document: “{filename}”
 

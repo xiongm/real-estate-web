@@ -49,6 +49,20 @@ Services:
 
 `GET /api/projects/{id}/summary` returns the project metadata, uploaded PDFs, completed final packets, and investor roster. It requires either the admin token or that project’s token via `X-Access-Token` header (or a `?token=` query parameter, which is what the investor portal uses).
 
+## Rotating secrets (Postgres, MinIO, Admin token, SMTP)
+
+- **Admin token & SMTP credentials**: Update `.env`, then restart the relevant containers (`docker compose up -d --build api web`). The services read these at startup.
+- **Postgres `POSTGRES_USER/POSTGRES_PASSWORD`**: Those env vars are only applied the first time the container creates the database. To rotate credentials on an existing DB:
+  1. `docker compose exec db psql -U <current_user>`
+  2. `ALTER USER <user> WITH PASSWORD 'newpass';`
+  3. Update `.env` (and any client connection strings) and restart the API.
+  4. If you need a completely different DB user, you must create it manually or recreate the DB volume (which wipes data).
+- **MinIO access/secret keys**: Similarly, `MINIO_ROOT_USER/PASSWORD` are applied only during first initialization. To rotate keys on a running MinIO instance, either:
+  - Log into the MinIO console (port 9001) and add/update a user via the UI, or
+  - Use `mc admin user add ...` to create a new access key.
+  Update `.env` with the new user’s access/secret and restart API/web. Only delete/recreate the MinIO data volume if you intentionally want a clean slate.
+- **Reminder**: Editing `.env` alone is not enough; restart the affected containers so they pick up the new values.
+
 ## Testing (Docker workflow)
 Run the API test suite inside the same image the service uses:
 

@@ -963,7 +963,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <a
-            href="/admin"
+            href={selectedProjectId ? `/admin?project=${selectedProjectId}` : '/admin'}
             style={{
               borderRadius: 999,
               border: `1px solid ${palette.accent}`,

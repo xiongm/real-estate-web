@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, MouseEvent, FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
 
 type Project = {
@@ -87,6 +88,29 @@ export default function AdminPage() {
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
   const [centerTab, setCenterTab] = useState<'documents' | 'share'>('documents');
   const [deletingInvestors, setDeletingInvestors] = useState(false);
+  const searchParams = useSearchParams();
+  const projectParamRaw = searchParams?.get('project') ?? null;
+  const projectParamId = projectParamRaw && !Number.isNaN(Number(projectParamRaw)) ? Number(projectParamRaw) : undefined;
+  const rememberProjectSelection = (id: number | null) => {
+    if (typeof window === 'undefined') return;
+    if (id !== null && id !== undefined) {
+      localStorage.setItem('adminSelectedProjectId', String(id));
+    } else {
+      localStorage.removeItem('adminSelectedProjectId');
+    }
+  };
+  const clearProjectQueryParam = () => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('project')) {
+      url.searchParams.delete('project');
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+  const selectProject = (id: number | null) => {
+    setSelectedProjectId(id);
+    rememberProjectSelection(id);
+  };
 
   const verifyAdminToken = useCallback(
     async (candidate: string) => {
@@ -148,20 +172,29 @@ export default function AdminPage() {
       const data = await resp.json();
       const sorted = Array.isArray(data) ? [...data].sort((a, b) => (a?.id ?? 0) - (b?.id ?? 0)) : [];
       setProjects(sorted);
-      if (typeof focusId === 'number') {
-        setSelectedProjectId(focusId);
-      } else if (sorted.length && !selectedProjectId) {
-        setSelectedProjectId(sorted[0].id);
+      const rawSaved = typeof window !== 'undefined' ? localStorage.getItem('adminSelectedProjectId') : null;
+      const savedId = rawSaved ? Number(rawSaved) : null;
+      const savedValid = typeof savedId === 'number' && Number.isFinite(savedId) && sorted.some((p) => p.id === savedId);
+
+      if (typeof focusId === 'number' && sorted.some((project) => project.id === focusId)) {
+        selectProject(focusId);
+        clearProjectQueryParam();
+      } else if (savedValid && savedId !== null) {
+        selectProject(savedId);
+      } else if (sorted.length) {
+        selectProject(sorted[0].id);
+      } else {
+        selectProject(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load projects');
     }
   };
 
-  useEffect(() => {
-    if (!adminVerified || !adminToken) return;
-    loadProjects();
-  }, [adminVerified, adminToken]);
+useEffect(() => {
+  if (!adminVerified || !adminToken) return;
+  loadProjects(projectParamId);
+}, [adminVerified, adminToken, projectParamId]);
 
   useEffect(() => {
     if (!selectedProjectId || !adminToken) return;
@@ -460,7 +493,7 @@ export default function AdminPage() {
         });
         if (!resp.ok) throw new Error(`Failed to delete project (${resp.status})`);
         if (projectId === selectedProjectId) {
-          setSelectedProjectId(null);
+          selectProject(null);
         }
       }
       setSelectedProjectIds([]);
@@ -627,7 +660,7 @@ export default function AdminPage() {
               return (
                 <button
                   key={`project-${project.id ?? idx}`}
-                  onClick={() => setSelectedProjectId(project.id)}
+                  onClick={() => selectProject(project.id)}
                   style={{
                     textAlign: 'left',
                     padding: '12px 14px',

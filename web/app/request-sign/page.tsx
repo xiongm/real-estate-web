@@ -961,7 +961,22 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           backdropFilter: 'blur(10px)',
         }}
       >
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <a
+            href="/admin"
+            style={{
+              borderRadius: 999,
+              border: `1px solid ${palette.accent}`,
+              color: palette.accent,
+              padding: '6px 14px',
+              textDecoration: 'none',
+              fontWeight: 600,
+              background: 'transparent',
+              fontSize: 13,
+            }}
+          >
+            ← Back to Admin
+          </a>
           <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Active document</p>
           <strong style={{ fontSize: 18, color: palette.textStrong }}>{documentLabel}</strong>
         </div>
@@ -976,20 +991,6 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               <span style={{ display: 'block', fontSize: 12, color: '#ef4444', marginTop: 4 }}>{projectParamError}</span>
             )}
           </div>
-          <a
-            href="/admin"
-            style={{
-              borderRadius: 999,
-              border: `1px solid ${palette.accent}`,
-              color: palette.accent,
-              padding: '8px 18px',
-              textDecoration: 'none',
-              fontWeight: 600,
-              background: 'transparent',
-            }}
-          >
-            ← Back to Admin
-          </a>
           <button
             type="button"
             onClick={logout}

@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, MouseEvent, FormEvent } from 'react';
-import InvestorsPage from '../investors/page';
 import { theme } from '../../lib/theme';
 
 type Project = {
@@ -71,8 +70,13 @@ export default function AdminPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedFinalIds, setSelectedFinalIds] = useState<number[]>([]);
   const [loadingInvestors, setLoadingInvestors] = useState(false);
-  const [showInvestorModal, setShowInvestorModal] = useState(false);
-  const [investorsDirty, setInvestorsDirty] = useState(false);
+  const [manageInvestorsMode, setManageInvestorsMode] = useState(false);
+  const [selectedInvestorIds, setSelectedInvestorIds] = useState<number[]>([]);
+  const [showInvestorForm, setShowInvestorForm] = useState(false);
+  const [newInvestorName, setNewInvestorName] = useState('');
+  const [newInvestorEmail, setNewInvestorEmail] = useState('');
+  const [newInvestorUnits, setNewInvestorUnits] = useState<string>('');
+  const [creatingInvestor, setCreatingInvestor] = useState(false);
   const [manageSignedMode, setManageSignedMode] = useState(false);
   const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
   const [hoveredFinalId, setHoveredFinalId] = useState<number | null>(null);
@@ -82,6 +86,7 @@ export default function AdminPage() {
   const [manageProjectsMode, setManageProjectsMode] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
   const [centerTab, setCenterTab] = useState<'documents' | 'share'>('documents');
+  const [deletingInvestors, setDeletingInvestors] = useState(false);
 
   const verifyAdminToken = useCallback(
     async (candidate: string) => {
@@ -185,6 +190,13 @@ export default function AdminPage() {
     setCenterTab('documents');
   }, [selectedProjectId]);
 
+  const resetInvestorForm = () => {
+    setShowInvestorForm(false);
+    setNewInvestorName('');
+    setNewInvestorEmail('');
+    setNewInvestorUnits('');
+  };
+
   const loadInvestors = async (projectId: number) => {
     if (!adminToken) return;
     setLoadingInvestors(true);
@@ -195,6 +207,11 @@ export default function AdminPage() {
       if (!resp.ok) throw new Error(`Failed to load investors (${resp.status})`);
       const list = await resp.json();
       setInvestors(list || []);
+      setSelectedInvestorIds([]);
+      setManageInvestorsMode(false);
+      resetInvestorForm();
+      setSelectedInvestorIds([]);
+      setManageInvestorsMode(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load investors');
     } finally {
@@ -229,25 +246,13 @@ export default function AdminPage() {
     const base = origin || 'http://localhost:3000';
     return `${base}/projects/${selectedProject.id}/${selectedProjectToken}`;
   }, [selectedProject, selectedProjectToken]);
+  const hasInvestors = investors.length > 0;
+  const hasSignedDocuments = finals.length > 0;
+  const hasOutstandingEnvelopes = outstandingEnvelopes.length > 0;
+  const canRequestSignatures = Boolean(selectedProjectId && hasInvestors);
 
   const toggleFinalSelection = (id: number) => {
     setSelectedFinalIds((prev) => (prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]));
-  };
-
-  const openInvestorModal = () => {
-    setInvestorsDirty(false);
-    setShowInvestorModal(true);
-  };
-
-  const closeInvestorModal = () => {
-    setShowInvestorModal(false);
-    if (investorsDirty && selectedProjectId) {
-      loadInvestors(selectedProjectId);
-    }
-  };
-
-  const handleProjectsChange = () => {
-    setInvestorsDirty(true);
   };
 
   const revokeEnvelope = useCallback(
@@ -312,6 +317,89 @@ export default function AdminPage() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const toggleInvestorsManage = () => {
+    setManageInvestorsMode((prev) => {
+      if (prev) {
+        setSelectedInvestorIds([]);
+        resetInvestorForm();
+      }
+      return !prev;
+    });
+  };
+
+  const toggleInvestorSelection = (id: number) => {
+    setSelectedInvestorIds((prev) => (prev.includes(id) ? prev.filter((iid) => iid !== id) : [...prev, id]));
+  };
+
+  const deleteSelectedInvestors = async () => {
+    if (!adminToken || !selectedProjectId || !selectedInvestorIds.length) return;
+    const confirmRemove = window.confirm(
+      `Remove ${selectedInvestorIds.length} investor(s)? This cannot be undone.`,
+    );
+    if (!confirmRemove) return;
+    setDeletingInvestors(true);
+    try {
+      for (const investorId of selectedInvestorIds) {
+        const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/investors/${investorId}`, {
+          method: 'DELETE',
+          headers: { 'X-Access-Token': adminToken },
+        });
+        if (!resp.ok) throw new Error(`Failed to remove investor (${resp.status})`);
+      }
+      setInvestors((prev) => prev.filter((inv) => !selectedInvestorIds.includes(inv.id)));
+      setSelectedInvestorIds([]);
+      setManageInvestorsMode(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove investors');
+    } finally {
+      setDeletingInvestors(false);
+    }
+  };
+
+  const createInvestor = async () => {
+    if (!adminToken || !selectedProjectId) return;
+    const name = newInvestorName.trim();
+    const email = newInvestorEmail.trim();
+    const units = Number(newInvestorUnits) || 0;
+    if (!name || !email) {
+      setError('Name and email are required to add an investor.');
+      return;
+    }
+    setCreatingInvestor(true);
+    try {
+      const payload = {
+        name,
+        email,
+        role: 'Investor',
+        routing_order: investors.length + 1,
+        units_invested: units,
+        metadata_json: '{}',
+      };
+      const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/investors`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Token': adminToken,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error(`Failed to add investor (${resp.status})`);
+      const created = await resp.json();
+      setInvestors((prev) => [...prev, created]);
+      resetInvestorForm();
+      setShowInvestorForm(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add investor');
+    } finally {
+      setCreatingInvestor(false);
+    }
+  };
+
+  const goToRequestSign = () => {
+    if (!canRequestSignatures || !selectedProjectId) return;
+    window.location.href = `/request-sign?project=${selectedProjectId}`;
   };
 
   const handleCardDownload = (event: MouseEvent<HTMLElement>, url: string) => {
@@ -724,337 +812,382 @@ export default function AdminPage() {
             })}
           </div>
           {centerTab === 'documents' && selectedProject && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <h4 style={{ margin: 0 }}>Signed Documents</h4>
-                  <button
-                    type="button"
-                    onClick={toggleSignedManage}
-                    style={{
-                      border: `1px solid ${palette.border}`,
-                      background: manageSignedMode ? palette.accent : '#fff',
-                      color: manageSignedMode ? '#fff' : palette.text,
-                      borderRadius: 999,
-                      padding: '4px 12px',
-                      fontSize: 12,
-                      cursor: finals.length ? 'pointer' : 'not-allowed',
-                      opacity: finals.length ? 1 : 0.4,
-                      boxShadow: manageSignedMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
-                    }}
-                    disabled={!finals.length}
-                  >
-                    {manageSignedMode ? 'Done' : 'Manage'}
-                  </button>
-                </div>
-                {manageSignedMode && (
-                  <button
-                    type="button"
-                    onClick={deleteSelectedFinals}
-                    disabled={!selectedFinalIds.length || actionLoading}
-                    style={{
-                      border: '1px solid rgba(248,113,113,0.8)',
-                      color: '#fca5a5',
-                      background: 'transparent',
-                      borderRadius: 999,
-                      padding: '6px 12px',
-                      fontSize: 13,
-                      cursor: !selectedFinalIds.length || actionLoading ? 'not-allowed' : 'pointer',
-                      opacity: !selectedFinalIds.length || actionLoading ? 0.5 : 1,
-                    }}
-                  >
-                    Delete Selected
-                  </button>
-                )}
-              </div>
-            <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {finals.length === 0 && <p style={{ color: palette.accentMuted }}>No signed documents yet.</p>}
-              {finals.map((item, idx) => {
-                const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${item.envelope_id}/pdf${tokenParam}`;
-                const finalEnvelope = envelopeMap[item.envelope_id];
-                const signerList = finalEnvelope?.signers ?? [];
-                const expanded = expandedFinals[item.envelope_id] ?? false;
-                const hasSigners = signerList.length > 0;
-                return (
-                  <div key={`final-${selectedProjectId}-${item.envelope_id ?? `idx-${idx}`}-${item.sha256_final ?? 'na'}`}>
-                    <div
-                      onClick={(event) => handleCardDownload(event, downloadUrl)}
-                      onMouseEnter={() => setHoveredFinalId(item.envelope_id)}
-                      onMouseLeave={() => setHoveredFinalId((prev) => (prev === item.envelope_id ? null : prev))}
-                      style={{
-                        background:
-                          selectedFinalIds.includes(item.envelope_id) && hoveredFinalId === item.envelope_id
-                            ? '#e4ddff'
-                            : selectedFinalIds.includes(item.envelope_id)
-                            ? '#ede9ff'
-                            : hoveredFinalId === item.envelope_id
-                            ? '#f5f2ff'
-                            : '#fbfbfe',
-                        borderRadius: 12,
-                        padding: 12,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 12,
-                        cursor: 'pointer',
-                        border: selectedFinalIds.includes(item.envelope_id)
-                          ? `1px solid ${palette.accent}`
-                          : `1px solid ${palette.border}`,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        {manageSignedMode && (
-                          <input
-                            type="checkbox"
-                            checked={selectedFinalIds.includes(item.envelope_id)}
-                            onChange={() => toggleFinalSelection(item.envelope_id)}
-                          />
-                        )}
-                        <div>
-                          <strong>{item.document_name}</strong>
-                          <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
-                            Completed {new Date(item.completed_at).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                      {hasSigners && (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setExpandedFinals((prev) => ({
-                              ...prev,
-                              [item.envelope_id]: !expanded,
-                            }));
-                          }}
-                          style={{
-                            border: `1px solid ${palette.border}`,
-                            borderRadius: 999,
-                            padding: '4px 12px',
-                            background: '#fff',
-                            cursor: 'pointer',
-                            fontSize: 12,
-                          }}
-                        >
-                          {expanded ? 'Hide signees' : 'Signees'}
-                        </button>
-                      )}
-                    </div>
-                    {expanded && hasSigners && (
-                      <div
-                        style={{
-                          marginTop: 8,
-                          marginLeft: manageSignedMode ? 32 : 0,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 8,
-                        }}
-                      >
-                        {signerList.map((signer) => {
-                          const completed = signer.status === 'completed';
-                          return (
-                            <div
-                              key={`final-signer-${item.envelope_id}-${signer.id}`}
-                              style={{
-                                padding: 12,
-                                borderRadius: 12,
-                                border: `1px solid ${palette.border}`,
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                background: '#fff',
-                              }}
-                            >
-                              <div>
-                                <strong>{signer.name}</strong>
-                                <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
-                              </div>
-                              <span
-                                style={{
-                                  borderRadius: 999,
-                                  padding: '4px 10px',
-                                  fontSize: 12,
-                                  color: completed ? '#065f46' : '#92400e',
-                                  background: completed ? '#dcfce7' : '#fffbeb',
-                                  border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
-                                }}
-                              >
-                                {completed ? 'Signed' : 'Pending'}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ marginTop: 28 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <div>
-                  <h4 style={{ margin: 0 }}>Out for Signature</h4>
-                  <span style={{ fontSize: 12, color: palette.accentMuted }}>
-                    {outstandingEnvelopes.length} open envelopes
-                  </span>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 12 }}>
                 <button
                   type="button"
-                  onClick={toggleEnvelopeManage}
+                  onClick={goToRequestSign}
+                  disabled={!canRequestSignatures}
                   style={{
-                    border: `1px solid ${palette.border}`,
-                    background: manageEnvelopesMode ? palette.accent : '#fff',
-                    color: manageEnvelopesMode ? '#fff' : palette.text,
-                    borderRadius: 999,
-                    padding: '4px 10px',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    boxShadow: manageEnvelopesMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
+                    border: `1px solid ${palette.accent}`,
+                    borderRadius: 10,
+                    padding: '10px 22px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    background: '#fff',
+                    color: canRequestSignatures ? palette.accent : palette.accentMuted,
+                    cursor: canRequestSignatures ? 'pointer' : 'not-allowed',
+                    opacity: canRequestSignatures ? 1 : 0.5,
                   }}
+                  title={
+                    canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
+                  }
                 >
-                  {manageEnvelopesMode ? 'Done' : 'Manage'}
+                  <span aria-hidden="true" style={{ marginRight: 8, fontSize: 14 }}>
+                    ✉️
+                  </span>
+                  Request New Signatures
                 </button>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
-                {outstandingEnvelopes.length === 0 && (
-                  <p style={{ color: palette.accentMuted }}>No outstanding envelopes.</p>
-                )}
-                {outstandingEnvelopes.map((env) => {
-                    const expanded = expandedEnvelopes[env.id] ?? false;
-                    const hasSigners = env.total_signers > 0;
-                    const progressLabel = hasSigners
-                      ? `${env.completed_signers}/${env.total_signers} signed`
-                      : 'Incomplete setup';
-                    const buttonLabel = expanded ? 'Hide signees' : progressLabel;
-                    const documentUrl =
-                      selectedProjectId && env.document?.id
-                        ? `${baseApi}/api/projects/${selectedProjectId}/documents/${env.document.id}/pdf${tokenParam}`
-                        : null;
-                    const fileLabel = env.document?.filename || 'Untitled PDF';
-                    return (
-                      <div
-                        key={`env-${env.id}`}
-                        onClick={(event) => documentUrl && handleCardDownload(event, documentUrl)}
+
+              {hasSignedDocuments && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <h4 style={{ margin: 0 }}>Signed Documents</h4>
+                      <button
+                        type="button"
+                        onClick={toggleSignedManage}
                         style={{
                           border: `1px solid ${palette.border}`,
-                          borderRadius: 18,
-                          padding: 16,
-                          background: '#fff',
-                          boxShadow: '0 10px 24px rgba(15,23,42,0.08)',
-                          cursor: documentUrl ? 'pointer' : 'default',
+                          background: manageSignedMode ? palette.accent : '#fff',
+                          color: manageSignedMode ? '#fff' : palette.text,
+                          borderRadius: 999,
+                          padding: '4px 12px',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          boxShadow: manageSignedMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                          <div>
-                            <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
-                            {env.subject && (
-                              <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>{env.subject}</p>
-                            )}
-                            {documentUrl && (
-                              <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
-                                Click to download the original upload
-                              </p>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExpandedEnvelopes((prev) => ({
-                                  ...prev,
-                                  [env.id]: !expanded,
-                                }))
-                              }
-                              style={{
-                                border: `1px solid ${palette.border}`,
-                                borderRadius: 999,
-                                padding: '4px 12px',
-                                background: '#fff',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                              }}
-                            >
-                              {buttonLabel}
-                            </button>
-                            {manageEnvelopesMode && (
+                        {manageSignedMode ? 'Done' : 'Manage'}
+                      </button>
+                    </div>
+                    {manageSignedMode && (
+                      <button
+                        type="button"
+                        onClick={deleteSelectedFinals}
+                        disabled={!selectedFinalIds.length || actionLoading}
+                        style={{
+                          border: '1px solid rgba(248,113,113,0.8)',
+                          color: '#fca5a5',
+                          background: 'transparent',
+                          borderRadius: 999,
+                          padding: '6px 12px',
+                          fontSize: 13,
+                          cursor: !selectedFinalIds.length || actionLoading ? 'not-allowed' : 'pointer',
+                          opacity: !selectedFinalIds.length || actionLoading ? 0.5 : 1,
+                        }}
+                      >
+                        Delete Selected
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {finals.map((item, idx) => {
+                      const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${item.envelope_id}/pdf${tokenParam}`;
+                      const finalEnvelope = envelopeMap[item.envelope_id];
+                      const signerList = finalEnvelope?.signers ?? [];
+                      const expanded = expandedFinals[item.envelope_id] ?? false;
+                      const hasSigners = signerList.length > 0;
+                      return (
+                        <div key={`final-${selectedProjectId}-${item.envelope_id ?? `idx-${idx}`}-${item.sha256_final ?? 'na'}`}>
+                          <div
+                            onClick={(event) => handleCardDownload(event, downloadUrl)}
+                            onMouseEnter={() => setHoveredFinalId(item.envelope_id)}
+                            onMouseLeave={() => setHoveredFinalId((prev) => (prev === item.envelope_id ? null : prev))}
+                            style={{
+                              background:
+                                selectedFinalIds.includes(item.envelope_id) && hoveredFinalId === item.envelope_id
+                                  ? '#e4ddff'
+                                  : selectedFinalIds.includes(item.envelope_id)
+                                  ? '#ede9ff'
+                                  : hoveredFinalId === item.envelope_id
+                                  ? '#f5f2ff'
+                                  : '#fbfbfe',
+                              borderRadius: 12,
+                              padding: 12,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 12,
+                              cursor: 'pointer',
+                              border: selectedFinalIds.includes(item.envelope_id)
+                                ? `1px solid ${palette.accent}`
+                                : `1px solid ${palette.border}`,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              {manageSignedMode && (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedFinalIds.includes(item.envelope_id)}
+                                  onChange={() => toggleFinalSelection(item.envelope_id)}
+                                />
+                              )}
+                              <div>
+                                <strong>{item.document_name}</strong>
+                                <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
+                                  Completed {new Date(item.completed_at).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                            {hasSigners && (
                               <button
                                 type="button"
-                                onClick={() => revokeEnvelope(env.id)}
-                                disabled={revokingEnvelopeId === env.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setExpandedFinals((prev) => ({
+                                    ...prev,
+                                    [item.envelope_id]: !expanded,
+                                  }));
+                                }}
                                 style={{
-                                  border: '1px solid #dc2626',
+                                  border: `1px solid ${palette.border}`,
                                   borderRadius: 999,
-                                  padding: '4px 10px',
+                                  padding: '4px 12px',
                                   background: '#fff',
-                                  color: '#dc2626',
-                                  cursor: revokingEnvelopeId === env.id ? 'wait' : 'pointer',
+                                  cursor: 'pointer',
                                   fontSize: 12,
                                 }}
                               >
-                                {revokingEnvelopeId === env.id ? 'Revoking…' : 'Revoke'}
+                                {expanded ? 'Hide signees' : 'Signees'}
                               </button>
                             )}
                           </div>
-                        </div>
-                        {expanded && (
-                          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {env.signers.map((signer) => {
-                              const completed = signer.status === 'completed';
-                              return (
-                                <div
-                                  key={signer.id}
-                                  style={{
-                                    padding: 12,
-                                    borderRadius: 12,
-                                    border: `1px solid ${palette.border}`,
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                  }}
-                                >
-                                  <div>
-                                    <strong>{signer.name}</strong>
-                                    <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
-                                  </div>
-                                  <span
+                          {expanded && hasSigners && (
+                            <div
+                              style={{
+                                marginTop: 8,
+                                marginLeft: manageSignedMode ? 32 : 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 8,
+                              }}
+                            >
+                              {signerList.map((signer) => {
+                                const completed = signer.status === 'completed';
+                                return (
+                                  <div
+                                    key={`final-signer-${item.envelope_id}-${signer.id}`}
                                     style={{
-                                      borderRadius: 999,
-                                      padding: '4px 10px',
-                                      fontSize: 12,
-                                      color: completed ? '#065f46' : '#92400e',
-                                      background: completed ? '#dcfce7' : '#fffbeb',
-                                      border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                                      padding: 12,
+                                      borderRadius: 12,
+                                      border: `1px solid ${palette.border}`,
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      background: '#fff',
                                     }}
                                   >
-                                    {completed ? 'Signed' : 'Pending'}
-                                  </span>
-                                  {signer.magic_link && (
-                                    <button
-                                      type="button"
-                                      onClick={() => navigator.clipboard.writeText(signer.magic_link)}
+                                    <div>
+                                      <strong>{signer.name}</strong>
+                                      <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
+                                    </div>
+                                    <span
                                       style={{
-                                        border: `1px solid ${palette.border}`,
                                         borderRadius: 999,
                                         padding: '4px 10px',
                                         fontSize: 12,
-                                        cursor: 'pointer',
-                                        background: '#fff',
-                                        marginLeft: 8,
+                                        color: completed ? '#065f46' : '#92400e',
+                                        background: completed ? '#dcfce7' : '#fffbeb',
+                                        border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
                                       }}
                                     >
-                                      Copy link
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                      {completed ? 'Signed' : 'Pending'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {hasOutstandingEnvelopes && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: hasSignedDocuments ? 20 : 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                    <div>
+                      <h4 style={{ margin: 0 }}>Out for Signature</h4>
+                      <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                        {outstandingEnvelopes.length} open envelopes
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleEnvelopeManage}
+                      style={{
+                        border: `1px solid ${palette.border}`,
+                        background: manageEnvelopesMode ? palette.accent : '#fff',
+                        color: manageEnvelopesMode ? '#fff' : palette.text,
+                        borderRadius: 999,
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        boxShadow: manageEnvelopesMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
+                      }}
+                    >
+                      {manageEnvelopesMode ? 'Done' : 'Manage'}
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {outstandingEnvelopes.map((env) => {
+                      const expanded = expandedEnvelopes[env.id] ?? false;
+                      const hasSigners = env.total_signers > 0;
+                      const progressLabel = hasSigners
+                        ? `${env.completed_signers}/${env.total_signers} signed`
+                        : 'Incomplete setup';
+                      const buttonLabel = expanded ? 'Hide signees' : progressLabel;
+                      const documentUrl =
+                        selectedProjectId && env.document?.id
+                          ? `${baseApi}/api/projects/${selectedProjectId}/documents/${env.document.id}/pdf${tokenParam}`
+                          : null;
+                      const fileLabel = env.document?.filename || 'Untitled PDF';
+                      return (
+                        <div
+                          key={`env-${env.id}`}
+                          onClick={(event) => documentUrl && handleCardDownload(event, documentUrl)}
+                          style={{
+                            border: `1px solid ${palette.border}`,
+                            borderRadius: 18,
+                            padding: 16,
+                            background: '#fff',
+                            boxShadow: '0 10px 24px rgba(15,23,42,0.08)',
+                            cursor: documentUrl ? 'pointer' : 'default',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                            <div>
+                              <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
+                              {env.subject && (
+                                <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>{env.subject}</p>
+                              )}
+                              {documentUrl && (
+                                <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
+                                  Click to download the original upload
+                                </p>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedEnvelopes((prev) => ({
+                                    ...prev,
+                                    [env.id]: !expanded,
+                                  }))
+                                }
+                                style={{
+                                  border: `1px solid ${palette.border}`,
+                                  borderRadius: 999,
+                                  padding: '4px 12px',
+                                  background: '#fff',
+                                  cursor: 'pointer',
+                                  fontSize: 12,
+                                }}
+                              >
+                                {buttonLabel}
+                              </button>
+                              {manageEnvelopesMode && (
+                                <button
+                                  type="button"
+                                  onClick={() => revokeEnvelope(env.id)}
+                                  disabled={revokingEnvelopeId === env.id}
+                                  style={{
+                                    border: '1px solid #dc2626',
+                                    borderRadius: 999,
+                                    padding: '4px 10px',
+                                    background: '#fff',
+                                    color: '#dc2626',
+                                    cursor: revokingEnvelopeId === env.id ? 'wait' : 'pointer',
+                                    fontSize: 12,
+                                  }}
+                                >
+                                  {revokingEnvelopeId === env.id ? 'Revoking…' : 'Revoke'}
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
+                          {expanded && (
+                            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {env.signers.map((signer) => {
+                                const completed = signer.status === 'completed';
+                                return (
+                                  <div
+                                    key={signer.id}
+                                    style={{
+                                      padding: 12,
+                                      borderRadius: 12,
+                                      border: `1px solid ${palette.border}`,
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                    }}
+                                  >
+                                    <div>
+                                      <strong>{signer.name}</strong>
+                                      <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
+                                    </div>
+                                    <span
+                                      style={{
+                                        borderRadius: 999,
+                                        padding: '4px 10px',
+                                        fontSize: 12,
+                                        color: completed ? '#065f46' : '#92400e',
+                                        background: completed ? '#dcfce7' : '#fffbeb',
+                                        border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                                      }}
+                                    >
+                                      {completed ? 'Signed' : 'Pending'}
+                                    </span>
+                                    {signer.magic_link && (
+                                      <button
+                                        type="button"
+                                        onClick={() => navigator.clipboard.writeText(signer.magic_link)}
+                                        style={{
+                                          border: `1px solid ${palette.border}`,
+                                          borderRadius: 999,
+                                          padding: '4px 10px',
+                                          fontSize: 12,
+                                          cursor: 'pointer',
+                                          background: '#fff',
+                                          marginLeft: 8,
+                                        }}
+                                      >
+                                        Copy link
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!hasSignedDocuments && !hasOutstandingEnvelopes && (
+                <div
+                  style={{
+                    border: `1px dashed ${palette.border}`,
+                    borderRadius: 16,
+                    padding: 24,
+                    textAlign: 'center',
+                    color: palette.accentMuted,
+                    background: '#f8fafc',
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: 13 }}>
+                    Upload a PDF and add investors to start sending signature requests.
+                  </p>
+                </div>
+              )}
             </div>
           )}
           {centerTab === 'documents' && !selectedProject && (
@@ -1272,161 +1405,178 @@ export default function AdminPage() {
               <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Investors</p>
               <h3 style={{ margin: 0 }}>{investors.length} contacts</h3>
             </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              {selectedProjectId && (
-                <>
-                  <button
-                    type="button"
-                    onClick={openInvestorModal}
-                    style={{
-                      border: `1px solid ${palette.accent}`,
-                      color: palette.accent,
-                      borderRadius: 999,
-                      padding: '6px 12px',
-                      fontSize: 12,
-                      background: 'transparent',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Add Investor
-                  </button>
-                  <a
-                    href={`/request-sign?project=${selectedProjectId}`}
-                    style={{
-                      border: `1px solid ${palette.accent}`,
-                      color: palette.accent,
-                      borderRadius: 999,
-                      padding: '6px 12px',
-                      fontSize: 12,
-                      textDecoration: 'none',
-                    }}
-                  >
-                    Request Signatures
-                  </a>
-                </>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={toggleInvestorsManage}
+                disabled={!selectedProjectId}
+                style={{
+                  border: `1px solid ${palette.border}`,
+                  background: manageInvestorsMode ? palette.accent : '#fff',
+                  color: !selectedProjectId ? palette.accentMuted : manageInvestorsMode ? '#fff' : palette.text,
+                  borderRadius: 999,
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  cursor: selectedProjectId ? 'pointer' : 'not-allowed',
+                  opacity: selectedProjectId ? 1 : 0.5,
+                  boxShadow: manageInvestorsMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
+                }}
+                title={selectedProjectId ? undefined : 'Select a project first'}
+              >
+                {manageInvestorsMode ? 'Done' : 'Manage'}
+              </button>
+              {manageInvestorsMode && selectedProjectId && (
+                <button
+                  type="button"
+                  onClick={deleteSelectedInvestors}
+                  disabled={!selectedInvestorIds.length || deletingInvestors}
+                  style={{
+                    border: '1px solid #dc2626',
+                    color: '#fff',
+                    background: deletingInvestors ? 'rgba(220,38,38,0.6)' : '#dc2626',
+                    borderRadius: 999,
+                    padding: '6px 12px',
+                    fontSize: 12,
+                    cursor: !selectedInvestorIds.length || deletingInvestors ? 'not-allowed' : 'pointer',
+                    opacity: !selectedInvestorIds.length && !deletingInvestors ? 0.5 : 1,
+                  }}
+                >
+                  {deletingInvestors ? 'Removing…' : 'Remove'}
+                </button>
               )}
             </div>
           </header>
           <div style={{ overflowY: 'auto', maxHeight: '70vh', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {investors.length === 0 && <p style={{ color: palette.accentMuted }}>No investors linked.</p>}
-            {investors.map((investor, idx) => (
-              <div
-                key={`investor-${investor.id ?? idx}`}
-                style={{
-                  borderRadius: 12,
-                  background: '#fff',
-                  border: `1px solid ${palette.border}`,
-                  padding: 12,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <strong>{investor.name}</strong>
-                  <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{investor.email}</p>
+            {investors.map((investor, idx) => {
+              const invId = investor.id ?? idx;
+              const selected = manageInvestorsMode && investor.id ? selectedInvestorIds.includes(investor.id) : false;
+              return (
+                <div
+                  key={`investor-${invId}`}
+                  style={{
+                    borderRadius: 12,
+                    background: selected ? '#eef2ff' : '#fff',
+                    border: selected ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                    padding: 12,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {manageInvestorsMode && investor.id && (
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleInvestorSelection(investor.id!)}
+                      />
+                    )}
+                    <div>
+                      <strong>{investor.name}</strong>
+                      <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{investor.email}</p>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                    {investor.units_invested?.toLocaleString()} units
+                  </span>
                 </div>
-                <span style={{ fontSize: 12, color: palette.accentMuted }}>
-                  {investor.units_invested?.toLocaleString()} units
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </section>
-      </main>
-      {showInvestorModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15,23,42,0.25)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            padding: '40px 24px',
-            zIndex: 120,
-            overflowY: 'auto',
-          }}
-        >
-          <div
-            style={{
-              width: 'min(1200px, 100%)',
-              background: '#fff',
-              borderRadius: 12,
-              boxShadow: '0 30px 60px rgba(15,23,42,0.15)',
-              maxHeight: '90vh',
-              display: 'flex',
-              flexDirection: 'column',
-              color: '#0f172a',
-            }}
-          >
-            <div
-              style={{
-                padding: '16px 24px',
-                borderBottom: '1px solid #e5e7eb',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <h3 style={{ margin: 0 }}>Investors</h3>
-              <button
-                type="button"
-                onClick={closeInvestorModal}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  fontSize: 22,
-                  lineHeight: 1,
-                  cursor: 'pointer',
-                  color: '#6b7280',
-                }}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ padding: '24px 24px 12px', overflowY: 'auto' }}>
-              {adminToken && (
-                <InvestorsPage
-                  onAnyChange={handleProjectsChange}
-                  initialProjectId={selectedProjectId ?? undefined}
-                  accessToken={adminToken}
-                />
+          {manageInvestorsMode && selectedProjectId && (
+            <div style={{ borderTop: `1px solid ${palette.border}`, marginTop: 12, paddingTop: 12 }}>
+              {!showInvestorForm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowInvestorForm(true)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: palette.accent,
+                    textAlign: 'left',
+                    padding: 0,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  + Add investor
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <input
+                    type="text"
+                    placeholder="Name"
+                    value={newInvestorName}
+                    onChange={(event) => setNewInvestorName(event.target.value)}
+                    style={{
+                      padding: 10,
+                      borderRadius: 8,
+                      border: `1px solid ${palette.border}`,
+                    }}
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={newInvestorEmail}
+                    onChange={(event) => setNewInvestorEmail(event.target.value)}
+                    style={{
+                      padding: 10,
+                      borderRadius: 8,
+                      border: `1px solid ${palette.border}`,
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Units (e.g. 10000)"
+                    value={newInvestorUnits}
+                    onChange={(event) => setNewInvestorUnits(event.target.value)}
+                    style={{
+                      padding: 10,
+                      borderRadius: 8,
+                      border: `1px solid ${palette.border}`,
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={createInvestor}
+                      disabled={creatingInvestor}
+                      style={{
+                        flex: 1,
+                        border: 'none',
+                        borderRadius: 999,
+                        padding: '10px 14px',
+                        background: creatingInvestor ? 'rgba(108,92,231,0.3)' : palette.accent,
+                        color: '#fff',
+                        fontWeight: 600,
+                        cursor: creatingInvestor ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {creatingInvestor ? 'Adding…' : 'Add'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetInvestorForm}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: palette.accentMuted,
+                        cursor: 'pointer',
+                        fontSize: 12,
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
-            <div
-              style={{
-                padding: '12px 24px 24px',
-                borderTop: '1px solid #e5e7eb',
-                display: 'flex',
-                justifyContent: 'flex-end',
-              }}
-            >
-              <button
-                type="button"
-                onClick={closeInvestorModal}
-                disabled={!investorsDirty}
-                style={{
-                  background: '#2563eb',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '10px 24px',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: investorsDirty ? 'pointer' : 'not-allowed',
-                  opacity: investorsDirty ? 1 : 0.5,
-                  boxShadow: investorsDirty ? '0 15px 30px rgba(37,99,235,0.35)' : 'none',
-                }}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
+        </section>
+      </main>
     </div>
   );
 

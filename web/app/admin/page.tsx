@@ -820,23 +820,47 @@ export default function AdminPage() {
                   disabled={!canRequestSignatures}
                   style={{
                     border: `1px solid ${palette.accent}`,
-                    borderRadius: 10,
-                    padding: '10px 22px',
+                    borderRadius: 16,
+                    padding: '12px 22px',
                     fontSize: 13,
                     fontWeight: 600,
                     background: '#fff',
                     color: canRequestSignatures ? palette.accent : palette.accentMuted,
                     cursor: canRequestSignatures ? 'pointer' : 'not-allowed',
                     opacity: canRequestSignatures ? 1 : 0.5,
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 14,
+                    boxShadow: 'none',
                   }}
                   title={
                     canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
                   }
                 >
-                  <span aria-hidden="true" style={{ marginRight: 8, fontSize: 14 }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: canRequestSignatures ? 'rgba(37,99,235,0.15)' : 'rgba(148,163,184,0.25)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 16,
+                    }}
+                  >
                     ✉️
                   </span>
-                  Request New Signatures
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: 14, letterSpacing: 0.3, color: palette.text }}>
+                      Request New Signatures
+                    </span>
+                    <span style={{ fontSize: 11, color: palette.accentMuted }}>
+                      Invite investors to sign PDF packet.
+                    </span>
+                  </span>
                 </button>
               </div>
 

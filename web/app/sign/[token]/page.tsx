@@ -850,6 +850,8 @@ function SignatureFieldCanvas({
     onChange(null);
   };
 
+  const compact = width < 200 || height < 110;
+  const clearLabel = compact ? '✕' : 'Clear';
   return (
     <div
       style={{
@@ -874,18 +876,20 @@ function SignatureFieldCanvas({
         onClick={clear}
         style={{
           position: 'absolute',
-          top: 6,
-          right: 6,
+          top: compact ? 4 : 6,
+          right: compact ? 4 : 6,
           background: 'rgba(15, 23, 42, 0.75)',
           color: '#fff',
           border: 'none',
           borderRadius: 999,
-          padding: '2px 10px',
-          fontSize: 11,
+          padding: compact ? '0 6px' : '2px 10px',
+          fontSize: compact ? 10 : 11,
           cursor: 'pointer',
+          lineHeight: compact ? '20px' : '22px',
+          minHeight: compact ? 20 : 24,
         }}
       >
-        Clear
+        {clearLabel}
       </button>
     </div>
   );

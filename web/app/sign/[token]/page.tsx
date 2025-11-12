@@ -324,17 +324,64 @@ export default function SignPage() {
           margin-top: 8px;
           color: #2563eb;
         }
-        .sign-content.completion .sign-columns {
+        .sign-content.completion {
+          height: calc(100vh - 78px);
+          min-height: 0;
           display: flex;
           flex-direction: column;
           gap: 24px;
+          overflow: hidden;
         }
-        .sign-content.completion .sign-doc-section {
-          max-height: none;
-          min-height: auto;
-          overflow-y: visible;
-          padding-right: 0;
-          padding-bottom: 0;
+        .completion-wrapper {
+          flex: 1;
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+          min-height: 0;
+        }
+        .completion-panel {
+          position: sticky;
+          top: 80px;
+          z-index: 10;
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          align-items: center;
+          padding: 24px 28px;
+          border: 1px solid #e5e7eb;
+          border-radius: 20px;
+          background: #ffffff;
+          box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+        }
+        .completion-panel .label {
+          margin: 0;
+          font-size: 12px;
+          color: #6b7280;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+        }
+        .completion-panel .status-title {
+          font-size: 22px;
+          margin: 4px 0 0;
+          color: #0f172a;
+        }
+        .completion-panel .message {
+          margin: 0;
+          font-size: 14px;
+          color: #0f172a;
+          line-height: 1.5;
+          max-width: 440px;
+        }
+        .completion-viewer {
+          flex: 1;
+          min-height: 0;
+          border: 1px solid #e5e7eb;
+          border-radius: 24px;
+          background: #fff;
+          padding: 28px;
+          box-shadow: 0 20px 60px rgba(12, 19, 43, 0.08);
+          overflow-y: auto;
         }
         @media (max-width: 1080px) {
           .sign-columns {
@@ -562,6 +609,7 @@ function FieldOverlay({
     top: screenY,
     width: screenWidth,
     height: screenHeight,
+    boxSizing: 'border-box' as const,
     pointerEvents: mode === 'view' ? 'none' : ('auto' as const),
     display: 'flex',
     alignItems: 'center',
@@ -716,6 +764,7 @@ function SignatureFieldCanvas({
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const ratioRef = useRef(1);
   const drawing = useRef(false);
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
 
@@ -724,13 +773,24 @@ function SignatureFieldCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const ratio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    ratioRef.current = ratio;
+    const scaledWidth = Math.max(1, Math.round(width * ratio));
+    const scaledHeight = Math.max(1, Math.round(height * ratio));
+    canvas.width = scaledWidth;
+    canvas.height = scaledHeight;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(ratio, ratio);
     ctxRef.current = ctx;
-    canvas.width = width;
-    canvas.height = height;
     ctx.clearRect(0, 0, width, height);
     if (value) {
       const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, width, height);
+      img.onload = () => {
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+      };
       img.src = `data:image/png;base64,${value}`;
     }
   }, [width, height, value]);
@@ -783,7 +843,10 @@ function SignatureFieldCanvas({
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
     if (!canvas || !ctx) return;
+    const ratio = ratioRef.current;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(ratio, ratio);
     onChange(null);
   };
 
@@ -791,23 +854,37 @@ function SignatureFieldCanvas({
     <div
       style={{
         ...style,
+        boxSizing: 'border-box',
         border: '2px dashed #2563eb',
         borderRadius: 6,
-        background: 'rgba(255,255,255,0.85)',
-        flexDirection: 'column',
-        gap: 4,
-        padding: 4,
+        background: 'rgba(255,255,255,0.9)',
+        overflow: 'hidden',
       }}
     >
       <canvas
         ref={canvasRef}
-        style={{ width: '100%', height: '100%', border: '1px solid #ddd', touchAction: 'none' }}
+        style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
         onPointerDown={startDrawing}
         onPointerMove={draw}
         onPointerUp={stopDrawing}
         onPointerLeave={stopDrawing}
       />
-      <button type="button" onClick={clear} style={{ alignSelf: 'flex-end', fontSize: 12 }}>
+      <button
+        type="button"
+        onClick={clear}
+        style={{
+          position: 'absolute',
+          top: 6,
+          right: 6,
+          background: 'rgba(15, 23, 42, 0.75)',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 999,
+          padding: '2px 10px',
+          fontSize: 11,
+          cursor: 'pointer',
+        }}
+      >
         Clear
       </button>
     </div>
@@ -832,69 +909,26 @@ function CompletionView({
   renderOverlays?: boolean;
 }) {
   return (
-    <div className="sign-content completion">
-      <div className="sign-columns">
-        <aside className="sign-sidebar completion">
-          <div>
-            <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Status</p>
-            <strong style={{ fontSize: 18 }}>
-              {info.sealed ? 'All parties signed' : info.status === 'waiting' ? 'Waiting for others' : 'Completed'}
-            </strong>
-          </div>
-          <p style={{ fontSize: 14, color: '#0f172a', lineHeight: 1.5 }}>{info.message}</p>
-          {typeof info.waitingOn === 'number' && info.waitingOn > 0 && (
-            <p style={{ fontSize: 13, color: '#6b7280' }}>
-              Still awaiting {info.waitingOn} signer{info.waitingOn === 1 ? '' : 's'}.
-            </p>
-          )}
-          {info.sha && (
-            <div style={{ fontSize: 12, color: '#475569' }}>
-              Final SHA256:
-              <br />
-              <code style={{ fontSize: 12 }}>{info.sha}</code>
-            </div>
-          )}
-          <p style={{ fontSize: 13, color: '#6b7280' }}>
-            We&apos;ll email a copy of the final PDF as soon as all parties finish.
-          </p>
-        </aside>
-        <section className="sign-doc-section completion">
-          <PdfSigningSurface
-            pages={pages}
-            loading={loading}
-            error={error}
-            fields={fields}
-            values={values}
-            onChange={() => {}}
-            mode="view"
-            renderOverlays={renderOverlays}
-          />
-        </section>
-        <aside className="sign-sidebar completion">
-          <div>
-            <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Status</p>
-            <strong style={{ fontSize: 18 }}>
-              {info.sealed ? 'All parties signed' : info.status === 'waiting' ? 'Waiting for others' : 'Completed'}
-            </strong>
-          </div>
-          <p style={{ fontSize: 14, color: '#0f172a', lineHeight: 1.5 }}>{info.message}</p>
-          {typeof info.waitingOn === 'number' && info.waitingOn > 0 && (
-            <p style={{ fontSize: 13, color: '#6b7280' }}>
-              Still awaiting {info.waitingOn} signer{info.waitingOn === 1 ? '' : 's'}.
-            </p>
-          )}
-          {info.sha && (
-            <div style={{ fontSize: 12, color: '#475569' }}>
-              Final SHA256:
-              <br />
-              <code style={{ fontSize: 12 }}>{info.sha}</code>
-            </div>
-          )}
-          <p style={{ fontSize: 13, color: '#6b7280' }}>
-            We&apos;ll email a copy of the final PDF as soon as all parties finish.
-          </p>
-        </aside>
-      </div>
+    <div className="completion-wrapper">
+      <section className="completion-panel">
+        <div>
+          <p className="label">Status</p>
+          <strong className="status-title">Document signed</strong>
+        </div>
+        <p className="message">{info.message}</p>
+      </section>
+      <section className="completion-viewer">
+        <PdfSigningSurface
+          pages={pages}
+          loading={loading}
+          error={error}
+          fields={fields}
+          values={values}
+          onChange={() => {}}
+          mode="view"
+          renderOverlays={renderOverlays}
+        />
+      </section>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import os
 from html import escape
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
@@ -9,6 +10,11 @@ from ..utils import canonical_json, sha256_bytes, make_token
 from ..auth import require_admin_access
 
 router = APIRouter()
+WEB_BASE_URL = os.getenv("WEB_BASE_URL") or os.getenv("NEXT_PUBLIC_WEB_BASE") or "http://localhost:3000"
+
+def _sign_link(token: str) -> str:
+    base = WEB_BASE_URL.rstrip('/')
+    return f"{base}/sign/{token}"
 
 def _append_event(session: Session, env_id: int, actor: str, type_: str, meta: dict, ip=None, ua=None):
     last = session.exec(
@@ -130,7 +136,7 @@ def send_envelope(
     intro = env.message or f"{requester_name} invited you to review and sign this document."
     for s in signers:
         token = make_token({"signer_id": s.id, "envelope_id": envelope_id})
-        link = f"http://localhost:3000/sign/{token}"
+        link = _sign_link(token)
         custom_subject = env.subject.strip() if env.subject else None
         subject_core = custom_subject or filename
         subject = f"Signature Requested: {subject_core}"
@@ -222,6 +228,6 @@ def dev_magic_links(
         token = make_token({"signer_id": s.id, "envelope_id": envelope_id})
         links.append({
             "signer": {"id": s.id, "name": s.name, "email": s.email},
-            "link": f"http://localhost:3000/sign/{token}"
+            "link": _sign_link(token)
         })
     return {"envelope_id": envelope_id, "links": links}

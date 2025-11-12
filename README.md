@@ -63,6 +63,9 @@ Services:
   Update `.env` with the new user’s access/secret and restart API/web. Only delete/recreate the MinIO data volume if you intentionally want a clean slate.
 - **Reminder**: Editing `.env` alone is not enough; restart the affected containers so they pick up the new values.
 
+### Public URLs in emails
+- Set `WEB_BASE_URL` (or `NEXT_PUBLIC_WEB_BASE`) in `.env` to the externally reachable URL for the web app (e.g., your Cloudflare Tunnel hostname). The API uses this value when generating magic-link emails (`<base>/sign/<token>`). If it’s missing, links fall back to `http://localhost:3000`.
+
 ## Testing (Docker workflow)
 Run the API test suite inside the same image the service uses:
 

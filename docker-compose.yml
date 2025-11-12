@@ -45,6 +45,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - WORKER_QUEUE=signing
       - ADMIN_ACCESS_TOKEN=${ADMIN_ACCESS_TOKEN}
+      - WEB_BASE_URL=${WEB_BASE_URL}
     depends_on:
       - db
       - minio

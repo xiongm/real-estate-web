@@ -860,7 +860,7 @@ function SignatureFieldCanvas({
         border: '2px dashed #2563eb',
         borderRadius: 6,
         background: 'rgba(255,255,255,0.9)',
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
       <canvas
@@ -876,8 +876,8 @@ function SignatureFieldCanvas({
         onClick={clear}
         style={{
           position: 'absolute',
-          top: compact ? 4 : 6,
-          right: compact ? 4 : 6,
+          top: compact ? -10 : -14,
+          right: compact ? -10 : -14,
           background: 'rgba(15, 23, 42, 0.75)',
           color: '#fff',
           border: 'none',

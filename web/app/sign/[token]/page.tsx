@@ -38,7 +38,7 @@ export default function SignPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
   const [completion, setCompletion] = useState<CompletionResult | null>(null);
-  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
 
   useEffect(() => {
     if (!token) return;
@@ -203,17 +203,9 @@ export default function SignPage() {
       renderOverlays={!showFinalPdf}
     />
   ) : (
-    <div style={{ flex: 1, padding: 24 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 320px', gap: 24, alignItems: 'flex-start' }}>
-        <section
-          style={{
-            maxHeight: 'calc(100vh - 160px)',
-            minHeight: 'calc(100vh - 160px)',
-            overflowY: 'auto',
-            paddingRight: 8,
-            paddingBottom: 32,
-          }}
-        >
+    <div className="sign-content">
+      <div className="sign-columns">
+        <section className="sign-doc-section">
           <PdfSigningSurface
             pages={pdfPages}
             loading={pdfLoading}
@@ -223,20 +215,10 @@ export default function SignPage() {
             onChange={handleFieldChange}
           />
         </section>
-        <aside style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: 12,
-              padding: '24px 28px',
-              background: '#fff',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 24,
-            }}
-          >
+        <aside className="sign-sidebar">
+          <div className="sign-sidebar-card">
             <Consent token={token} consented={consented} onToggle={setConsented} />
-            <div style={{ paddingTop: 4 }}>
+            <div className="sign-sidebar-action">
               <Complete
                 token={token}
                 values={payloadValues}
@@ -249,7 +231,7 @@ export default function SignPage() {
               />
             </div>
           </div>
-          {!completion && statusMessage && <p style={{ marginTop: 8, color: '#2563eb' }}>{statusMessage}</p>}
+          {!completion && statusMessage && <p className="status-message">{statusMessage}</p>}
         </aside>
       </div>
     </div>
@@ -291,12 +273,92 @@ export default function SignPage() {
         </div>
       </header>
       {mainContent}
+      <style jsx>{`
+        .sign-content {
+          flex: 1;
+          padding: 24px;
+        }
+        .sign-columns {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 320px;
+          gap: 24px;
+          align-items: flex-start;
+        }
+        .sign-doc-section {
+          max-height: calc(100vh - 160px);
+          min-height: calc(100vh - 160px);
+          overflow-y: auto;
+          padding-right: 8px;
+          padding-bottom: 32px;
+        }
+        .sign-sidebar {
+          position: sticky;
+          top: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .sign-sidebar.completion {
+          position: static;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 24px 28px;
+          background: #fff;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .sign-sidebar-card {
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 24px 28px;
+          background: #fff;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .sign-sidebar-action {
+          padding-top: 4px;
+        }
+        .status-message {
+          margin-top: 8px;
+          color: #2563eb;
+        }
+        .sign-content.completion .sign-columns {
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .sign-content.completion .sign-doc-section {
+          max-height: none;
+          min-height: auto;
+          overflow-y: visible;
+          padding-right: 0;
+          padding-bottom: 0;
+        }
+        @media (max-width: 1080px) {
+          .sign-columns {
+            grid-template-columns: 1fr;
+          }
+          .sign-sidebar {
+            position: static;
+          }
+          .sign-sidebar-card {
+            order: 2;
+          }
+        }
+        @media (max-width: 640px) {
+          .sign-sidebar-card {
+            padding: 20px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
 function Consent({ token, consented, onToggle }: { token: string; consented: boolean; onToggle: (value: boolean) => void }) {
-  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const onChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
     if (!checked) {
@@ -336,7 +398,7 @@ function Complete({
   onSuccess: (info: CompletionResult) => void;
   onError: (msg: string) => void;
 }) {
-  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const [sending, setSending] = useState(false);
   const onComplete = async () => {
     const missingRequired = Object.values(values).some((meta: any) => {
@@ -770,17 +832,33 @@ function CompletionView({
   renderOverlays?: boolean;
 }) {
   return (
-    <div style={{ flex: 1, padding: 24 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 320px', gap: 24, alignItems: 'flex-start' }}>
-        <section
-          style={{
-            maxHeight: 'calc(100vh - 160px)',
-            minHeight: 'calc(100vh - 160px)',
-            overflowY: 'auto',
-            paddingRight: 8,
-            paddingBottom: 32,
-          }}
-        >
+    <div className="sign-content completion">
+      <div className="sign-columns">
+        <aside className="sign-sidebar completion">
+          <div>
+            <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Status</p>
+            <strong style={{ fontSize: 18 }}>
+              {info.sealed ? 'All parties signed' : info.status === 'waiting' ? 'Waiting for others' : 'Completed'}
+            </strong>
+          </div>
+          <p style={{ fontSize: 14, color: '#0f172a', lineHeight: 1.5 }}>{info.message}</p>
+          {typeof info.waitingOn === 'number' && info.waitingOn > 0 && (
+            <p style={{ fontSize: 13, color: '#6b7280' }}>
+              Still awaiting {info.waitingOn} signer{info.waitingOn === 1 ? '' : 's'}.
+            </p>
+          )}
+          {info.sha && (
+            <div style={{ fontSize: 12, color: '#475569' }}>
+              Final SHA256:
+              <br />
+              <code style={{ fontSize: 12 }}>{info.sha}</code>
+            </div>
+          )}
+          <p style={{ fontSize: 13, color: '#6b7280' }}>
+            We&apos;ll email a copy of the final PDF as soon as all parties finish.
+          </p>
+        </aside>
+        <section className="sign-doc-section completion">
           <PdfSigningSurface
             pages={pages}
             loading={loading}
@@ -792,19 +870,7 @@ function CompletionView({
             renderOverlays={renderOverlays}
           />
         </section>
-        <aside
-          style={{
-            position: 'sticky',
-            top: 24,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: '24px 28px',
-            background: '#fff',
-          }}
-        >
+        <aside className="sign-sidebar completion">
           <div>
             <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Status</p>
             <strong style={{ fontSize: 18 }}>

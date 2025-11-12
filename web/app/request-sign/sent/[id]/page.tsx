@@ -14,7 +14,7 @@ export default function EnvelopeSentPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const envelopeId = params?.id;
-  const baseApi = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const [summary, setSummary] = useState<EnvelopeSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

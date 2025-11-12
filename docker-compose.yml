@@ -74,7 +74,8 @@ services:
   web:
     build: ./web
     environment:
-      - NEXT_PUBLIC_API_BASE=http://localhost:8000
+      - NEXT_PUBLIC_API_BASE=
+      - API_HOST=http://api:8000
       - NEXT_PUBLIC_ADMIN_TOKEN_PLACEHOLDER=${ADMIN_ACCESS_TOKEN}
     ports:
       - "3000:3000"

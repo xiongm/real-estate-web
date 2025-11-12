@@ -36,7 +36,7 @@ export default function ProjectViewerPage() {
     const abort = new AbortController();
     setLoading(true);
     setError(null);
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'}/api/projects/${projectId}/summary`, {
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000'}/api/projects/${projectId}/summary`, {
       headers: { 'X-Access-Token': token },
       signal: abort.signal,
     })
@@ -55,7 +55,7 @@ export default function ProjectViewerPage() {
     return () => abort.abort();
   }, [projectId, token]);
 
-  const baseApi = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
 
   if (!projectId) {
     return <div style={{ padding: 40 }}>Invalid project id.</div>;

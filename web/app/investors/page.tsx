@@ -25,7 +25,7 @@ type InvestorsPageProps = {
 };
 
 export default function InvestorsPage({ onAnyChange, initialProjectId, accessToken }: InvestorsPageProps) {
-  const base = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [investors, setInvestors] = useState<ProjectInvestor[]>([]);

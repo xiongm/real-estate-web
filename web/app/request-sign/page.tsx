@@ -109,7 +109,7 @@ const createSigner = (order: number): SignerForm => ({
 });
 
 export default function RequestSignPage() {
-  const baseApi = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const router = useRouter();
   const searchParams = useSearchParams();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);

@@ -52,7 +52,7 @@ const palette = {
 const shadows = theme.shadows;
 
 export default function AdminPage() {
-  const baseApi = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const [adminToken, setAdminToken] = useState('');
   const [adminVerified, setAdminVerified] = useState(false);
   const [adminTokenLoading, setAdminTokenLoading] = useState(true);

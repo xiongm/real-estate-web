@@ -88,9 +88,28 @@ export default function AdminPage() {
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
   const [centerTab, setCenterTab] = useState<'documents' | 'share'>('documents');
   const [deletingInvestors, setDeletingInvestors] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
+  const [investorDrawerOpen, setInvestorDrawerOpen] = useState(false);
+  const closeDrawers = () => {
+    setProjectDrawerOpen(false);
+    setInvestorDrawerOpen(false);
+  };
   const searchParams = useSearchParams();
   const projectParamRaw = searchParams?.get('project') ?? null;
   const projectParamId = projectParamRaw && !Number.isNaN(Number(projectParamRaw)) ? Number(projectParamRaw) : undefined;
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const update = () => setIsMobile(window.innerWidth <= 900);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  useEffect(() => {
+    if (!isMobile) {
+      closeDrawers();
+    }
+  }, [isMobile]);
   const rememberProjectSelection = (id: number | null) => {
     if (typeof window === 'undefined') return;
     if (id !== null && id !== undefined) {
@@ -110,6 +129,9 @@ export default function AdminPage() {
   const selectProject = (id: number | null) => {
     setSelectedProjectId(id);
     rememberProjectSelection(id);
+    if (isMobile) {
+      setProjectDrawerOpen(false);
+    }
   };
 
   const verifyAdminToken = useCallback(
@@ -144,6 +166,7 @@ export default function AdminPage() {
     setAdminToken('');
     setAdminVerified(false);
     setAdminTokenError(null);
+    closeDrawers();
     if (typeof window !== 'undefined') {
       localStorage.removeItem('adminAccessToken');
     }
@@ -625,9 +648,226 @@ useEffect(() => {
     );
   }
 
+  const projectSidebarContent = (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <h2 style={{ margin: 0, fontSize: 20, color: palette.text }}>Projects</h2>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={toggleProjectManage}
+            style={{
+              border: `1px solid ${palette.border}`,
+              background: manageProjectsMode ? palette.accent : '#fff',
+              color: manageProjectsMode ? '#fff' : palette.text,
+              borderRadius: 999,
+              padding: '4px 10px',
+              fontSize: 12,
+              cursor: 'pointer',
+              boxShadow: manageProjectsMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
+            }}
+          >
+            {manageProjectsMode ? 'Done' : 'Manage'}
+          </button>
+          {manageProjectsMode && (
+            <button
+              type="button"
+              onClick={deleteSelectedProjects}
+              disabled={!selectedProjectIds.length || actionLoading}
+              style={{
+                border: '1px solid #dc2626',
+                color: '#fff',
+                background: '#dc2626',
+                borderRadius: 999,
+                padding: '4px 10px',
+                fontSize: 12,
+                cursor: !selectedProjectIds.length || actionLoading ? 'not-allowed' : 'pointer',
+                opacity: !selectedProjectIds.length || actionLoading ? 0.5 : 1,
+                boxShadow: !selectedProjectIds.length || actionLoading ? 'none' : '0 10px 18px rgba(220,38,38,0.25)',
+              }}
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      </div>
+      {isMobile && (
+        <div className="drawer-mobile-close">
+          <button type="button" onClick={() => setProjectDrawerOpen(false)}>
+            Close ✕
+          </button>
+        </div>
+      )}
+      <div className="project-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
+        {projects.map((project, idx) => {
+          const active = project.id === selectedProjectId;
+          return (
+            <button
+              key={`project-${project.id ?? idx}`}
+              onClick={() => selectProject(project.id)}
+              style={{
+                textAlign: 'left',
+                padding: '12px 14px',
+                borderRadius: 14,
+                border: `1px solid ${active ? palette.accent : palette.border}`,
+                background: active ? 'linear-gradient(135deg,#6c5ce7,#7f6bff)' : '#fff',
+                color: active ? '#fff' : palette.text,
+                cursor: 'pointer',
+                fontWeight: active ? 600 : 500,
+                boxShadow: active ? '0 12px 24px rgba(108,92,231,0.25)' : '0 4px 12px rgba(15,23,42,0.05)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {manageProjectsMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedProjectIds.includes(project.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={() => toggleProjectSelection(project.id)}
+                    />
+                  )}
+                  <div>
+                    <strong>{project.name}</strong>
+                    <p style={{ margin: 0, fontSize: 12, color: active ? 'rgba(255,255,255,0.8)' : palette.accentMuted }}>#{project.id}</p>
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+        {manageProjectsMode && (
+          <div style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 12, marginTop: 4 }}>
+            {!showProjectForm ? (
+              <button
+                type="button"
+                onClick={() => setShowProjectForm(true)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: palette.accent,
+                  textAlign: 'left',
+                  padding: 0,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                + Create project
+              </button>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input
+                  type="text"
+                  value={newProjectName}
+                  onChange={(event) => setNewProjectName(event.target.value)}
+                  placeholder="Project name"
+                  style={{
+                    padding: 10,
+                    borderRadius: 10,
+                    border: `1px solid ${palette.border}`,
+                    background: '#fff',
+                    color: palette.text,
+                  }}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={createProject}
+                    disabled={creatingProject}
+                    style={{
+                      flex: 1,
+                      borderRadius: 999,
+                      border: 'none',
+                      padding: '10px 14px',
+                      background: creatingProject ? 'rgba(108,92,231,0.3)' : palette.accent,
+                      color: '#fff',
+                      fontWeight: 600,
+                      cursor: creatingProject ? 'not-allowed' : 'pointer',
+                      boxShadow: creatingProject ? 'none' : '0 12px 24px rgba(108,92,231,0.25)',
+                    }}
+                  >
+                    {creatingProject ? 'Adding…' : 'Add'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProjectForm(false);
+                      setNewProjectName('');
+                    }}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: palette.accentMuted,
+                      cursor: 'pointer',
+                      fontSize: 12,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={logout}
+        style={{
+          marginTop: 8,
+          border: `1px solid ${palette.accent}`,
+          background: '#fff',
+          color: palette.accent,
+          borderRadius: 999,
+          padding: '6px 12px',
+          fontSize: 12,
+          cursor: 'pointer',
+          fontWeight: 600,
+        }}
+      >
+        Sign out
+      </button>
+    </>
+  );
+
+  const layoutClasses = ['admin-layout'];
+  if (isMobile) layoutClasses.push('mobile');
+  if (isMobile && projectDrawerOpen) layoutClasses.push('show-projects');
+  if (isMobile && investorDrawerOpen) layoutClasses.push('show-investors');
+  const layoutClassName = layoutClasses.join(' ');
+  const drawerActive = isMobile && (projectDrawerOpen || investorDrawerOpen);
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: palette.bg, color: palette.text }}>
+    <div className={layoutClassName} style={{ minHeight: '100vh', display: 'flex', background: palette.bg, color: palette.text }}>
+      {isMobile && (
+        <div className="admin-mobile-header">
+          <button
+            type="button"
+            onClick={() => {
+              setProjectDrawerOpen(true);
+              setInvestorDrawerOpen(false);
+            }}
+          >
+            Projects
+          </button>
+          <div className="admin-mobile-heading">
+            <p>Project</p>
+            <strong>{selectedProject?.name || 'Select a project'}</strong>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setInvestorDrawerOpen(true);
+              setProjectDrawerOpen(false);
+            }}
+            disabled={!selectedProjectId}
+          >
+            Investors
+          </button>
+        </div>
+      )}
       <aside
+        className="admin-sidebar"
         style={{
           width: 260,
           padding: 24,
@@ -639,178 +879,10 @@ useEffect(() => {
           boxShadow: '0 10px 30px rgba(17, 24, 39, 0.05)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 20, color: palette.text }}>Projects</h2>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={toggleProjectManage}
-              style={{
-                border: `1px solid ${palette.border}`,
-                background: manageProjectsMode ? palette.accent : '#fff',
-                color: manageProjectsMode ? '#fff' : palette.text,
-                borderRadius: 999,
-                padding: '4px 10px',
-                fontSize: 12,
-                cursor: 'pointer',
-                boxShadow: manageProjectsMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
-              }}
-            >
-              {manageProjectsMode ? 'Done' : 'Manage'}
-            </button>
-            {manageProjectsMode && (
-              <button
-                type="button"
-                onClick={deleteSelectedProjects}
-                disabled={!selectedProjectIds.length || actionLoading}
-                style={{
-                  border: '1px solid #dc2626',
-                  color: '#fff',
-                  background: '#dc2626',
-                  borderRadius: 999,
-                  padding: '4px 10px',
-                  fontSize: 12,
-                  cursor: !selectedProjectIds.length || actionLoading ? 'not-allowed' : 'pointer',
-                  opacity: !selectedProjectIds.length || actionLoading ? 0.5 : 1,
-                  boxShadow: !selectedProjectIds.length || actionLoading ? 'none' : '0 10px 18px rgba(220,38,38,0.25)',
-                }}
-              >
-                Delete
-              </button>
-            )}
-          </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
-            {projects.map((project, idx) => {
-              const active = project.id === selectedProjectId;
-              return (
-                <button
-                  key={`project-${project.id ?? idx}`}
-                  onClick={() => selectProject(project.id)}
-                  style={{
-                    textAlign: 'left',
-                    padding: '12px 14px',
-                    borderRadius: 14,
-                    border: `1px solid ${active ? palette.accent : palette.border}`,
-                    background: active ? 'linear-gradient(135deg,#6c5ce7,#7f6bff)' : '#fff',
-                    color: active ? '#fff' : palette.text,
-                    cursor: 'pointer',
-                    fontWeight: active ? 600 : 500,
-                    boxShadow: active ? '0 12px 24px rgba(108,92,231,0.25)' : '0 4px 12px rgba(15,23,42,0.05)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {manageProjectsMode && (
-                        <input
-                          type="checkbox"
-                          checked={selectedProjectIds.includes(project.id)}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={() => toggleProjectSelection(project.id)}
-                        />
-                      )}
-                      <div>
-                        <strong>{project.name}</strong>
-                        <p style={{ margin: 0, fontSize: 12, color: active ? 'rgba(255,255,255,0.8)' : palette.accentMuted }}>#{project.id}</p>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          {manageProjectsMode && (
-            <div style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 12, marginTop: 4 }}>
-              {!showProjectForm ? (
-                <button
-                  type="button"
-                  onClick={() => setShowProjectForm(true)}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: palette.accent,
-                    textAlign: 'left',
-                    padding: 0,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  + Create project
-                </button>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <input
-                    type="text"
-                    value={newProjectName}
-                    onChange={(event) => setNewProjectName(event.target.value)}
-                    placeholder="Project name"
-                    style={{
-                      padding: 10,
-                      borderRadius: 10,
-                      border: `1px solid ${palette.border}`,
-                      background: '#fff',
-                      color: palette.text,
-                    }}
-                  />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={createProject}
-                      disabled={creatingProject}
-                      style={{
-                        flex: 1,
-                        borderRadius: 999,
-                        border: 'none',
-                        padding: '10px 14px',
-                        background: creatingProject ? 'rgba(108,92,231,0.3)' : palette.accent,
-                        color: '#fff',
-                        fontWeight: 600,
-                        cursor: creatingProject ? 'not-allowed' : 'pointer',
-                        boxShadow: creatingProject ? 'none' : '0 12px 24px rgba(108,92,231,0.25)',
-                      }}
-                    >
-                      {creatingProject ? 'Adding…' : 'Add'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowProjectForm(false);
-                        setNewProjectName('');
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: palette.accentMuted,
-                        cursor: 'pointer',
-                        fontSize: 12,
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={logout}
-          style={{
-            marginTop: 8,
-            border: `1px solid ${palette.accent}`,
-            background: '#fff',
-            color: palette.accent,
-            borderRadius: 999,
-            padding: '6px 12px',
-            fontSize: 12,
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
-        >
-          Sign out
-        </button>
+        {projectSidebarContent}
+      
       </aside>
-      <main style={{ flex: 1, display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24, padding: 32 }}>
+      <main className="admin-main" style={{ flex: 1, display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24, padding: 32 }}>
         <section
           style={{
             borderRadius: 24,
@@ -1472,6 +1544,7 @@ useEffect(() => {
           )}
         </section>
         <section
+          className="investor-panel"
           style={{
             borderRadius: 24,
             background: palette.panel,
@@ -1529,6 +1602,13 @@ useEffect(() => {
               )}
             </div>
           </header>
+          {isMobile && (
+            <div className="drawer-mobile-close">
+              <button type="button" onClick={() => setInvestorDrawerOpen(false)}>
+                Close ✕
+              </button>
+            </div>
+          )}
           <div style={{ overflowY: 'auto', maxHeight: '70vh', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {investors.length === 0 && <p style={{ color: palette.accentMuted }}>No investors linked.</p>}
             {investors.map((investor, idx) => {
@@ -1660,6 +1740,130 @@ useEffect(() => {
           )}
         </section>
       </main>
+      {drawerActive && <div className="drawer-overlay" onClick={closeDrawers} />}
+      <style jsx>{`
+        .admin-layout {
+          gap: 0;
+        }
+        .admin-main-grid {
+          display: grid;
+          grid-template-columns: 1.4fr 1fr;
+          gap: 24px;
+        }
+        .project-scroll {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          overflow-y: auto;
+          max-height: calc(100vh - 220px);
+        }
+        .drawer-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.45);
+          z-index: 30;
+        }
+        .admin-mobile-header {
+          display: none;
+        }
+        .drawer-mobile-close {
+          display: none;
+        }
+        @media (max-width: 1200px) {
+          .admin-main-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        .admin-layout.mobile {
+          flex-direction: column;
+          position: relative;
+        }
+        .admin-layout.mobile .admin-main {
+          padding: 16px !important;
+        }
+        .admin-layout.mobile .admin-main-grid {
+          grid-template-columns: 1fr;
+        }
+        .admin-layout.mobile .admin-mobile-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 16px;
+          border-bottom: 1px solid ${palette.border};
+          background: #fff;
+          position: sticky;
+          top: 0;
+          z-index: 15;
+        }
+        .admin-mobile-header button {
+          border: none;
+          border-radius: 999px;
+          padding: 8px 14px;
+          font-size: 13px;
+          font-weight: 600;
+          background: ${palette.accent};
+          color: #fff;
+          cursor: pointer;
+        }
+        .admin-mobile-header button:disabled {
+          background: rgba(148, 163, 184, 0.4);
+          color: rgba(255, 255, 255, 0.7);
+          cursor: not-allowed;
+        }
+        .admin-mobile-header .admin-mobile-heading p {
+          margin: 0;
+          font-size: 11px;
+          color: ${palette.accentMuted};
+        }
+        .admin-mobile-header .admin-mobile-heading strong {
+          font-size: 14px;
+          color: ${palette.text};
+        }
+        .admin-layout.mobile .admin-sidebar {
+          position: fixed;
+          top: 0;
+          left: 0;
+          height: 100%;
+          width: min(320px, 85vw);
+          transform: translateX(-100%);
+          transition: transform 0.3s ease;
+          z-index: 40;
+          box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+        }
+        .admin-layout.mobile .project-scroll {
+          max-height: calc(100vh - 220px);
+        }
+        .admin-layout.mobile.show-projects .admin-sidebar {
+          transform: translateX(0);
+        }
+        .admin-layout.mobile .investor-panel {
+          position: fixed;
+          top: 0;
+          right: 0;
+          height: 100%;
+          width: min(360px, 85vw);
+          transform: translateX(100%);
+          transition: transform 0.3s ease;
+          z-index: 40;
+          box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+        }
+        .admin-layout.mobile.show-investors .investor-panel {
+          transform: translateX(0);
+        }
+        .admin-layout.mobile .drawer-mobile-close {
+          display: flex;
+          justify-content: flex-end;
+          margin-top: 4px;
+        }
+        .drawer-mobile-close button {
+          border: none;
+          background: transparent;
+          color: ${palette.accent};
+          font-weight: 600;
+          cursor: pointer;
+        }
+      `}</style>
     </div>
   );
 

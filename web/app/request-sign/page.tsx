@@ -156,6 +156,7 @@ export default function RequestSignPage() {
   const [adminTokenError, setAdminTokenError] = useState<string | null>(null);
   const [tokenInput, setTokenInput] = useState('');
   const readyToReview = Boolean(documentInfo && fields.length > 0);
+  const [isMobile, setIsMobile] = useState(false);
   const activeProject = selectedProjectId ? projects.find((project) => project.id === selectedProjectId) ?? null : null;
   const activeProjectName = activeProject?.name || (selectedProjectId ? `Project #${selectedProjectId}` : 'No project selected');
   const canUploadDocument = Boolean(selectedProjectId && !projectParamError);
@@ -189,6 +190,13 @@ export default function RequestSignPage() {
         window.removeEventListener('pointerup', toolDragHandlersRef.current.up);
       }
     };
+  }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const update = () => setIsMobile(window.innerWidth <= 960);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   const verifyAdminToken = useCallback(
@@ -942,6 +950,56 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
             Continue
           </button>
         </form>
+      </div>
+    );
+  }
+  if (isMobile) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: palette.pageBackground,
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 420,
+            width: '100%',
+            background: '#fff',
+            borderRadius: 24,
+            padding: 32,
+            textAlign: 'center',
+            boxShadow: theme.shadows.card,
+            border: `1px solid ${theme.colors.border}`,
+          }}
+        >
+          <h2 style={{ marginTop: 0, color: palette.textStrong }}>Use a desktop browser</h2>
+          <p style={{ color: palette.accentMuted, fontSize: 14, lineHeight: 1.6 }}>
+            The Request Sign designer is optimized for larger screens. Please continue from a laptop or desktop computer
+            to upload documents, place fields, and send envelopes.
+          </p>
+          <a
+            href={selectedProjectId ? `/admin?project=${selectedProjectId}` : '/admin'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 16,
+              padding: '10px 18px',
+              borderRadius: 999,
+              background: palette.accent,
+              color: '#fff',
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            Back to Admin
+          </a>
+        </div>
       </div>
     );
   }

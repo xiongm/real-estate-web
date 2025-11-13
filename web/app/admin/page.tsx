@@ -925,7 +925,8 @@ useEffect(() => {
                   style={{
                     border: 'none',
                     background: 'transparent',
-                    color: active ? palette.accent : '#cbd5f5',
+                    color: active ? palette.accent : palette.textStrong,
+                    opacity: active ? 1 : 0.7,
                     fontSize: 14,
                     fontWeight: active ? 600 : 500,
                     padding: '6px 0',
@@ -996,17 +997,17 @@ useEffect(() => {
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 16,
+                      fontSize: 18,
                     }}
                   >
-                    ✉️
+                    👥
                   </span>
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={{ fontSize: 14, letterSpacing: 0.3, color: palette.text }}>
                       Request signatures
                     </span>
-                    <span style={{ fontSize: 11, color: palette.accentMuted }}>
-                      Invite investors to sign PDF packet.
+                    <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                      Invite investors to sign PDF packet
                     </span>
                   </span>
                 </button>

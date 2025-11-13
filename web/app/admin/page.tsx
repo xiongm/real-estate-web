@@ -58,6 +58,7 @@ export default function AdminPage() {
   const [adminTokenLoading, setAdminTokenLoading] = useState(true);
   const [adminTokenError, setAdminTokenError] = useState<string | null>(null);
   const [tokenInput, setTokenInput] = useState('');
+  const [verifyingLocally, setVerifyingLocally] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [finals, setFinals] = useState<FinalArtifact[]>([]);
@@ -557,7 +558,9 @@ useEffect(() => {
     event.preventDefault();
     const candidate = tokenInput.trim();
     if (!candidate) return;
+    setVerifyingLocally(true);
     await verifyAdminToken(candidate);
+    setVerifyingLocally(false);
     setTokenInput('');
   };
 
@@ -626,23 +629,49 @@ useEffect(() => {
               background: '#fff',
               color: palette.text,
             }}
+            disabled={verifyingLocally}
           />
           {adminTokenError && <p style={{ color: '#f87171', margin: 0 }}>{adminTokenError}</p>}
           <button
             type="submit"
+            disabled={verifyingLocally}
             style={{
               border: 'none',
               borderRadius: 999,
               padding: '10px 16px',
-              background: palette.accent,
+              background: verifyingLocally ? 'rgba(108,92,231,0.6)' : palette.accent,
               color: '#fff',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: verifyingLocally ? 'wait' : 'pointer',
               boxShadow: '0 12px 25px rgba(108,92,231,0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
             }}
           >
-            Continue
+            {verifyingLocally && (
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255,255,255,0.4)',
+                  borderTopColor: '#fff',
+                  animation: 'adminMiniSpin 0.8s linear infinite',
+                }}
+              />
+            )}
+            {verifyingLocally ? 'Verifying…' : 'Continue'}
           </button>
+          <style jsx>{`
+            @keyframes adminMiniSpin {
+              to {
+                transform: rotate(360deg);
+              }
+            }
+          `}</style>
         </form>
       </div>
     );

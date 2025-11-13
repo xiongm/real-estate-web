@@ -161,6 +161,7 @@ export default function RequestSignPage() {
   const [adminTokenLoading, setAdminTokenLoading] = useState(true);
   const [adminTokenError, setAdminTokenError] = useState<string | null>(null);
   const [tokenInput, setTokenInput] = useState('');
+  const [verifyingLocally, setVerifyingLocally] = useState(false);
   const readyToReview = Boolean(documentInfo && fields.length > 0);
   const [isMobile, setIsMobile] = useState(false);
   const activeProject = selectedProjectId ? projects.find((project) => project.id === selectedProjectId) ?? null : null;
@@ -869,7 +870,9 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     event.preventDefault();
     const candidate = tokenInput.trim();
     if (!candidate) return;
+    setVerifyingLocally(true);
     await verifyAdminToken(candidate);
+    setVerifyingLocally(false);
     setTokenInput('');
   };
 
@@ -939,22 +942,48 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               background: '#fff',
               color: theme.colors.text,
             }}
+            disabled={verifyingLocally}
           />
           {adminTokenError && <p style={{ color: '#f87171', margin: 0 }}>{adminTokenError}</p>}
           <button
             type="submit"
+            disabled={verifyingLocally}
             style={{
               border: 'none',
               borderRadius: 8,
               padding: '10px 12px',
-              background: palette.accent,
+              background: verifyingLocally ? 'rgba(37,99,235,0.6)' : palette.accent,
               color: '#fff',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: verifyingLocally ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
             }}
           >
-            Continue
+            {verifyingLocally && (
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255,255,255,0.4)',
+                  borderTopColor: '#fff',
+                  animation: 'reqMiniSpin 0.8s linear infinite',
+                }}
+              />
+            )}
+            {verifyingLocally ? 'Verifying…' : 'Continue'}
           </button>
+          <style jsx>{`
+            @keyframes reqMiniSpin {
+              to {
+                transform: rotate(360deg);
+              }
+            }
+          `}</style>
         </form>
       </div>
     );

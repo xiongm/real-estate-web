@@ -79,6 +79,12 @@ const FIELD_LABELS: Record<FieldType, string> = {
   date: 'Date',
   checkbox: 'Checkbox',
 };
+const FIELD_ICONS: Record<FieldType, string> = {
+  signature: '✍️',
+  text: '📝',
+  date: '📅',
+  checkbox: '☑️',
+};
 
 const palette = {
   pageBackground: theme.colors.gradient,
@@ -1355,21 +1361,56 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         {Object.entries(FIELD_LABELS).map(([value, label]) => {
                           const isActive =
                             draggingTool?.investor.id === investor.id && draggingTool?.type === (value as FieldType);
+                          const icon = FIELD_ICONS[value as FieldType];
+                          const fullLabel = `${label} field`;
                           return (
                             <button
                               key={value}
                               type="button"
                               onPointerDown={(event) => beginToolDrag(event, value as FieldType, investor)}
                               style={{
-                                padding: '6px 12px',
-                                borderRadius: 999,
+                                padding: '8px 14px',
+                                borderRadius: 14,
                                 border: isActive ? `2px solid ${palette.accent}` : '1px solid rgba(148,163,184,0.4)',
-                                background: isActive ? 'rgba(56,189,248,0.15)' : 'transparent',
+                                background: isActive ? 'rgba(56,189,248,0.15)' : '#fff',
                                 color: palette.textStrong,
                                 cursor: isActive ? 'grabbing' : 'grab',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                fontSize: 13,
+                                boxShadow: isActive ? '0 6px 12px rgba(56,189,248,0.25)' : '0 4px 10px rgba(15,23,42,0.08)',
+                                transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+                              }}
+                              onMouseEnter={(event) => {
+                                if (isActive) return;
+                                event.currentTarget.style.background = 'rgba(148,163,184,0.12)';
+                                event.currentTarget.style.boxShadow = '0 6px 12px rgba(15,23,42,0.15)';
+                                event.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={(event) => {
+                                if (isActive) return;
+                                event.currentTarget.style.background = '#fff';
+                                event.currentTarget.style.boxShadow = '0 4px 10px rgba(15,23,42,0.08)';
+                                event.currentTarget.style.transform = 'translateY(0)';
                               }}
                             >
-                              {label}
+                              <span
+                                aria-hidden="true"
+                                style={{
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: '50%',
+                                  background: 'rgba(15,23,42,0.05)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 14,
+                                }}
+                              >
+                                {icon}
+                              </span>
+                              {fullLabel}
                             </button>
                           );
                         })}

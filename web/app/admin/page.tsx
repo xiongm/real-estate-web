@@ -951,7 +951,7 @@ useEffect(() => {
                   disabled={!canRequestSignatures}
                   style={{
                     border: `1px solid ${palette.accent}`,
-                    borderRadius: 16,
+                    borderRadius: 10,
                     padding: '12px 22px',
                     fontSize: 13,
                     fontWeight: 600,
@@ -963,7 +963,24 @@ useEffect(() => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 14,
-                    boxShadow: 'none',
+                    boxShadow: canRequestSignatures ? '0 6px 14px rgba(37,99,235,0.12)' : 'none',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease',
+                  }}
+                  onMouseEnter={(event) => {
+                    const target = event.currentTarget;
+                    if (!canRequestSignatures) return;
+                    target.style.transform = 'translateY(-1px)';
+                    target.style.boxShadow = '0 10px 20px rgba(37,99,235,0.18)';
+                    target.style.background = 'rgba(37,99,235,0.05)';
+                    target.style.color = '#1d4ed8';
+                  }}
+                  onMouseLeave={(event) => {
+                    const target = event.currentTarget;
+                    if (!canRequestSignatures) return;
+                    target.style.transform = 'translateY(0)';
+                    target.style.boxShadow = '0 6px 14px rgba(37,99,235,0.12)';
+                    target.style.background = '#fff';
+                    target.style.color = palette.accent;
                   }}
                   title={
                     canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
@@ -986,7 +1003,7 @@ useEffect(() => {
                   </span>
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={{ fontSize: 14, letterSpacing: 0.3, color: palette.text }}>
-                      Request New Signatures
+                      Request signatures
                     </span>
                     <span style={{ fontSize: 11, color: palette.accentMuted }}>
                       Invite investors to sign PDF packet.

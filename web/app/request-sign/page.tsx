@@ -1313,9 +1313,6 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               </p>
             </div>
           </div>
-          <p style={{ fontSize: 12, color: palette.accentMuted, margin: '0 0 8px' }}>
-            Add or edit investors from the Admin → Projects page.
-          </p>
           {!projectInvestors.length ? (
             <p style={{ fontSize: 13, color: palette.accentMuted }}>Add investors to this project before placing any fields.</p>
           ) : (

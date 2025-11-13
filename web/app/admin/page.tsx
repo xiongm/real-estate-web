@@ -540,8 +540,34 @@ useEffect(() => {
 
   if (adminTokenLoading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: palette.bg }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: palette.bg,
+          flexDirection: 'column',
+          gap: 16,
+        }}
+      >
+        <div className="spinner" aria-hidden="true" />
         <p>Verifying access…</p>
+        <style jsx>{`
+          .spinner {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            border: 6px solid rgba(255, 255, 255, 0.35);
+            border-top-color: #2563eb;
+            animation: spin 0.9s linear infinite;
+          }
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
       </div>
     );
   }

@@ -1779,10 +1779,11 @@ useEffect(() => {
           position: relative;
         }
         .admin-layout.mobile .admin-main {
+          display: block !important;
           padding: 16px !important;
         }
-        .admin-layout.mobile .admin-main-grid {
-          grid-template-columns: 1fr;
+        .admin-layout.mobile .admin-main > section {
+          margin-bottom: 24px;
         }
         .admin-layout.mobile .admin-mobile-header {
           display: flex;
@@ -1830,6 +1831,7 @@ useEffect(() => {
           transition: transform 0.3s ease;
           z-index: 40;
           box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+          background: #fff;
         }
         .admin-layout.mobile .project-scroll {
           max-height: calc(100vh - 220px);
@@ -1837,7 +1839,11 @@ useEffect(() => {
         .admin-layout.mobile.show-projects .admin-sidebar {
           transform: translateX(0);
         }
+        .admin-layout.mobile:not(.show-projects) .admin-sidebar {
+          pointer-events: none;
+        }
         .admin-layout.mobile .investor-panel {
+          display: block;
           position: fixed;
           top: 0;
           right: 0;
@@ -1847,9 +1853,13 @@ useEffect(() => {
           transition: transform 0.3s ease;
           z-index: 40;
           box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+          background: ${palette.panel};
         }
         .admin-layout.mobile.show-investors .investor-panel {
           transform: translateX(0);
+        }
+        .admin-layout.mobile:not(.show-investors) .investor-panel {
+          pointer-events: none;
         }
         .admin-layout.mobile .drawer-mobile-close {
           display: flex;

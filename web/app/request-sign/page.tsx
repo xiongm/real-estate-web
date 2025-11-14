@@ -1211,11 +1211,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               {pdfPages.map((page) => (
                 <div
                   key={page.pageIndex}
-                  ref={registerPageRef(page.pageIndex)}
-                  data-page-container
                   style={{
-                    position: 'relative',
-                    width: page.width,
                     margin: '0 auto',
                     background: '#fff',
                     borderRadius: 18,
@@ -1224,127 +1220,137 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   }}
                   onClick={() => setSelectedFieldId(null)}
                 >
-                  <img
-                    src={page.dataUrl}
-                    alt={`Page ${page.pageIndex + 1}`}
-                    style={{ width: '100%', display: 'block', borderRadius: 8 }}
-                  />
-                  {fields
-                    .filter((field) => field.pageIndex === page.pageIndex)
-                    .map((field) => (
-                      <div
-                        key={field.id}
-                        onPointerDown={(event) => startDrag(event, field, 'move')}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSelectedFieldId(field.id);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          left: field.x,
-                          top: field.y,
-                          width: field.width,
-                          height: field.height,
-                          border: field.id === selectedFieldId ? `2px solid ${palette.accent}` : '1px solid rgba(17,24,39,0.6)',
-                          background: 'rgba(56,189,248,0.18)',
-                          color: theme.colors.text,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          letterSpacing: 0.2,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'move',
-                          userSelect: 'none',
-                          borderRadius: 6,
-                          boxShadow: '0 6px 18px rgba(15,23,42,0.15)',
-                        }}
-                      >
-                        <span>{field.name || FIELD_LABELS[field.type]}</span>
-                        <button
-                          type="button"
+                  <div
+                    ref={registerPageRef(page.pageIndex)}
+                    data-page-container
+                    style={{
+                      position: 'relative',
+                      width: page.width,
+                      margin: '0 auto',
+                    }}
+                  >
+                    <img
+                      src={page.dataUrl}
+                      alt={`Page ${page.pageIndex + 1}`}
+                      style={{ width: '100%', display: 'block', borderRadius: 8 }}
+                    />
+                    {fields
+                      .filter((field) => field.pageIndex === page.pageIndex)
+                      .map((field) => (
+                        <div
+                          key={field.id}
+                          onPointerDown={(event) => startDrag(event, field, 'move')}
                           onClick={(event) => {
                             event.stopPropagation();
-                            setFields((prev) => prev.filter((f) => f.id !== field.id));
+                            setSelectedFieldId(field.id);
                           }}
                           style={{
                             position: 'absolute',
-                            top: -12,
-                            right: -12,
-                            width: 24,
-                            height: 24,
-                            borderRadius: '50%',
-                            border: '1px solid #fff',
-                            background: 'rgba(17,24,39,0.85)',
-                            color: '#fff',
+                            left: field.x,
+                            top: field.y,
+                            width: field.width,
+                            height: field.height,
+                            border: field.id === selectedFieldId ? `2px solid ${palette.accent}` : '1px solid rgba(17,24,39,0.6)',
+                            background: 'rgba(56,189,248,0.18)',
+                            color: theme.colors.text,
                             fontSize: 12,
-                            cursor: 'pointer',
+                            fontWeight: 600,
+                            letterSpacing: 0.2,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                            cursor: 'move',
+                            userSelect: 'none',
+                            borderRadius: 6,
+                            boxShadow: '0 6px 18px rgba(15,23,42,0.15)',
                           }}
-                          aria-label="Remove field"
                         >
-                          🗑️
-                        </button>
-                        {selectedFieldId === field.id && field.type === 'text' && (
-                          <div
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onClick={(event) => event.stopPropagation()}
+                          <span>{field.name || FIELD_LABELS[field.type]}</span>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setFields((prev) => prev.filter((f) => f.id !== field.id));
+                            }}
                             style={{
                               position: 'absolute',
-                              top: -field.height - 20,
-                              left: 0,
-                              background: '#fff',
-                              borderRadius: 12,
-                              border: '1px solid rgba(148,163,184,0.5)',
-                              padding: 10,
-                              boxShadow: '0 12px 25px rgba(15,23,42,0.2)',
+                              top: -12,
+                              right: -12,
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              border: '1px solid #fff',
+                              background: 'rgba(17,24,39,0.85)',
+                              color: '#fff',
+                              fontSize: 12,
+                              cursor: 'pointer',
                               display: 'flex',
-                              flexDirection: 'column',
-                              gap: 6,
-                              minWidth: 200,
-                              zIndex: 30,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                             }}
+                            aria-label="Remove field"
                           >
-                            <label style={{ fontSize: 11, color: palette.accentMuted }}>Font</label>
-                            <select
-                              value={field.fontFamily || DEFAULT_FONT}
-                              onChange={(event) => updateField(field.id, { fontFamily: event.target.value as FontChoice })}
+                            🗑️
+                          </button>
+                          {selectedFieldId === field.id && field.type === 'text' && (
+                            <div
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => event.stopPropagation()}
                               style={{
-                                padding: 6,
-                                borderRadius: 6,
-                                border: '1px solid rgba(148,163,184,0.6)',
-                                fontSize: 12,
+                                position: 'absolute',
+                                top: -field.height - 20,
+                                left: 0,
+                                background: '#fff',
+                                borderRadius: 12,
+                                border: '1px solid rgba(148,163,184,0.5)',
+                                padding: 10,
+                                boxShadow: '0 12px 25px rgba(15,23,42,0.2)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 6,
+                                minWidth: 200,
+                                zIndex: 30,
                               }}
                             >
-                              {TEXT_FONT_OPTIONS.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                        <div
-                          onPointerDown={(event) => {
-                            event.stopPropagation();
-                            startDrag(event, field, 'resize');
-                          }}
-                          style={{
-                            position: 'absolute',
-                            right: -7,
-                            bottom: -7,
-                            width: 14,
-                            height: 14,
-                            background: '#2563eb',
-                            borderRadius: '50%',
-                            cursor: 'nwse-resize',
-                          }}
-                        />
-                      </div>
-                    ))}
+                              <label style={{ fontSize: 11, color: palette.accentMuted }}>Font</label>
+                              <select
+                                value={field.fontFamily || DEFAULT_FONT}
+                                onChange={(event) => updateField(field.id, { fontFamily: event.target.value as FontChoice })}
+                                style={{
+                                  padding: 6,
+                                  borderRadius: 6,
+                                  border: '1px solid rgba(148,163,184,0.6)',
+                                  fontSize: 12,
+                                }}
+                              >
+                                {TEXT_FONT_OPTIONS.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          <div
+                            onPointerDown={(event) => {
+                              event.stopPropagation();
+                              startDrag(event, field, 'resize');
+                            }}
+                            style={{
+                              position: 'absolute',
+                              right: -7,
+                              bottom: -7,
+                              width: 14,
+                              height: 14,
+                              background: '#2563eb',
+                              borderRadius: '50%',
+                              cursor: 'nwse-resize',
+                            }}
+                          />
+                        </div>
+                      ))}
+                  </div>
                 </div>
               ))}
             </div>

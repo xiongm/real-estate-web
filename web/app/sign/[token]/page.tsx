@@ -633,6 +633,8 @@ function FieldOverlay({
         <div
           style={{
             ...baseStyle,
+            display: 'flex',
+            alignItems: 'center',
             border: '1px solid #cbd5f5',
             borderRadius: 4,
             background: 'rgba(255,255,255,0.9)',
@@ -645,7 +647,12 @@ function FieldOverlay({
       );
     }
     return (
-      <div style={baseStyle}>
+      <div
+        style={{
+          ...baseStyle,
+          display: 'block',
+        }}
+      >
         <input
           type="text"
           value={value ?? ''}
@@ -659,6 +666,7 @@ function FieldOverlay({
             borderRadius: 4,
             fontSize: 14,
             fontFamily,
+            boxSizing: 'border-box',
           }}
         />
       </div>
@@ -670,6 +678,8 @@ function FieldOverlay({
         <div
           style={{
             ...baseStyle,
+            display: 'flex',
+            alignItems: 'center',
             border: '1px solid #cbd5f5',
             borderRadius: 4,
             background: 'rgba(255,255,255,0.9)',
@@ -682,7 +692,12 @@ function FieldOverlay({
       );
     }
     return (
-      <div style={baseStyle}>
+      <div
+        style={{
+          ...baseStyle,
+          display: 'block',
+        }}
+      >
         <input
           type="date"
           value={value ?? ''}
@@ -694,6 +709,7 @@ function FieldOverlay({
             background: 'rgba(255,255,255,0.9)',
             border: '1px solid #94a3b8',
             borderRadius: 4,
+            boxSizing: 'border-box',
           }}
         />
       </div>

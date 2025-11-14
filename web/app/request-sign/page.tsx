@@ -20,6 +20,10 @@ const TEXT_FONT_OPTIONS: Array<{ id: FontChoice; label: string }> = [
   { id: 'mono', label: 'Mono' },
   { id: 'script', label: 'Script' },
 ];
+const FONT_LABELS = TEXT_FONT_OPTIONS.reduce(
+  (acc, option) => ({ ...acc, [option.id]: option.label }),
+  {} as Record<FontChoice, string>,
+);
 const DEFAULT_FONT: FontChoice = 'sans';
 
 type Field = {
@@ -1277,6 +1281,24 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           </span>
                         ) : (
                           <span>{field.name || FIELD_LABELS[field.type]}</span>
+                        )}
+                        {field.type === 'text' && (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: -18,
+                              left: 0,
+                              fontSize: 10,
+                              padding: '2px 6px',
+                              borderRadius: 6,
+                              background: 'rgba(15,23,42,0.85)',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              color: '#fff',
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            {FONT_LABELS[field.fontFamily || DEFAULT_FONT]}
+                          </span>
                         )}
                           <button
                             type="button"

@@ -96,6 +96,7 @@ def create_envelope(
             role=assigned_role or "Signer",
             name=f.name,
             signer_id=target_signer_id,
+            font_family=f.font_family or "sans",
         ))
     session.commit()
     _append_event(session, env.id, "system", "created", {"envelope_id": env.id})

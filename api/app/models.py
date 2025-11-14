@@ -67,6 +67,7 @@ class Field(SQLModel, table=True):
     role: str = "Investor"
     name: Optional[str] = None
     signer_id: Optional[int] = None
+    font_family: str = ORMField(default="sans")
 
 class ProjectInvestor(SQLModel, table=True):
     id: Optional[int] = ORMField(default=None, primary_key=True)

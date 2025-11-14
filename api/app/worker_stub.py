@@ -9,13 +9,23 @@ from io import BytesIO
 from pypdf import PdfReader, PdfWriter
 import json, base64, hashlib, datetime
 
+FONT_MAP = {
+    "sans": ("Helvetica", 10),
+    "serif": ("Times-Roman", 10),
+    "times": ("Times-Roman", 10),
+    "mono": ("Courier", 10),
+    "script": ("Helvetica-Oblique", 10),
+}
+
 def _overlay_page(width, height, draw_ops):
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=(width, height))
     for op in draw_ops:
         t = op.get("type")
         if t == "text":
-            c.setFont("Helvetica", 10)
+            font_name = op.get("font_name", "Helvetica")
+            font_size = op.get("font_size", 10)
+            c.setFont(font_name, font_size)
             x, y, txt = op["x"], op["y"], op["text"]
             c.drawString(x, y, txt)
         elif t == "checkbox":
@@ -64,7 +74,16 @@ def seal_pdf(original_pdf_bytes: bytes, envelope_id: int, values: dict):
         p = max(0, min(num_pages - 1, int(v.get("page", 1)) - 1))
         draw_map.setdefault(p, [])
         if t in ("text", "date"):
-            draw_map[p].append({"type": "text", "x": v["x"], "y": v["y"], "text": str(v.get("value", ""))})
+            font_key = (v.get("font") or "sans").lower()
+            font_name, font_size = FONT_MAP.get(font_key, FONT_MAP["sans"])
+            draw_map[p].append({
+                "type": "text",
+                "x": v["x"],
+                "y": v["y"],
+                "text": str(v.get("value", "")),
+                "font_name": font_name,
+                "font_size": font_size,
+            })
         elif t == "checkbox":
             draw_map[p].append({"type": "checkbox", "x": v["x"], "y": v["y"], "checked": bool(v.get("value"))})
         elif t in ("signature", "initials"):

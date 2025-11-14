@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, PointerEvent as ReactPointerEvent, FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, PointerEvent as ReactPointerEvent, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import InvestorsPage from '../investors/page';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
@@ -11,6 +11,16 @@ if (typeof window !== 'undefined') {
 }
 
 type FieldType = 'signature' | 'text' | 'date' | 'checkbox';
+
+type FontChoice = 'sans' | 'serif' | 'times' | 'mono' | 'script';
+const TEXT_FONT_OPTIONS: Array<{ id: FontChoice; label: string }> = [
+  { id: 'sans', label: 'Sans' },
+  { id: 'serif', label: 'Serif' },
+  { id: 'times', label: 'Times New Roman' },
+  { id: 'mono', label: 'Mono' },
+  { id: 'script', label: 'Script' },
+];
+const DEFAULT_FONT: FontChoice = 'sans';
 
 type Field = {
   id: string;
@@ -24,6 +34,7 @@ type Field = {
   width: number;
   height: number;
   signerClientId: string | null;
+  fontFamily?: FontChoice;
 };
 
 type DragDescriptor = {
@@ -152,8 +163,15 @@ export default function RequestSignPage() {
   const [confirmDetail, setConfirmDetail] = useState<EnvelopeDetail | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
-  const [confirmMessage, setConfirmMessage] = useState('');
-  const [confirmSending, setConfirmSending] = useState(false);
+const [confirmMessage, setConfirmMessage] = useState('');
+const [confirmSending, setConfirmSending] = useState(false);
+const selectedField = useMemo(
+  () => fields.find((field) => field.id === selectedFieldId) || null,
+  [fields, selectedFieldId],
+);
+  const updateField = useCallback((id: string, updates: Partial<Field>) => {
+    setFields((prev) => prev.map((field) => (field.id === id ? { ...field, ...updates } : field)));
+  }, []);
   const [requesterName, setRequesterName] = useState('');
   const [requesterEmail, setRequesterEmail] = useState('');
   const [adminToken, setAdminToken] = useState('');
@@ -606,6 +624,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       width: defaults.width,
       height: defaults.height,
       signerClientId: investor.id ? String(investor.id) : null,
+      fontFamily: DEFAULT_FONT,
     };
     setFields((prev) => [...prev, newField]);
     setSelectedFieldId(newField.id);
@@ -688,19 +707,20 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const pdfWidth = Number((field.width / meta.scale).toFixed(2));
         const pdfHeight = Number((field.height / meta.scale).toFixed(2));
         const pdfY = Number((meta.baseHeight - (field.y + field.height) / meta.scale).toFixed(2));
-        return {
-          page: field.pageIndex + 1,
-          x: pdfX,
-          y: pdfY,
-          w: pdfWidth,
-          h: pdfHeight,
-          type: field.type,
-          required: field.required,
-          role: field.role,
-          name: field.name || undefined,
-          signer_key: field.signerClientId || undefined,
-        };
-      })
+      return {
+        page: field.pageIndex + 1,
+        x: pdfX,
+        y: pdfY,
+        w: pdfWidth,
+        h: pdfHeight,
+        type: field.type,
+        required: field.required,
+        role: field.role,
+        name: field.name || undefined,
+        font_family: field.fontFamily || DEFAULT_FONT,
+        signer_key: field.signerClientId || undefined,
+      };
+    })
       .filter(Boolean) as Array<{
       page: number;
       x: number;
@@ -711,6 +731,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       required: boolean;
       role: string;
       name?: string;
+      font_family: string;
     }>;
   };
 
@@ -1267,6 +1288,45 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         >
                           🗑️
                         </button>
+                        {selectedFieldId === field.id && field.type === 'text' && (
+                          <div
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => event.stopPropagation()}
+                            style={{
+                              position: 'absolute',
+                              top: -field.height - 20,
+                              left: 0,
+                              background: '#fff',
+                              borderRadius: 12,
+                              border: '1px solid rgba(148,163,184,0.5)',
+                              padding: 10,
+                              boxShadow: '0 12px 25px rgba(15,23,42,0.2)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 6,
+                              minWidth: 200,
+                              zIndex: 30,
+                            }}
+                          >
+                            <label style={{ fontSize: 11, color: palette.accentMuted }}>Font</label>
+                            <select
+                              value={field.fontFamily || DEFAULT_FONT}
+                              onChange={(event) => updateField(field.id, { fontFamily: event.target.value as FontChoice })}
+                              style={{
+                                padding: 6,
+                                borderRadius: 6,
+                                border: '1px solid rgba(148,163,184,0.6)',
+                                fontSize: 12,
+                              }}
+                            >
+                              {TEXT_FONT_OPTIONS.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         <div
                           onPointerDown={(event) => {
                             event.stopPropagation();
@@ -1448,7 +1508,6 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
             </div>
           )}
         </div>
-
         {error && (
           <div
             style={{

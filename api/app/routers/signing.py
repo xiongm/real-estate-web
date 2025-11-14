@@ -96,6 +96,7 @@ def _collect_envelope_values(session: Session, envelope_id: int):
             "w": field.w,
             "h": field.h,
             "value": value,
+            "font": data.get("font") or field.font_family or "sans",
         }
     return combined
 

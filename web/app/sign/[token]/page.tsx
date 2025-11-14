@@ -22,6 +22,15 @@ type CompletionResult = {
   status?: string;
   sha?: string;
 };
+const DEFAULT_FONT = 'sans';
+const FONT_STACKS: Record<string, string> = {
+  sans: `'Inter', 'Helvetica Neue', Arial, sans-serif`,
+  serif: `'Georgia', 'Times New Roman', serif`,
+  times: `'Times New Roman', Times, serif`,
+  mono: `'JetBrains Mono', 'Courier New', monospace`,
+  script: `'Lucida Handwriting', 'Brush Script MT', cursive`,
+};
+const resolveFontStack = (id?: string) => FONT_STACKS[id ?? DEFAULT_FONT] || FONT_STACKS[DEFAULT_FONT];
 
 export default function SignPage() {
   if (typeof window !== 'undefined') {
@@ -137,6 +146,7 @@ export default function SignPage() {
         h: meta.h,
         value: meta.value,
         required: meta.required,
+        font: meta.font_family || DEFAULT_FONT,
       },
     ]);
     return Object.fromEntries(entries);
@@ -615,6 +625,7 @@ function FieldOverlay({
     alignItems: 'center',
     justifyContent: 'center',
   };
+  const fontFamily = resolveFontStack(field.font_family);
 
   if (field.type === 'text') {
     if (mode === 'view') {
@@ -629,7 +640,7 @@ function FieldOverlay({
             padding: '0 6px',
           }}
         >
-          <span style={{ fontSize: 12, color: '#0f172a' }}>{value || ''}</span>
+          <span style={{ fontSize: 12, color: '#0f172a', fontFamily }}>{value || ''}</span>
         </div>
       );
     }
@@ -647,6 +658,7 @@ function FieldOverlay({
             border: '1px solid #94a3b8',
             borderRadius: 4,
             fontSize: 14,
+            fontFamily,
           }}
         />
       </div>
@@ -665,7 +677,7 @@ function FieldOverlay({
             padding: '0 6px',
           }}
         >
-          <span style={{ fontSize: 12, color: '#0f172a' }}>{value || ''}</span>
+          <span style={{ fontSize: 12, color: '#0f172a', fontFamily }}>{value || ''}</span>
         </div>
       );
     }

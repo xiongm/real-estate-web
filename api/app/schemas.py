@@ -21,6 +21,8 @@ class FieldCreate(BaseModel):
     role: str = "Investor"
     name: Optional[str] = None
     signer_key: Optional[str] = None
+    font_family: Optional[str] = None
+    font_family: Optional[str] = None
 
 class EnvelopeCreate(BaseModel):
     project_id: int

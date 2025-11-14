@@ -75,6 +75,18 @@ docker compose run --rm api-tests
 
 This spins up the API image, runs `pytest`, and exits. The tests mock MinIO and use an isolated SQLite DB, so nothing persists between runs.
 
+### Web E2E tests (Playwright)
+The `web` app now ships with a lightweight Playwright harness that spins up `next dev` automatically and drives the currently checked-in UI.
+
+```bash
+cd web
+npm install                # once
+npx playwright install     # once, installs the browsers
+npm run test:e2e
+```
+
+Need an inspector? `npm run test:e2e:ui` opens the Playwright runner so you can step through scenarios locally. Set `PLAYWRIGHT_BASE_URL` if you prefer to hit an already running web server instead of letting the test suite start `npm run dev`.
+
 ## Python stamper
 We use `reportlab` to paint visible content (text/checkbox/signature PNG) onto a PDF page overlay, then `pypdf` to merge with the original. Certificate page is generated via `reportlab` and appended.
 

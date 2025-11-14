@@ -2,13 +2,21 @@
   "name": "signing-web",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000",
-    "postinstall": "node scripts/copy-pdf-worker.js"
+    "dev": "node scripts/dev-server.js",
+    "postinstall": "node scripts/copy-pdf-worker.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "next": "15.0.3",
     "pdfjs-dist": "^4.4.168",
     "react": "18.3.1",
     "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.5",
+    "typescript": "5.9.3"
   }
 }

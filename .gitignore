@@ -5,5 +5,6 @@
 node_modules/
 web/node_modules/
 web/.next/
+web/test-results/
 web/tsconfig.json
 web/next-env.d.ts

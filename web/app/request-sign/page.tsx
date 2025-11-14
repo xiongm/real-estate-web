@@ -1282,6 +1282,21 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         ) : (
                           <span>{field.name || FIELD_LABELS[field.type]}</span>
                         )}
+                        {['signature', 'text', 'date'].includes(field.type) && (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: 6,
+                              left: 6,
+                              fontSize: 16,
+                              lineHeight: 1,
+                              pointerEvents: 'none',
+                            }}
+                            aria-hidden="true"
+                          >
+                            {FIELD_ICONS[field.type as FieldType]}
+                          </span>
+                        )}
                         {field.type === 'text' && (
                           <span
                             style={{

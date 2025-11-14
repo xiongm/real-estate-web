@@ -210,11 +210,14 @@ def test_envelope_send_and_sign_flow(client, test_engine, mock_storage, sent_ema
 
     send_resp = client.post(
         f"/api/envelopes/{envelope_id}/send",
-        json={"requester_name": "Admin User"},
+        json={"requester_name": "Admin User", "requester_email": "admin@example.com"},
         headers=ADMIN_HEADERS,
     )
     assert send_resp.status_code == 200
     assert sent_emails, "Expected at least one email to be queued"
+    first_email = sent_emails[0]
+    assert first_email["reply_to"] == "admin@example.com"
+    assert first_email["sender_name"] == "Admin User via Real Estate Signing"
 
     with Session(test_engine) as session:
         signer = session.exec(select(Signer).where(Signer.envelope_id == envelope_id)).first()

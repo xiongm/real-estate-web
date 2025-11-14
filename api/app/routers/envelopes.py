@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 from ..db import get_session
 from ..models import Envelope, Signer, Field, Document, Event, ProjectInvestor
 from ..schemas import EnvelopeCreate, EnvelopeSend
-from ..email import send_email
+from ..email import send_email, format_sender_name
 from ..utils import canonical_json, sha256_bytes, make_token
 from ..auth import require_admin_access
 
@@ -132,8 +132,9 @@ def send_envelope(
         select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
     ).all()
     filename = doc.filename or "Document"
-    requester_name = env.requester_name or "Your contact"
-    requester_email = env.requester_email
+    requester_given_name = (env.requester_name or "").strip() or None
+    requester_name = requester_given_name or "Your contact"
+    requester_email = (env.requester_email or "").strip() or None
     intro = env.message or f"{requester_name} invited you to review and sign this document."
     for s in signers:
         token = make_token({"signer_id": s.id, "envelope_id": envelope_id})
@@ -172,7 +173,14 @@ Open document: {link}
   </body>
 </html>
 """
-        send_email(s.email, subject, text_body, html_body=html_body)
+        send_email(
+            s.email,
+            subject,
+            text_body,
+            html_body=html_body,
+            sender_name=format_sender_name(requester_given_name),
+            reply_to=requester_email,
+        )
 
     _append_event(session, env.id, "system", "sent", {})
     return {"ok": True}

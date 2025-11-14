@@ -66,7 +66,15 @@ def mock_storage(monkeypatch) -> Dict[str, bytes]:
 def sent_emails(monkeypatch):
     messages = []
 
-    def fake_send_email(to, subject, text_body, html_body=None, attachments=None):
+    def fake_send_email(
+        to,
+        subject,
+        text_body,
+        html_body=None,
+        attachments=None,
+        sender_name=None,
+        reply_to=None,
+    ):
         messages.append(
             {
                 "to": to,
@@ -74,6 +82,8 @@ def sent_emails(monkeypatch):
                 "text": text_body,
                 "html": html_body,
                 "attachments": attachments or [],
+                "sender_name": sender_name,
+                "reply_to": reply_to,
             }
         )
 

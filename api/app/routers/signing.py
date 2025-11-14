@@ -8,7 +8,7 @@ from ..models import Signer, Envelope, Field, Event, Document, FinalArtifact, Si
 from ..schemas import SignSave, ConsentAccept
 from ..utils import read_token, canonical_json, sha256_bytes
 from ..storage import get_bytes, put_bytes
-from ..email import send_email
+from ..email import send_email, format_sender_name
 import json
 
 router = APIRouter()
@@ -240,8 +240,10 @@ def complete_signing(token: str, payload: SignSave, session: Session = Depends(g
     filename = doc.filename or f"Envelope {env.id}"
     subject = f"Completed: {filename}"
     sha_line = f"Final SHA256: {sha_final}"
-    invited_by = env.requester_name or "Your team"
-    invited_contact = f"{invited_by}{f' · {env.requester_email}' if env.requester_email else ''}"
+    requester_given_name = (env.requester_name or "").strip() or None
+    requester_email = (env.requester_email or "").strip() or None
+    invited_by = requester_given_name or "Your team"
+    invited_contact = f"{invited_by}{f' · {requester_email}' if requester_email else ''}"
     plain_body = (
         f"All parties have finished signing {filename}.\n"
         f"Requested by: {invited_contact}\n\n"
@@ -274,6 +276,15 @@ def complete_signing(token: str, payload: SignSave, session: Session = Depends(g
         "maintype": "application",
         "subtype": "pdf",
     }]
+    sender_label = format_sender_name(requester_given_name)
     for s in signers:
-        send_email(s.email, subject, plain_body, html_body=html_body, attachments=attachments)
+        send_email(
+            s.email,
+            subject,
+            plain_body,
+            html_body=html_body,
+            attachments=attachments,
+            sender_name=sender_label,
+            reply_to=requester_email,
+        )
     return response

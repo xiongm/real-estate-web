@@ -1265,7 +1265,19 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                             boxShadow: '0 6px 18px rgba(15,23,42,0.15)',
                           }}
                         >
+                        {field.type === 'checkbox' ? (
+                          <span
+                            style={{
+                              fontSize: Math.max(12, field.height * 0.6),
+                              color: '#0f172a',
+                              lineHeight: 1,
+                            }}
+                          >
+                            ✕
+                          </span>
+                        ) : (
                           <span>{field.name || FIELD_LABELS[field.type]}</span>
+                        )}
                           <button
                             type="button"
                             onClick={(event) => {
@@ -1293,7 +1305,25 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           >
                             🗑️
                           </button>
-                          {selectedFieldId === field.id && field.type === 'text' && (
+                        {selectedFieldId === field.id && field.type === 'checkbox' && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: field.height + 6,
+                              left: 0,
+                              padding: '4px 8px',
+                              borderRadius: 6,
+                              background: 'rgba(15,23,42,0.9)',
+                              color: '#fff',
+                              fontSize: 11,
+                              whiteSpace: 'nowrap',
+                              boxShadow: '0 4px 10px rgba(15,23,42,0.25)',
+                            }}
+                          >
+                            {field.name || FIELD_LABELS[field.type]}
+                          </div>
+                        )}
+                        {selectedFieldId === field.id && field.type === 'text' && (
                             <div
                               onPointerDown={(event) => event.stopPropagation()}
                               onClick={(event) => event.stopPropagation()}

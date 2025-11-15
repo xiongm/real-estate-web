@@ -207,6 +207,15 @@ export default function RequestSignPage() {
   const [isMobile, setIsMobile] = useState(false);
   const activeProject = selectedProjectId ? projects.find((project) => project.id === selectedProjectId) ?? null : null;
   const activeProjectName = activeProject?.name || (selectedProjectId ? `Project #${selectedProjectId}` : 'No project selected');
+  const pageTitle = useMemo(
+    () => (activeProject ? `${activeProject.name} | Request Sign` : 'Request Sign'),
+    [activeProject],
+  );
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.title = pageTitle;
+    }
+  }, [pageTitle]);
   const canUploadDocument = Boolean(selectedProjectId && !projectParamError);
   const defaultFieldRole = 'Investor';
   const fileInputRef = useRef<HTMLInputElement | null>(null);

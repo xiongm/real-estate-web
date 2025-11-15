@@ -471,6 +471,15 @@ useEffect(() => {
   );
   const hasDocuments = documentEntries.length > 0;
   const canRequestSignatures = Boolean(selectedProjectId && hasInvestors);
+  const pageTitle = useMemo(
+    () => (selectedProject ? `${selectedProject.name} | Admin` : 'Admin Portal'),
+    [selectedProject],
+  );
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.title = pageTitle;
+    }
+  }, [pageTitle]);
 
   useEffect(() => {
     if (!hasDocuments && manageDocumentsMode) {

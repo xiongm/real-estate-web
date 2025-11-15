@@ -70,16 +70,37 @@ type ProjectInvestor = {
   units_invested: number;
 };
 
-type EnvelopeDetail = {
-  id: number;
-  subject: string;
-  message: string;
-  document?: { id: number; filename: string };
-  signers: Array<{ id: number; name: string; email: string; role: string; routing_order: number }>;
-  requester_name?: string | null;
-  requester_email?: string | null;
+type EnvelopeSignerPayload = {
+  client_id: string;
+  project_investor_id: number;
+  name: string;
+  email: string;
+  role: string;
+  routing_order: number;
 };
 
+type EnvelopeFieldPayload = {
+  page: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  type: FieldType;
+  required: boolean;
+  role: string;
+  name?: string;
+  font_family: string;
+  signer_key?: string;
+};
+
+type EnvelopeCreatePayload = {
+  project_id: number;
+  document_id: number;
+  subject: string;
+  message: string;
+  signers: EnvelopeSignerPayload[];
+  fields: EnvelopeFieldPayload[];
+};
 
 const FIELD_DEFAULTS: Record<FieldType, { width: number; height: number }> = {
   signature: { width: 240, height: 90 },
@@ -161,18 +182,16 @@ export default function RequestSignPage() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [confirmEnvelopeId, setConfirmEnvelopeId] = useState<number | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [confirmDrawerOpen, setConfirmDrawerOpen] = useState(false);
-  const [confirmDetail, setConfirmDetail] = useState<EnvelopeDetail | null>(null);
-  const [confirmLoading, setConfirmLoading] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
-const [confirmMessage, setConfirmMessage] = useState('');
-const [confirmSending, setConfirmSending] = useState(false);
-const selectedField = useMemo(
-  () => fields.find((field) => field.id === selectedFieldId) || null,
-  [fields, selectedFieldId],
-);
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmSending, setConfirmSending] = useState(false);
+  const [pendingEnvelopePayload, setPendingEnvelopePayload] = useState<EnvelopeCreatePayload | null>(null);
+  const selectedField = useMemo(
+    () => fields.find((field) => field.id === selectedFieldId) || null,
+    [fields, selectedFieldId],
+  );
   const updateField = useCallback((id: string, updates: Partial<Field>) => {
     setFields((prev) => prev.map((field) => (field.id === id ? { ...field, ...updates } : field)));
   }, []);
@@ -369,38 +388,6 @@ const selectedField = useMemo(
     const raf = requestAnimationFrame(() => setConfirmDrawerOpen(true));
     return () => cancelAnimationFrame(raf);
   }, [confirmVisible]);
-
-  useEffect(() => {
-    if (!confirmEnvelopeId || !confirmVisible || !adminToken) return;
-    let cancelled = false;
-    setConfirmLoading(true);
-    setConfirmError(null);
-    setConfirmDetail(null);
-    fetch(`${baseApi}/api/envelopes/${confirmEnvelopeId}`, {
-      headers: { 'X-Access-Token': adminToken ?? '' },
-    })
-      .then((resp) => {
-        if (!resp.ok) throw new Error(`Unable to load envelope (${resp.status})`);
-        return resp.json();
-      })
-      .then((data) => {
-        if (cancelled) return;
-        setConfirmDetail(data);
-        setConfirmMessage(data.message ?? '');
-        setSubject((prev) => (data.subject !== undefined && data.subject !== null ? data.subject : prev));
-        setRequesterName((prev) => (data.requester_name !== undefined && data.requester_name !== null ? data.requester_name : prev));
-        setRequesterEmail((prev) => (data.requester_email !== undefined && data.requester_email !== null ? data.requester_email : prev));
-      })
-      .catch((err) => {
-        if (!cancelled) setConfirmError(err instanceof Error ? err.message : 'Failed to load envelope');
-      })
-      .finally(() => {
-        if (!cancelled) setConfirmLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [confirmEnvelopeId, confirmVisible, baseApi, adminToken]);
 
   useEffect(() => {
     setFields((prev) => prev.map((field) => ({ ...field, role: field.role || defaultFieldRole })));
@@ -701,7 +688,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     }));
   };
 
-  const buildFieldPayload = () => {
+  const buildFieldPayload = (): EnvelopeFieldPayload[] => {
     if (!pdfPages.length) return [];
     return fields
       .map((field) => {
@@ -711,32 +698,21 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const pdfWidth = Number((field.width / meta.scale).toFixed(2));
         const pdfHeight = Number((field.height / meta.scale).toFixed(2));
         const pdfY = Number((meta.baseHeight - (field.y + field.height) / meta.scale).toFixed(2));
-      return {
-        page: field.pageIndex + 1,
-        x: pdfX,
-        y: pdfY,
-        w: pdfWidth,
-        h: pdfHeight,
-        type: field.type,
-        required: field.required,
-        role: field.role,
-        name: field.name || undefined,
-        font_family: field.fontFamily || DEFAULT_FONT,
-        signer_key: field.signerClientId || undefined,
-      };
-    })
-      .filter(Boolean) as Array<{
-      page: number;
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      type: FieldType;
-      required: boolean;
-      role: string;
-      name?: string;
-      font_family: string;
-    }>;
+        return {
+          page: field.pageIndex + 1,
+          x: pdfX,
+          y: pdfY,
+          w: pdfWidth,
+          h: pdfHeight,
+          type: field.type,
+          required: field.required,
+          role: field.role,
+          name: field.name || undefined,
+          font_family: field.fontFamily || DEFAULT_FONT,
+          signer_key: field.signerClientId || undefined,
+        };
+      })
+      .filter((value): value is EnvelopeFieldPayload => Boolean(value));
   };
 
   const exportFields = () => {
@@ -759,17 +735,15 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     setConfirmDrawerOpen(false);
     setTimeout(() => {
       setConfirmVisible(false);
-      setConfirmEnvelopeId(null);
-      setConfirmDetail(null);
+      setPendingEnvelopePayload(null);
       setConfirmError(null);
-      setConfirmLoading(false);
       setConfirmMessage('');
       setConfirmSending(false);
     }, 320);
   };
 
   const sendConfirmedEnvelope = async () => {
-    if (!confirmEnvelopeId) return;
+    if (!pendingEnvelopePayload) return;
     if (!requesterName.trim() || !requesterEmail.trim()) {
       setConfirmError('Provide your name and email so recipients know who invited them.');
       return;
@@ -781,7 +755,26 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     setConfirmSending(true);
     setConfirmError(null);
     try {
-      const resp = await fetch(`${baseApi}/api/envelopes/${confirmEnvelopeId}/send`, {
+      const createPayload: EnvelopeCreatePayload = {
+        ...pendingEnvelopePayload,
+        subject,
+        message: confirmMessage,
+      };
+      const createResp = await fetch(`${baseApi}/api/envelopes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Token': adminToken,
+        },
+        body: JSON.stringify(createPayload),
+      });
+      if (!createResp.ok) {
+        const detail = await safeParseError(createResp);
+        throw new Error(detail || `Create envelope failed (${createResp.status})`);
+      }
+      const created = await createResp.json();
+      const envelopeId = created.id;
+      const sendResp = await fetch(`${baseApi}/api/envelopes/${envelopeId}/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -794,12 +787,12 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           requester_email: requesterEmail.trim(),
         }),
       });
-      if (!resp.ok) {
-        const detail = await safeParseError(resp);
+      if (!sendResp.ok) {
+        const detail = await safeParseError(sendResp);
         throw new Error(detail || 'Failed to send envelope');
       }
       closeConfirmPanel();
-      router.push(`/request-sign/sent/${confirmEnvelopeId}`);
+      router.push(`/request-sign/sent/${envelopeId}`);
     } catch (err) {
       setConfirmError(err instanceof Error ? err.message : 'Failed to send envelope');
     } finally {
@@ -852,43 +845,26 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     }
     setSubmitting(true);
     setError(null);
-    try {
-      const createResp = await fetch(`${baseApi}/api/envelopes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Access-Token': adminToken,
-        },
-        body: JSON.stringify({
-          project_id: projectNumeric,
-          document_id: documentInfo.id,
-          subject,
-          message,
-          signers: readySigners.map((signer, index) => ({
-            client_id: `investor-${signer.project_investor_id}`,
-            project_investor_id: signer.project_investor_id,
-            name: signer.name,
-            email: signer.email,
-            role: signer.role,
-            routing_order: index + 1,
-          })),
-          fields: fieldPayload,
-        }),
-      });
-      if (!createResp.ok) {
-        const detail = await safeParseError(createResp);
-        throw new Error(detail || `Create envelope failed (${createResp.status})`);
-      }
-      const created = await createResp.json();
-      setConfirmEnvelopeId(created.id);
-      setConfirmMessage(message);
-      setConfirmVisible(true);
-      return;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit envelope');
-    } finally {
-      setSubmitting(false);
-    }
+    const payload: EnvelopeCreatePayload = {
+      project_id: projectNumeric,
+      document_id: documentInfo.id,
+      subject,
+      message,
+      signers: readySigners.map((signer, index) => ({
+        client_id: `investor-${signer.project_investor_id}`,
+        project_investor_id: signer.project_investor_id,
+        name: signer.name,
+        email: signer.email,
+        role: signer.role,
+        routing_order: index + 1,
+      })),
+      fields: fieldPayload,
+    };
+    setPendingEnvelopePayload(payload);
+    setConfirmMessage(message);
+    setConfirmError(null);
+    setConfirmVisible(true);
+    setSubmitting(false);
   };
 
   const handleAdminTokenSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1760,7 +1736,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               <div>
                 <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Document</p>
                 <strong style={{ fontSize: 20 }}>
-                  {confirmDetail?.document?.filename || documentInfo?.filename || 'Envelope review'}
+                  {documentInfo?.filename || 'Envelope review'}
                 </strong>
               </div>
               <button
@@ -1783,8 +1759,8 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               {confirmError && (
                 <div style={{ padding: 12, borderRadius: 8, background: '#fee2e2', color: '#991b1b' }}>{confirmError}</div>
               )}
-              {confirmLoading || !confirmDetail ? (
-                <p>Loading details…</p>
+              {!pendingEnvelopePayload ? (
+                <p>No envelope prepared yet.</p>
               ) : (
                 <>
                   <section
@@ -1798,32 +1774,32 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       gap: 12,
                     }}
                   >
-                <div>
-                  <label htmlFor="confirm-subject" style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
-                    Subject
-                  </label>
-                  <input
-                    id="confirm-subject"
-                    type="text"
-                    value={subject}
-                    onChange={(event) => setSubject(event.target.value)}
-                    style={{
-                      width: '100%',
-                      border: '1px solid #cbd5f5',
-                      borderRadius: 8,
-                      padding: '8px 10px',
-                      fontSize: 14,
-                    }}
-                    placeholder="Subject line"
-                  />
-                </div>
-                <div>
-                  <p style={{ margin: '8px 0 4px', fontSize: 12, color: '#6b7280' }}>Recipients</p>
-                  <p style={{ fontSize: 13, color: '#475569', margin: '0 0 8px' }}>Please review signers before sending.</p>
-                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {confirmDetail.signers.map((signer) => (
+                    <div>
+                      <label htmlFor="confirm-subject" style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                        Subject
+                      </label>
+                      <input
+                        id="confirm-subject"
+                        type="text"
+                        value={subject}
+                        onChange={(event) => setSubject(event.target.value)}
+                        style={{
+                          width: '100%',
+                          border: '1px solid #cbd5f5',
+                          borderRadius: 8,
+                          padding: '8px 10px',
+                          fontSize: 14,
+                        }}
+                        placeholder="Subject line"
+                      />
+                    </div>
+                    <div>
+                      <p style={{ margin: '8px 0 4px', fontSize: 12, color: '#6b7280' }}>Recipients</p>
+                      <p style={{ fontSize: 13, color: '#475569', margin: '0 0 8px' }}>Please review signers before sending.</p>
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {pendingEnvelopePayload.signers.map((signer) => (
                           <div
-                            key={signer.id}
+                            key={signer.client_id}
                             style={{
                               border: '1px solid #e5e7eb',
                               borderRadius: 10,
@@ -1854,44 +1830,44 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       gap: 16,
                     }}
                   >
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Your name</label>
-                  <input
-                    type="text"
-                    value={requesterName}
-                    onChange={(event) => setRequesterName(event.target.value)}
-                    placeholder="e.g. Alex Chen"
-                    required
-                    style={{
-                      width: '100%',
-                      border: '1px solid #cbd5f5',
-                      borderRadius: 8,
-                      padding: '8px 10px',
-                      marginBottom: 12,
-                      borderColor: !requesterName.trim() ? '#f87171' : '#cbd5f5',
-                    }}
-                  />
-                  <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Your email</label>
-                  <input
-                    type="email"
-                    value={requesterEmail}
-                    onChange={(event) => setRequesterEmail(event.target.value)}
-                    placeholder="you@example.com"
-                    required
-                    style={{
-                      width: '100%',
-                      border: '1px solid #cbd5f5',
-                      borderRadius: 8,
-                      padding: '8px 10px',
-                      marginBottom: 12,
-                      borderColor: !requesterEmail.trim() ? '#f87171' : '#cbd5f5',
-                    }}
-                  />
-                  <label htmlFor="confirm-message" style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
-                    Email message
-                  </label>
-                  <textarea
-                    id="confirm-message"
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Your name</label>
+                      <input
+                        type="text"
+                        value={requesterName}
+                        onChange={(event) => setRequesterName(event.target.value)}
+                        placeholder="e.g. Alex Chen"
+                        required
+                        style={{
+                          width: '100%',
+                          border: '1px solid #cbd5f5',
+                          borderRadius: 8,
+                          padding: '8px 10px',
+                          marginBottom: 12,
+                          borderColor: !requesterName.trim() ? '#f87171' : '#cbd5f5',
+                        }}
+                      />
+                      <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Your email</label>
+                      <input
+                        type="email"
+                        value={requesterEmail}
+                        onChange={(event) => setRequesterEmail(event.target.value)}
+                        placeholder="you@example.com"
+                        required
+                        style={{
+                          width: '100%',
+                          border: '1px solid #cbd5f5',
+                          borderRadius: 8,
+                          padding: '8px 10px',
+                          marginBottom: 12,
+                          borderColor: !requesterEmail.trim() ? '#f87171' : '#cbd5f5',
+                        }}
+                      />
+                      <label htmlFor="confirm-message" style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                        Email message
+                      </label>
+                      <textarea
+                        id="confirm-message"
                         value={confirmMessage}
                         onChange={(event) => setConfirmMessage(event.target.value)}
                         rows={6}

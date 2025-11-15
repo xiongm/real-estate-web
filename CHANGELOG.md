@@ -1,6 +1,18 @@
 # Changelog
 All notable changes to this project are documented here.
 
+## [v1.2.0] – 2025-11-14
+### Added
+- Playwright end-to-end infrastructure (config, npm scripts, dev-server wrapper, README instructions) so `npm run test:e2e` runs the app automatically across Chromium/Firefox/WebKit.
+- Comprehensive admin portal specs with mocked API responses that exercise token verification, project switching, investor bulk delete, signed-document cleanup, and envelope revocation flows.
+
+### Changed
+- Home page now highlights the admin dashboard entry point to speed up operator workflows and smoke testing.
+- Admin dashboard controls expose deterministic `data-testid` hooks around signed documents, outstanding envelopes, and investor management toggles so automation can target them reliably.
+
+### Fixed
+- Envelope notification emails now format friendly sender names, wire up `Reply-To` headers with the requester’s address, and attach the right metadata so recipients can reply directly and email tests assert the behavior.
+
 ## [v1.1.0] – 2024-05-27
 ### Added
 - Inline field settings for designers: drag-placed text fields now display their selected font badge, and signature/date/text boxes show the same icons used in the toolbar.

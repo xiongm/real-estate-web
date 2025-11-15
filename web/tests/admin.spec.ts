@@ -1,4 +1,5 @@
 import { expect, Page, test } from '@playwright/test';
+import path from 'path';
 
 type ProjectFixture = {
   id: number;
@@ -255,6 +256,10 @@ test.describe('Admin portal', () => {
 
     const envelopeSection = page.getByTestId('outstanding-envelopes-section');
     await envelopeSection.getByTestId('envelope-manage-toggle').click();
+    const envelopeCheckbox = envelopeSection.getByRole('checkbox').first();
+    await envelopeCheckbox.check();
+    const revokeSelectedButton = envelopeSection.getByTestId('envelope-revoke-selected');
+    await expect(revokeSelectedButton).toBeEnabled();
 
     await page.route('**/api/projects/*/envelopes/*', async (route) => {
       await route.fulfill(jsonResponse({ revoked: true }));
@@ -263,9 +268,96 @@ test.describe('Admin portal', () => {
     const revokeDialog = page.waitForEvent('dialog');
     await Promise.all([
       revokeDialog.then((dialog) => dialog.accept()),
-      envelopeSection.getByRole('button', { name: 'Revoke' }).click(),
+      revokeSelectedButton.click(),
     ]);
 
     await expect(page.getByTestId('outstanding-envelopes-section')).toHaveCount(0);
+  });
+
+  test('request sign only creates envelope after final submit', async ({ page }) => {
+    const investors = {
+      201: [
+        { id: 1, name: 'Alex Example', email: 'alex@example.com', units_invested: 10, role: 'Investor' },
+      ],
+    } satisfies Record<number, InvestorFixture[]>;
+    await mockAdminData(page, { investorsByProject: investors });
+
+    const pdfFixture = path.join(process.cwd(), 'tests', 'fixtures', 'sample.pdf');
+    await page.route('**/api/projects/201/documents', async (route) => {
+      await route.fulfill(jsonResponse({ id: 910, filename: 'Test Packet.pdf' }));
+    });
+
+    const createdEnvelopeId = 5555;
+    let createCalls = 0;
+    let sendCalls = 0;
+
+    await page.route('**/api/envelopes', async (route) => {
+      if (route.request().method() === 'POST') {
+        createCalls += 1;
+        await route.fulfill(jsonResponse({ id: createdEnvelopeId }));
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.route(`**/api/envelopes/${createdEnvelopeId}/send`, async (route) => {
+      sendCalls += 1;
+      await route.fulfill(jsonResponse({ ok: true }));
+    });
+
+    await page.route(`**/api/envelopes/${createdEnvelopeId}`, async (route) => {
+      await route.fulfill(
+        jsonResponse({
+          id: createdEnvelopeId,
+          subject: 'Please sign',
+          document: { id: 910, filename: 'Test Packet.pdf' },
+          signers: investors[201].map((investor) => ({ id: investor.id, name: investor.name, email: investor.email })),
+        }),
+      );
+    });
+
+    await page.goto('/request-sign?project=201');
+    const tokenInput = page.getByPlaceholder('Admin token');
+    await tokenInput.waitFor();
+    await tokenInput.fill('valid-token');
+    await page.getByRole('button', { name: /continue/i }).click();
+
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles(pdfFixture);
+    const pdfContainer = page.locator('[data-page-container]').first();
+    await pdfContainer.waitFor();
+
+    const signatureButton = page.getByRole('button', { name: /Signature field/i }).first();
+    await signatureButton.scrollIntoViewIfNeeded();
+    await signatureButton.dragTo(pdfContainer, {
+      targetPosition: { x: 60, y: 80 },
+    });
+
+    await expect(pdfContainer.getByText('Alex Example Signature')).toBeVisible();
+
+    const reviewButton = page.getByRole('button', { name: /Review & Send/i }).first();
+    await expect(reviewButton).toBeEnabled();
+    await reviewButton.click();
+
+    const subjectInput = page.getByLabel('Subject');
+    await expect(subjectInput).toBeVisible();
+    const nameInput = page.getByPlaceholder('e.g. Alex Chen');
+    const emailInput = page.getByPlaceholder('you@example.com');
+    await nameInput.fill('Admin Example');
+    await emailInput.fill('admin@example.com');
+
+    await page.getByRole('button', { name: /^Cancel$/ }).click();
+    await subjectInput.waitFor({ state: 'detached' });
+    expect(createCalls).toBe(0);
+
+    await reviewButton.click();
+    await expect(subjectInput).toBeVisible();
+    await nameInput.fill('Admin Example');
+    await emailInput.fill('admin@example.com');
+    await page.getByRole('button', { name: 'Submit' }).click();
+
+    await page.waitForURL(`**/request-sign/sent/${createdEnvelopeId}`);
+    expect(createCalls).toBe(1);
+    expect(sendCalls).toBe(1);
   });
 });

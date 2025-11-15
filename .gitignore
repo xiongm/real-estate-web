@@ -8,3 +8,4 @@ web/.next/
 web/test-results/
 web/tsconfig.json
 web/next-env.d.ts
+tags

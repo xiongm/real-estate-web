@@ -183,6 +183,9 @@ export default function AdminPage() {
   const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
   const [investorDrawerOpen, setInvestorDrawerOpen] = useState(false);
   const [requestButtonHovered, setRequestButtonHovered] = useState(false);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
+  const [projectDetailsLoaded, setProjectDetailsLoaded] = useState(false);
+  const [initialPageReady, setInitialPageReady] = useState(false);
   const closeDrawers = () => {
     setProjectDrawerOpen(false);
     setInvestorDrawerOpen(false);
@@ -219,6 +222,11 @@ export default function AdminPage() {
     }
   };
   const selectProject = (id: number | null) => {
+    if (id === null) {
+      setProjectDetailsLoaded(true);
+    } else if (id !== selectedProjectId) {
+      setProjectDetailsLoaded(false);
+    }
     setSelectedProjectId(id);
     rememberProjectSelection(id);
     if (isMobile) {
@@ -306,6 +314,14 @@ export default function AdminPage() {
     setAdminToken('');
     setAdminVerified(false);
     setAdminTokenError(null);
+    setProjectsLoaded(false);
+    setProjectDetailsLoaded(false);
+    setInitialPageReady(false);
+    setProjects([]);
+    setSelectedProjectId(null);
+    setFinals([]);
+    setEnvelopes([]);
+    setInvestors([]);
     closeDrawers();
     if (typeof window !== 'undefined') {
       localStorage.removeItem('adminAccessToken');
@@ -327,6 +343,7 @@ export default function AdminPage() {
 
   const loadProjects = async (focusId?: number) => {
     if (!adminToken) return;
+    setProjectsLoaded(false);
     try {
       const resp = await fetch(`${baseApi}/api/projects`, {
         headers: { 'X-Access-Token': adminToken },
@@ -352,6 +369,8 @@ export default function AdminPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load projects');
+    } finally {
+      setProjectsLoaded(true);
     }
   };
 
@@ -361,31 +380,60 @@ useEffect(() => {
 }, [adminVerified, adminToken, projectParamId]);
 
   useEffect(() => {
-    if (!selectedProjectId || !adminToken) return;
-    setLoading(true);
-    setError(null);
-    Promise.all([
-      fetch(`${baseApi}/api/projects/${selectedProjectId}/final-artifacts`, {
-        headers: { 'X-Access-Token': adminToken },
-      }).then((r) => r.json()),
-      fetch(`${baseApi}/api/projects/${selectedProjectId}/envelopes`, {
-        headers: { 'X-Access-Token': adminToken },
-      }).then((r) => r.json()),
-    ])
-      .then(([finalsData, envelopesData]) => {
+    if (!adminToken) return;
+    if (!selectedProjectId) {
+      setProjectDetailsLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    const fetchProjectDetails = async () => {
+      setProjectDetailsLoaded(false);
+      setLoading(true);
+      setError(null);
+      try {
+        const [finalsData, envelopesData] = await Promise.all([
+          fetch(`${baseApi}/api/projects/${selectedProjectId}/final-artifacts`, {
+            headers: { 'X-Access-Token': adminToken },
+          }).then((r) => r.json()),
+          fetch(`${baseApi}/api/projects/${selectedProjectId}/envelopes`, {
+            headers: { 'X-Access-Token': adminToken },
+          }).then((r) => r.json()),
+        ]);
+        if (cancelled) return;
         setFinals(finalsData || []);
         setEnvelopes(envelopesData || []);
         setSelectedFinalIds([]);
         setExpandedEnvelopes({});
-        loadInvestors(selectedProjectId);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load project details'))
-      .finally(() => setLoading(false));
+        await loadInvestors(selectedProjectId);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load project details');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setProjectDetailsLoaded(true);
+        }
+      }
+    };
+    fetchProjectDetails();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedProjectId, adminToken]);
 
   useEffect(() => {
     setCenterTab('documents');
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (initialPageReady) return;
+    if (adminTokenLoading) return;
+    if (!adminVerified) return;
+    if (!projectsLoaded) return;
+    if (!projectDetailsLoaded) return;
+    setInitialPageReady(true);
+  }, [initialPageReady, adminTokenLoading, adminVerified, projectsLoaded, projectDetailsLoaded]);
 
   const resetInvestorForm = () => {
     setShowInvestorForm(false);
@@ -970,6 +1018,40 @@ useEffect(() => {
             }
           `}</style>
         </form>
+      </div>
+    );
+  }
+
+  if (!initialPageReady) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: palette.bg,
+          flexDirection: 'column',
+          gap: 16,
+        }}
+      >
+        <div className="spinner" aria-hidden="true" />
+        <p>Preparing dashboard…</p>
+        <style jsx>{`
+          .spinner {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            border: 6px solid rgba(255, 255, 255, 0.35);
+            border-top-color: #2563eb;
+            animation: spin 0.9s linear infinite;
+          }
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
       </div>
     );
   }

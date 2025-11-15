@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project are documented here.
 
+## [v1.2.0] – 2025-11-15
+### Changed
+- Admin dashboard now waits to render until admin token verification, project fetch, and per-project document/investor data all resolve; readiness flags gate the UI so controls (e.g., “Request Signatures”) only appear once underlying data is loaded, preventing partial flashes during refreshes.
+
 ## [v1.1.0] – 2024-05-27
 ### Added
 - Inline field settings for designers: drag-placed text fields now display their selected font badge, and signature/date/text boxes show the same icons used in the toolbar.

@@ -97,7 +97,7 @@ export default function AdminPage() {
   const [envelopes, setEnvelopes] = useState<EnvelopeSummary[]>([]);
   const [expandedEnvelopes, setExpandedEnvelopes] = useState<Record<number, boolean>>({});
   const [expandedFinals, setExpandedFinals] = useState<Record<number, boolean>>({});
-  const [revokingEnvelopeId, setRevokingEnvelopeId] = useState<number | null>(null);
+  const [selectedEnvelopeIds, setSelectedEnvelopeIds] = useState<number[]>([]);
   const [investors, setInvestors] = useState<Investor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +114,10 @@ export default function AdminPage() {
   const [manageSignedMode, setManageSignedMode] = useState(false);
   const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
   const [hoveredFinalId, setHoveredFinalId] = useState<number | null>(null);
+  const [hoveredEnvelopeId, setHoveredEnvelopeId] = useState<number | null>(null);
+  const [hoveredProjectId, setHoveredProjectId] = useState<number | null>(null);
+  const [hoveredSignerKey, setHoveredSignerKey] = useState<string | null>(null);
+  const [revokingEnvelopes, setRevokingEnvelopes] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
@@ -314,8 +318,10 @@ useEffect(() => {
     setManageSignedMode(false);
     setManageEnvelopesMode(false);
     setSelectedFinalIds([]);
+    setSelectedEnvelopeIds([]);
     setExpandedEnvelopes({});
     setExpandedFinals({});
+    setRevokingEnvelopes(false);
     return project;
   }, [projects, selectedProjectId]);
   const selectedProjectToken = selectedProject?.access_token ?? null;
@@ -344,33 +350,42 @@ useEffect(() => {
     setSelectedFinalIds((prev) => (prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]));
   };
 
-  const revokeEnvelope = useCallback(
-    async (envelopeId: number) => {
-      if (!selectedProjectId) return;
-      const confirmRemove = window.confirm('Revoke this envelope and remove all pending magic links?');
-      if (!confirmRemove) return;
-      setRevokingEnvelopeId(envelopeId);
-      try {
+  const toggleEnvelopeSelection = (id: number) => {
+    setSelectedEnvelopeIds((prev) => (prev.includes(id) ? prev.filter((eid) => eid !== id) : [...prev, id]));
+  };
+
+  const revokeSelectedEnvelopes = async () => {
+    if (!selectedProjectId || !selectedEnvelopeIds.length) return;
+    const envelopeIds = [...selectedEnvelopeIds];
+    const confirmRemove = window.confirm(
+      `Revoke ${envelopeIds.length} envelope(s)? Pending signees will lose access immediately.`,
+    );
+    if (!confirmRemove) return;
+    setRevokingEnvelopes(true);
+    try {
+      for (const envelopeId of envelopeIds) {
         const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/envelopes/${envelopeId}`, {
           method: 'DELETE',
           headers: { 'X-Access-Token': adminToken ?? '' },
         });
         if (!resp.ok) throw new Error(`Failed to revoke envelope (${resp.status})`);
-        setEnvelopes((prev) => prev.filter((env) => env.id !== envelopeId));
-        setSelectedFinalIds((prev) => prev.filter((id) => id !== envelopeId));
-        setExpandedEnvelopes((prev) => {
-          const next = { ...prev };
-          delete next[envelopeId];
-          return next;
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to revoke envelope');
-      } finally {
-        setRevokingEnvelopeId(null);
       }
-    },
-    [selectedProjectId, baseApi, adminToken],
-  );
+      setEnvelopes((prev) => prev.filter((env) => !envelopeIds.includes(env.id)));
+      setSelectedEnvelopeIds([]);
+      setSelectedFinalIds((prev) => prev.filter((id) => !envelopeIds.includes(id)));
+      setExpandedEnvelopes((prev) => {
+        const next = { ...prev };
+        envelopeIds.forEach((envelopeId) => {
+          delete next[envelopeId];
+        });
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke envelopes');
+    } finally {
+      setRevokingEnvelopes(false);
+    }
+  };
 
   const toggleSignedManage = () => {
     setManageSignedMode((prev) => {
@@ -380,10 +395,13 @@ useEffect(() => {
   };
 
   const toggleEnvelopeManage = () => {
-    setManageEnvelopesMode((prev) => !prev);
-    if (revokingEnvelopeId) {
-      setRevokingEnvelopeId(null);
-    }
+    setManageEnvelopesMode((prev) => {
+      if (prev) {
+        setSelectedEnvelopeIds([]);
+        setRevokingEnvelopes(false);
+      }
+      return !prev;
+    });
   };
 
   const deleteSelectedFinals = async () => {
@@ -762,20 +780,30 @@ useEffect(() => {
       <div className="project-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
         {projects.map((project, idx) => {
           const active = project.id === selectedProjectId;
+          const hovered = hoveredProjectId === project.id;
           return (
             <button
               key={`project-${project.id ?? idx}`}
               onClick={() => selectProject(project.id)}
+              onMouseEnter={() => setHoveredProjectId(project.id)}
+              onMouseLeave={() =>
+                setHoveredProjectId((prev) => (prev === project.id ? null : prev))
+              }
               style={{
                 textAlign: 'left',
                 padding: '12px 14px',
                 borderRadius: 14,
-                border: `1px solid ${active ? palette.accent : palette.border}`,
-                background: active ? 'linear-gradient(135deg,#6c5ce7,#7f6bff)' : '#fff',
+                border: `1px solid ${active || hovered ? palette.accent : palette.border}`,
+                background: active ? 'linear-gradient(135deg,#6c5ce7,#7f6bff)' : hovered ? '#f5f2ff' : '#fff',
                 color: active ? '#fff' : palette.text,
                 cursor: 'pointer',
                 fontWeight: active ? 600 : 500,
-                boxShadow: active ? '0 12px 24px rgba(108,92,231,0.25)' : '0 4px 12px rgba(15,23,42,0.05)',
+                boxShadow: active
+                  ? '0 12px 24px rgba(108,92,231,0.25)'
+                  : hovered
+                  ? '0 8px 18px rgba(15,23,42,0.12)'
+                  : '0 4px 12px rgba(15,23,42,0.05)',
+                transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
@@ -790,7 +818,15 @@ useEffect(() => {
                   )}
                   <div>
                     <strong>{project.name}</strong>
-                    <p style={{ margin: 0, fontSize: 12, color: active ? 'rgba(255,255,255,0.8)' : palette.accentMuted }}>#{project.id}</p>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        color: active ? 'rgba(255,255,255,0.8)' : palette.accentMuted,
+                      }}
+                    >
+                      #{project.id}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1205,17 +1241,25 @@ useEffect(() => {
                             >
                               {signerList.map((signer) => {
                                 const completed = signer.status === 'completed';
+                                const signerKey = `final-signer-${item.envelope_id}-${signer.id}`;
+                                const signerHovered = hoveredSignerKey === signerKey;
                                 return (
                                   <div
-                                    key={`final-signer-${item.envelope_id}-${signer.id}`}
+                                    key={signerKey}
+                                    onMouseEnter={() => setHoveredSignerKey(signerKey)}
+                                    onMouseLeave={() =>
+                                      setHoveredSignerKey((prev) => (prev === signerKey ? null : prev))
+                                    }
                                     style={{
                                       padding: 12,
                                       borderRadius: 12,
-                                      border: `1px solid ${palette.border}`,
+                                      border: signerHovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
                                       display: 'flex',
                                       justifyContent: 'space-between',
                                       alignItems: 'center',
-                                      background: '#fff',
+                                      background: signerHovered ? '#f5f2ff' : '#fff',
+                                      boxShadow: signerHovered ? '0 8px 18px rgba(15,23,42,0.12)' : 'none',
+                                      transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                                     }}
                                   >
                                     <div>
@@ -1253,28 +1297,51 @@ useEffect(() => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                     <div>
-                      <h4 style={{ margin: 0 }}>Out for Signature</h4>
+                      <h4 style={{ margin: 0 }}>Awaiting Signature</h4>
                       <span style={{ fontSize: 12, color: palette.accentMuted }}>
                         {outstandingEnvelopes.length} open envelopes
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={toggleEnvelopeManage}
-                      data-testid="envelope-manage-toggle"
-                      style={{
-                        border: `1px solid ${palette.border}`,
-                        background: manageEnvelopesMode ? palette.accent : '#fff',
-                        color: manageEnvelopesMode ? '#fff' : palette.text,
-                        borderRadius: 999,
-                        padding: '4px 10px',
-                        fontSize: 12,
-                        cursor: 'pointer',
-                        boxShadow: manageEnvelopesMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
-                      }}
-                    >
-                      {manageEnvelopesMode ? 'Done' : 'Manage'}
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <button
+                        type="button"
+                        onClick={toggleEnvelopeManage}
+                        data-testid="envelope-manage-toggle"
+                        style={{
+                          border: `1px solid ${palette.border}`,
+                          background: manageEnvelopesMode ? palette.accent : '#fff',
+                          color: manageEnvelopesMode ? '#fff' : palette.text,
+                          borderRadius: 999,
+                          padding: '4px 10px',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          boxShadow: manageEnvelopesMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
+                        }}
+                      >
+                        {manageEnvelopesMode ? 'Done' : 'Manage'}
+                      </button>
+                      {manageEnvelopesMode && (
+                        <button
+                          type="button"
+                          onClick={revokeSelectedEnvelopes}
+                          data-testid="envelope-revoke-selected"
+                          disabled={!selectedEnvelopeIds.length || revokingEnvelopes}
+                          style={{
+                            border: '1px solid rgba(220,38,38,0.8)',
+                            background: 'rgba(254,226,226,0.3)',
+                            color: '#dc2626',
+                            borderRadius: 999,
+                            padding: '6px 12px',
+                            fontSize: 13,
+                            cursor:
+                              !selectedEnvelopeIds.length || revokingEnvelopes ? 'not-allowed' : 'pointer',
+                            opacity: !selectedEnvelopeIds.length || revokingEnvelopes ? 0.5 : 1,
+                          }}
+                        >
+                          {revokingEnvelopes ? 'Revoking…' : 'Revoke Selected'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {outstandingEnvelopes.map((env) => {
@@ -1289,25 +1356,52 @@ useEffect(() => {
                           ? `${baseApi}/api/projects/${selectedProjectId}/documents/${env.document.id}/pdf${tokenParam}`
                           : null;
                       const fileLabel = env.document?.filename || 'Untitled PDF';
+                      const envelopeHovered = hoveredEnvelopeId === env.id;
+                      const envelopeSelected = selectedEnvelopeIds.includes(env.id);
                       return (
                         <div
                           key={`env-${env.id}`}
                           onClick={(event) => documentUrl && handleCardDownload(event, documentUrl)}
+                          onMouseEnter={() => setHoveredEnvelopeId(env.id)}
+                          onMouseLeave={() =>
+                            setHoveredEnvelopeId((prev) => (prev === env.id ? null : prev))
+                          }
                           style={{
-                            border: `1px solid ${palette.border}`,
+                            border:
+                              envelopeSelected || envelopeHovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
                             borderRadius: 18,
                             padding: 16,
-                            background: '#fff',
-                            boxShadow: '0 10px 24px rgba(15,23,42,0.08)',
+                            background: envelopeSelected
+                              ? envelopeHovered
+                                ? '#e4ddff'
+                                : '#ede9ff'
+                              : envelopeHovered
+                              ? '#f5f2ff'
+                              : '#fff',
+                            boxShadow: envelopeSelected
+                              ? '0 12px 28px rgba(108,92,231,0.25)'
+                              : envelopeHovered
+                              ? '0 12px 28px rgba(15,23,42,0.14)'
+                              : '0 10px 24px rgba(15,23,42,0.08)',
                             cursor: documentUrl ? 'pointer' : 'default',
+                            transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                            <div>
-                              <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
-                              <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
-                                {formatSentLabel(env.created_at)}
-                              </p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              {manageEnvelopesMode && (
+                                <input
+                                  type="checkbox"
+                                  checked={envelopeSelected}
+                                  onChange={() => toggleEnvelopeSelection(env.id)}
+                                />
+                              )}
+                              <div>
+                                <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
+                                <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
+                                  {formatSentLabel(env.created_at)}
+                                </p>
+                              </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                               <button
@@ -1326,43 +1420,34 @@ useEffect(() => {
                                   cursor: 'pointer',
                                   fontSize: 12,
                                 }}
-                              >
-                                {buttonLabel}
-                              </button>
-                              {manageEnvelopesMode && (
-                                <button
-                                  type="button"
-                                  onClick={() => revokeEnvelope(env.id)}
-                                  disabled={revokingEnvelopeId === env.id}
-                                  style={{
-                                    border: '1px solid #dc2626',
-                                    borderRadius: 999,
-                                    padding: '4px 10px',
-                                    background: '#fff',
-                                    color: '#dc2626',
-                                    cursor: revokingEnvelopeId === env.id ? 'wait' : 'pointer',
-                                    fontSize: 12,
-                                  }}
-                                >
-                                  {revokingEnvelopeId === env.id ? 'Revoking…' : 'Revoke'}
-                                </button>
-                              )}
+                                  >
+                                    {buttonLabel}
+                                  </button>
                             </div>
                           </div>
                           {expanded && (
                             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
                               {env.signers.map((signer) => {
                                 const completed = signer.status === 'completed';
+                                const signerKey = `outstanding-signer-${env.id}-${signer.id}`;
+                                const signerHovered = hoveredSignerKey === signerKey;
                                 return (
                                   <div
-                                    key={signer.id}
+                                    key={signerKey}
+                                    onMouseEnter={() => setHoveredSignerKey(signerKey)}
+                                    onMouseLeave={() =>
+                                      setHoveredSignerKey((prev) => (prev === signerKey ? null : prev))
+                                    }
                                     style={{
                                       padding: 12,
                                       borderRadius: 12,
-                                      border: `1px solid ${palette.border}`,
+                                      border: signerHovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
                                       display: 'flex',
                                       justifyContent: 'space-between',
                                       alignItems: 'center',
+                                      background: signerHovered ? '#f5f2ff' : '#fff',
+                                      boxShadow: signerHovered ? '0 8px 18px rgba(15,23,42,0.12)' : 'none',
+                                      transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                                     }}
                                   >
                                     <div>

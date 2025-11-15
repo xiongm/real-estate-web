@@ -82,7 +82,6 @@ const awaitingChipStyle = {
 const documentLinkStyle: CSSProperties = {
   fontSize: 16,
   color: palette.accent,
-  textDecoration: 'underline',
   fontWeight: 600,
   display: 'inline-flex',
   alignItems: 'center',
@@ -1358,6 +1357,15 @@ useEffect(() => {
 
   return (
     <div className={layoutClassName} style={{ minHeight: '100vh', display: 'flex', background: palette.bg, color: palette.text }}>
+      <style jsx global>{`
+        .admin-document-link {
+          text-decoration: none;
+        }
+        .admin-document-link:hover,
+        .admin-document-link:focus-visible {
+          text-decoration: underline;
+        }
+      `}</style>
       {isMobile && (
         <div className="admin-mobile-header">
           <button
@@ -1636,7 +1644,13 @@ useEffect(() => {
                                 )}
                                 <div>
                                   {documentUrl ? (
-                                    <a href={documentUrl} target="_blank" rel="noreferrer" style={documentLinkStyle}>
+                                    <a
+                                      href={documentUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={documentLinkStyle}
+                                      className="admin-document-link"
+                                    >
                                       <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
                                     </a>
                                   ) : (
@@ -1799,7 +1813,13 @@ useEffect(() => {
                                 />
                               )}
                               <div>
-                                <a href={downloadUrl} target="_blank" rel="noreferrer" style={documentLinkStyle}>
+                                <a
+                                  href={downloadUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={documentLinkStyle}
+                                  className="admin-document-link"
+                                >
                                   <strong style={{ fontSize: 16 }}>{item.document_name}</strong>
                                 </a>
                                 <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>

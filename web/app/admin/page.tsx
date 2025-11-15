@@ -27,7 +27,16 @@ type EnvelopeSummary = {
   document?: { id: number | null; filename: string | null };
   total_signers: number;
   completed_signers: number;
-  signers: Array<{ id: number; name: string; email: string; status: string; role: string; routing_order: number; magic_link?: string | null }>;
+  signers: Array<{
+    id: number;
+    name: string;
+    email: string;
+    status: string;
+    role: string;
+    routing_order: number;
+    completed_at?: string | null;
+    magic_link?: string | null;
+  }>;
 };
 
 type Investor = {
@@ -1241,6 +1250,10 @@ useEffect(() => {
                             >
                               {signerList.map((signer) => {
                                 const completed = signer.status === 'completed';
+                                const completionLabel =
+                                  completed && signer.completed_at
+                                    ? formatLocalDateTime(signer.completed_at) || 'time unavailable'
+                                    : null;
                                 const signerKey = `final-signer-${item.envelope_id}-${signer.id}`;
                                 const signerHovered = hoveredSignerKey === signerKey;
                                 return (
@@ -1265,6 +1278,9 @@ useEffect(() => {
                                     <div>
                                       <strong>{signer.name}</strong>
                                       <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
+                                      {completionLabel && (
+                                        <span style={{ fontSize: 11, color: palette.accentMuted }}>Completed {completionLabel}</span>
+                                      )}
                                     </div>
                                     <span
                                       style={{
@@ -1429,6 +1445,10 @@ useEffect(() => {
                             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
                               {env.signers.map((signer) => {
                                 const completed = signer.status === 'completed';
+                                const completionLabel =
+                                  completed && signer.completed_at
+                                    ? formatLocalDateTime(signer.completed_at) || 'time unavailable'
+                                    : null;
                                 const signerKey = `outstanding-signer-${env.id}-${signer.id}`;
                                 const signerHovered = hoveredSignerKey === signerKey;
                                 return (
@@ -1453,6 +1473,9 @@ useEffect(() => {
                                     <div>
                                       <strong>{signer.name}</strong>
                                       <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
+                                      {completionLabel && (
+                                        <span style={{ fontSize: 11, color: palette.accentMuted }}>Completed {completionLabel}</span>
+                                      )}
                                     </div>
                                     <span
                                       style={{

@@ -289,6 +289,7 @@ def list_project_envelopes(
                         "status": s.status,
                         "role": s.role,
                         "routing_order": s.routing_order,
+                        "completed_at": s.completed_at,
                         "magic_link": f"{link_base}/sign/{make_token({'signer_id': s.id, 'envelope_id': env.id})}",
                     }
                     for s in signers

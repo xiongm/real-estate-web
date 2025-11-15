@@ -1043,13 +1043,14 @@ useEffect(() => {
               </div>
 
               {hasSignedDocuments && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div data-testid="signed-documents-section" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <h4 style={{ margin: 0 }}>Signed Documents</h4>
                       <button
                         type="button"
                         onClick={toggleSignedManage}
+                        data-testid="signed-manage-toggle"
                         style={{
                           border: `1px solid ${palette.border}`,
                           background: manageSignedMode ? palette.accent : '#fff',
@@ -1069,6 +1070,7 @@ useEffect(() => {
                         type="button"
                         onClick={deleteSelectedFinals}
                         disabled={!selectedFinalIds.length || actionLoading}
+                        data-testid="signed-delete-selected"
                         style={{
                           border: '1px solid rgba(248,113,113,0.8)',
                           color: '#fca5a5',
@@ -1210,7 +1212,10 @@ useEffect(() => {
               )}
 
               {hasOutstandingEnvelopes && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: hasSignedDocuments ? 20 : 0 }}>
+                <div
+                  data-testid="outstanding-envelopes-section"
+                  style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: hasSignedDocuments ? 20 : 0 }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                     <div>
                       <h4 style={{ margin: 0 }}>Out for Signature</h4>
@@ -1221,6 +1226,7 @@ useEffect(() => {
                     <button
                       type="button"
                       onClick={toggleEnvelopeManage}
+                      data-testid="envelope-manage-toggle"
                       style={{
                         border: `1px solid ${palette.border}`,
                         background: manageEnvelopesMode ? palette.accent : '#fff',
@@ -1613,6 +1619,7 @@ useEffect(() => {
                 type="button"
                 onClick={toggleInvestorsManage}
                 disabled={!selectedProjectId}
+                data-testid="investor-manage-toggle"
                 style={{
                   border: `1px solid ${palette.border}`,
                   background: manageInvestorsMode ? palette.accent : '#fff',
@@ -1633,6 +1640,7 @@ useEffect(() => {
                   type="button"
                   onClick={deleteSelectedInvestors}
                   disabled={!selectedInvestorIds.length || deletingInvestors}
+                  data-testid="investor-remove-button"
                   style={{
                     border: '1px solid #dc2626',
                     color: '#fff',

@@ -120,6 +120,12 @@ export default function AdminPage() {
   const [newInvestorEmail, setNewInvestorEmail] = useState('');
   const [newInvestorUnits, setNewInvestorUnits] = useState<string>('');
   const [creatingInvestor, setCreatingInvestor] = useState(false);
+  const [hoveredInvestorId, setHoveredInvestorId] = useState<number | null>(null);
+  const [editingInvestorId, setEditingInvestorId] = useState<number | null>(null);
+  const [editingInvestorName, setEditingInvestorName] = useState('');
+  const [editingInvestorEmail, setEditingInvestorEmail] = useState('');
+  const [editingInvestorUnits, setEditingInvestorUnits] = useState<string>('');
+  const [editingInvestorSaving, setEditingInvestorSaving] = useState(false);
   const [manageSignedMode, setManageSignedMode] = useState(false);
   const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
   const [hoveredFinalId, setHoveredFinalId] = useState<number | null>(null);
@@ -312,8 +318,12 @@ useEffect(() => {
       setSelectedInvestorIds([]);
       setManageInvestorsMode(false);
       resetInvestorForm();
-      setSelectedInvestorIds([]);
-      setManageInvestorsMode(false);
+      setEditingInvestorId(null);
+      setEditingInvestorName('');
+      setEditingInvestorEmail('');
+      setEditingInvestorUnits('');
+      setEditingInvestorSaving(false);
+      setHoveredInvestorId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load investors');
     } finally {
@@ -331,6 +341,15 @@ useEffect(() => {
     setExpandedEnvelopes({});
     setExpandedFinals({});
     setRevokingEnvelopes(false);
+    setManageInvestorsMode(false);
+    setSelectedInvestorIds([]);
+    resetInvestorForm();
+    setEditingInvestorId(null);
+    setEditingInvestorName('');
+    setEditingInvestorEmail('');
+    setEditingInvestorUnits('');
+    setEditingInvestorSaving(false);
+    setHoveredInvestorId(null);
     return project;
   }, [projects, selectedProjectId]);
   const selectedProjectToken = selectedProject?.access_token ?? null;
@@ -436,10 +455,17 @@ useEffect(() => {
   };
 
   const toggleInvestorsManage = () => {
+    if (!selectedProjectId) return;
     setManageInvestorsMode((prev) => {
       if (prev) {
         setSelectedInvestorIds([]);
         resetInvestorForm();
+      } else {
+        setEditingInvestorId(null);
+        setEditingInvestorName('');
+        setEditingInvestorEmail('');
+        setEditingInvestorUnits('');
+        setEditingInvestorSaving(false);
       }
       return !prev;
     });
@@ -471,6 +497,66 @@ useEffect(() => {
       setError(err instanceof Error ? err.message : 'Failed to remove investors');
     } finally {
       setDeletingInvestors(false);
+    }
+  };
+
+  const beginInvestorEdit = (investor: Investor) => {
+    if (!investor.id) return;
+    setEditingInvestorId(investor.id);
+    setEditingInvestorName(investor.name ?? '');
+    setEditingInvestorEmail(investor.email ?? '');
+    setEditingInvestorUnits(
+      typeof investor.units_invested === 'number' ? String(investor.units_invested) : '',
+    );
+  };
+
+  const cancelInvestorEdit = () => {
+    setEditingInvestorId(null);
+    setEditingInvestorName('');
+    setEditingInvestorEmail('');
+    setEditingInvestorUnits('');
+    setEditingInvestorSaving(false);
+  };
+
+  const saveInvestorEdit = async () => {
+    if (!selectedProjectId || !adminToken || !editingInvestorId) return;
+    const name = editingInvestorName.trim();
+    const email = editingInvestorEmail.trim();
+    if (!name || !email) {
+      setError('Name and email are required to update an investor.');
+      return;
+    }
+    const payload: Record<string, unknown> = { name, email };
+    const unitsTrimmed = editingInvestorUnits.trim();
+    if (unitsTrimmed.length) {
+      const parsedUnits = Number(unitsTrimmed);
+      if (Number.isNaN(parsedUnits)) {
+        setError('Units invested must be a valid number.');
+        return;
+      }
+      payload.units_invested = parsedUnits;
+    }
+    setEditingInvestorSaving(true);
+    try {
+      const resp = await fetch(
+        `${baseApi}/api/projects/${selectedProjectId}/investors/${editingInvestorId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Access-Token': adminToken,
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+      if (!resp.ok) throw new Error(`Failed to update investor (${resp.status})`);
+      const updated = await resp.json();
+      setInvestors((prev) => prev.map((inv) => (inv.id === updated.id ? { ...inv, ...updated } : inv)));
+      cancelInvestorEdit();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update investor');
+    } finally {
+      setEditingInvestorSaving(false);
     }
   };
 
@@ -1807,36 +1893,150 @@ useEffect(() => {
             {investors.map((investor, idx) => {
               const invId = investor.id ?? idx;
               const selected = manageInvestorsMode && investor.id ? selectedInvestorIds.includes(investor.id) : false;
+              const hovered = hoveredInvestorId === invId;
+              const editing = Boolean(investor.id && editingInvestorId === investor.id);
+              const cardBackground = selected
+                ? '#eef2ff'
+                : editing
+                ? '#f5f3ff'
+                : hovered
+                ? '#f8fafc'
+                : '#fff';
+              const cardBorder = selected || editing ? palette.accent : palette.border;
+              const boxShadow = selected || hovered || editing ? '0 8px 18px rgba(15,23,42,0.12)' : '0 4px 10px rgba(15,23,42,0.05)';
+              const unitsLabel =
+                typeof investor.units_invested === 'number'
+                  ? `${investor.units_invested.toLocaleString()} units`
+                  : 'Units n/a';
               return (
                 <div
                   key={`investor-${invId}`}
+                  onMouseEnter={() => setHoveredInvestorId(invId)}
+                  onMouseLeave={() => setHoveredInvestorId((prev) => (prev === invId ? null : prev))}
                   style={{
                     borderRadius: 12,
-                    background: selected ? '#eef2ff' : '#fff',
-                    border: selected ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                    background: cardBackground,
+                    border: `1px solid ${cardBorder}`,
                     padding: 12,
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center',
+                    alignItems: editing ? 'stretch' : 'center',
                     gap: 12,
+                    boxShadow,
+                    transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {manageInvestorsMode && investor.id && (
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={() => toggleInvestorSelection(investor.id!)}
-                      />
-                    )}
-                    <div>
-                      <strong>{investor.name}</strong>
-                      <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{investor.email}</p>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 12, color: palette.accentMuted }}>
-                    {investor.units_invested?.toLocaleString()} units
-                  </span>
+                  {editing ? (
+                    <>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input
+                          type="text"
+                          value={editingInvestorName}
+                          onChange={(event) => setEditingInvestorName(event.target.value)}
+                          placeholder="Investor name"
+                          style={{
+                            padding: 8,
+                            borderRadius: 8,
+                            border: `1px solid ${palette.border}`,
+                          }}
+                        />
+                        <input
+                          type="email"
+                          value={editingInvestorEmail}
+                          onChange={(event) => setEditingInvestorEmail(event.target.value)}
+                          placeholder="Investor email"
+                          style={{
+                            padding: 8,
+                            borderRadius: 8,
+                            border: `1px solid ${palette.border}`,
+                          }}
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          value={editingInvestorUnits}
+                          onChange={(event) => setEditingInvestorUnits(event.target.value)}
+                          placeholder="Units invested"
+                          style={{
+                            padding: 8,
+                            borderRadius: 8,
+                            border: `1px solid ${palette.border}`,
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={cancelInvestorEdit}
+                          disabled={editingInvestorSaving}
+                          style={{
+                            border: `1px solid ${palette.border}`,
+                            background: '#fff',
+                            color: palette.text,
+                            borderRadius: 999,
+                            padding: '6px 14px',
+                            fontSize: 12,
+                            cursor: editingInvestorSaving ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveInvestorEdit}
+                          disabled={editingInvestorSaving}
+                          style={{
+                            border: 'none',
+                            background: palette.accent,
+                            color: '#fff',
+                            borderRadius: 999,
+                            padding: '6px 14px',
+                            fontSize: 12,
+                            cursor: editingInvestorSaving ? 'not-allowed' : 'pointer',
+                            boxShadow: editingInvestorSaving ? 'none' : '0 8px 18px rgba(108,92,231,0.25)',
+                          }}
+                        >
+                          {editingInvestorSaving ? 'Saving…' : 'Save'}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {manageInvestorsMode && investor.id && (
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleInvestorSelection(investor.id!)}
+                          />
+                        )}
+                        <div>
+                          <strong>{investor.name}</strong>
+                          <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{investor.email}</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                        <span style={{ fontSize: 12, color: palette.accentMuted }}>{unitsLabel}</span>
+                        {!manageInvestorsMode && investor.id && (
+                          <button
+                            type="button"
+                            onClick={() => beginInvestorEdit(investor)}
+                            style={{
+                              border: `1px solid ${palette.border}`,
+                              borderRadius: 999,
+                              padding: '4px 10px',
+                              fontSize: 12,
+                              background: '#fff',
+                              color: palette.text,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}

@@ -50,6 +50,38 @@ const palette = {
   code: theme.colors.code,
 };
 const shadows = theme.shadows;
+const completedChipStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  borderRadius: 999,
+  background: '#dcfce7',
+  color: '#166534',
+  padding: '2px 8px',
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+const normalizeTimestamp = (value: string) => {
+  if (!value) return value;
+  if (value.endsWith('Z')) return value;
+  if (/[+-]\d\d:\d\d$/.test(value)) return value;
+  return `${value}Z`;
+};
+
+const formatLocalDateTime = (timestamp?: string | null) => {
+  if (!timestamp) return null;
+  const date = new Date(normalizeTimestamp(timestamp));
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+};
+
+const formatSentLabel = (timestamp?: string | null) => {
+  const formatted = formatLocalDateTime(timestamp);
+  return formatted ? `Sent ${formatted}` : 'Sent time unavailable';
+};
 
 export default function AdminPage() {
   const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
@@ -1130,9 +1162,12 @@ useEffect(() => {
                               )}
                               <div>
                                 <strong>{item.document_name}</strong>
-                                <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
-                                  Completed {new Date(item.completed_at).toLocaleString()}
-                                </p>
+                                <div style={{ margin: '6px 0 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={completedChipStyle}>Completed</span>
+                                  <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                                    {formatLocalDateTime(item.completed_at) ?? 'time unavailable'}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                             {hasSigners && (
@@ -1270,14 +1305,9 @@ useEffect(() => {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                             <div>
                               <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
-                              {env.subject && (
-                                <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>{env.subject}</p>
-                              )}
-                              {documentUrl && (
-                                <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
-                                  Click to download the original upload
-                                </p>
-                              )}
+                              <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
+                                {formatSentLabel(env.created_at)}
+                              </p>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                               <button

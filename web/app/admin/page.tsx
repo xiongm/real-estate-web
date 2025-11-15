@@ -1228,8 +1228,8 @@ useEffect(() => {
                 style={{
                   display: 'flex',
                   flexWrap: 'wrap',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  alignItems: isMobile ? 'stretch' : 'center',
+                  justifyContent: 'flex-start',
                   gap: 12,
                   marginTop: 12,
                 }}
@@ -1259,7 +1259,15 @@ useEffect(() => {
                   </span>
                   <span style={{ fontSize: 14, fontWeight: 700 }}>Request signatures</span>
                 </button>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: 12,
+                    width: isMobile ? '100%' : 'auto',
+                  }}
+                >
                   <button
                     type="button"
                     onClick={toggleDocumentsManage}
@@ -1370,8 +1378,16 @@ useEffect(() => {
                               transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-start',
+                                gap: 16,
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 200 }}>
                                 {manageEnvelopesMode && (
                                   <input
                                     type="checkbox"
@@ -1387,7 +1403,7 @@ useEffect(() => {
                                   </p>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                                 <span style={awaitingChipStyle}>Awaiting</span>
                                 <button
                                   type="button"
@@ -1522,8 +1538,16 @@ useEffect(() => {
                             transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              gap: 16,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 200 }}>
                               {manageSignedMode && (
                                 <input
                                   type="checkbox"
@@ -1539,7 +1563,7 @@ useEffect(() => {
                                 </p>
                               </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                               <span style={completedChipStyle}>Completed</span>
                               {hasSigners && (
                                 <button

@@ -20,6 +20,7 @@ from ..models import (
 from ..storage import put_bytes, get_bytes, delete_object
 from ..utils import sha256_bytes, make_token
 from ..auth import require_admin_access, require_project_or_admin
+from ..schemas import ProjectUpdate
 
 def _serialize_document(doc: Document):
     return {
@@ -62,6 +63,33 @@ def list_projects(
     ctx=Depends(require_admin_access),
 ):
     return session.exec(select(Project)).all()
+
+
+@router.patch("/{project_id}")
+def update_project(
+    project_id: int,
+    payload: ProjectUpdate,
+    session: Session = Depends(get_session),
+    ctx=Depends(require_admin_access),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "project not found")
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        return project
+    if "name" in data:
+        existing = session.exec(
+            select(Project).where(Project.name == data["name"], Project.id != project_id)
+        ).first()
+        if existing:
+            raise HTTPException(status.HTTP_409_CONFLICT, "project name already exists")
+    for key, value in data.items():
+        setattr(project, key, value)
+    session.add(project)
+    session.commit()
+    session.refresh(project)
+    return project
 
 @router.post("/{project_id}/documents")
 async def upload_document(

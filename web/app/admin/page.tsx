@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, MouseEvent, FormEvent, CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, MouseEvent, FormEvent, CSSProperties, KeyboardEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
 
@@ -161,6 +161,9 @@ export default function AdminPage() {
   const [editingInvestorEmail, setEditingInvestorEmail] = useState('');
   const [editingInvestorUnits, setEditingInvestorUnits] = useState<string>('');
   const [editingInvestorSaving, setEditingInvestorSaving] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
+  const [editingProjectName, setEditingProjectName] = useState('');
+  const [editingProjectSaving, setEditingProjectSaving] = useState(false);
   const [manageSignedMode, setManageSignedMode] = useState(false);
   const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
   const [manageDocumentsMode, setManageDocumentsMode] = useState(false);
@@ -220,6 +223,54 @@ export default function AdminPage() {
     rememberProjectSelection(id);
     if (isMobile) {
       setProjectDrawerOpen(false);
+    }
+  };
+
+  const cancelProjectEdit = () => {
+    setEditingProjectId(null);
+    setEditingProjectName('');
+    setEditingProjectSaving(false);
+  };
+
+  const beginProjectEdit = (project: Project) => {
+    if (!project.id) return;
+    setEditingProjectId(project.id);
+    setEditingProjectName(project.name ?? '');
+    setEditingProjectSaving(false);
+  };
+
+  const saveProjectEdit = async () => {
+    if (!adminToken || !editingProjectId) return;
+    const trimmedName = editingProjectName.trim();
+    if (!trimmedName) {
+      setError('Project name is required.');
+      return;
+    }
+    setEditingProjectSaving(true);
+    try {
+      const resp = await fetch(`${baseApi}/api/projects/${editingProjectId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Token': adminToken,
+        },
+        body: JSON.stringify({ name: trimmedName }),
+      });
+      if (!resp.ok) throw new Error(`Failed to update project (${resp.status})`);
+      const updated = await resp.json();
+      setProjects((prev) => prev.map((proj) => (proj.id === updated.id ? { ...proj, ...updated } : proj)));
+      cancelProjectEdit();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update project');
+    } finally {
+      setEditingProjectSaving(false);
+    }
+  };
+
+  const handleProjectKeyDown = (event: KeyboardEvent<HTMLDivElement>, projectId: number) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectProject(projectId);
     }
   };
 
@@ -284,6 +335,7 @@ export default function AdminPage() {
       const data = await resp.json();
       const sorted = Array.isArray(data) ? [...data].sort((a, b) => (a?.id ?? 0) - (b?.id ?? 0)) : [];
       setProjects(sorted);
+      cancelProjectEdit();
       const rawSaved = typeof window !== 'undefined' ? localStorage.getItem('adminSelectedProjectId') : null;
       const savedId = rawSaved ? Number(rawSaved) : null;
       const savedValid = typeof savedId === 'number' && Number.isFinite(savedId) && sorted.some((p) => p.id === savedId);
@@ -725,7 +777,11 @@ useEffect(() => {
 
   const toggleProjectManage = () => {
     setManageProjectsMode((prev) => {
-      if (prev) setSelectedProjectIds([]);
+      if (prev) {
+        setSelectedProjectIds([]);
+      } else {
+        cancelProjectEdit();
+      }
       return !prev;
     });
   };
@@ -963,56 +1019,146 @@ useEffect(() => {
         {projects.map((project, idx) => {
           const active = project.id === selectedProjectId;
           const hovered = hoveredProjectId === project.id;
+          const isEditing = project.id === editingProjectId;
+          const baseBackground = active
+            ? 'linear-gradient(135deg,#6c5ce7,#7f6bff)'
+            : hovered || isEditing
+            ? '#f5f2ff'
+            : '#fff';
           return (
-            <button
+            <div
               key={`project-${project.id ?? idx}`}
-              onClick={() => selectProject(project.id)}
+              role={!isEditing ? 'button' : undefined}
+              tabIndex={!isEditing ? 0 : -1}
+              onClick={!isEditing ? () => selectProject(project.id) : undefined}
+              onKeyDown={!isEditing ? (event) => handleProjectKeyDown(event, project.id) : undefined}
               onMouseEnter={() => setHoveredProjectId(project.id)}
-              onMouseLeave={() =>
-                setHoveredProjectId((prev) => (prev === project.id ? null : prev))
-              }
+              onMouseLeave={() => setHoveredProjectId((prev) => (prev === project.id ? null : prev))}
               style={{
                 textAlign: 'left',
                 padding: '12px 14px',
                 borderRadius: 14,
-                border: `1px solid ${active || hovered ? palette.accent : palette.border}`,
-                background: active ? 'linear-gradient(135deg,#6c5ce7,#7f6bff)' : hovered ? '#f5f2ff' : '#fff',
+                border: `1px solid ${active || hovered || isEditing ? palette.accent : palette.border}`,
+                background: baseBackground,
                 color: active ? '#fff' : palette.text,
-                cursor: 'pointer',
+                cursor: isEditing ? 'default' : 'pointer',
                 fontWeight: active ? 600 : 500,
                 boxShadow: active
                   ? '0 12px 24px rgba(108,92,231,0.25)'
-                  : hovered
+                  : hovered || isEditing
                   ? '0 8px 18px rgba(15,23,42,0.12)'
                   : '0 4px 12px rgba(15,23,42,0.05)',
                 transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {manageProjectsMode && (
-                    <input
-                      type="checkbox"
-                      checked={selectedProjectIds.includes(project.id)}
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={() => toggleProjectSelection(project.id)}
-                    />
-                  )}
-                  <div>
-                    <strong>{project.name}</strong>
-                    <p
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input
+                    type="text"
+                    value={editingProjectName}
+                    onChange={(event) => setEditingProjectName(event.target.value)}
+                    placeholder="Project name"
+                    disabled={editingProjectSaving}
+                    style={{
+                      padding: 10,
+                      borderRadius: 10,
+                      border: `1px solid ${palette.border}`,
+                      background: '#fff',
+                      color: palette.text,
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        cancelProjectEdit();
+                      }}
+                      disabled={editingProjectSaving}
                       style={{
-                        margin: 0,
+                        border: `1px solid ${palette.border}`,
+                        background: '#fff',
+                        color: palette.text,
+                        borderRadius: 999,
+                        padding: '6px 14px',
                         fontSize: 12,
-                        color: active ? 'rgba(255,255,255,0.8)' : palette.accentMuted,
+                        cursor: editingProjectSaving ? 'not-allowed' : 'pointer',
                       }}
                     >
-                      #{project.id}
-                    </p>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        saveProjectEdit();
+                      }}
+                      disabled={editingProjectSaving || !editingProjectName.trim()}
+                      style={{
+                        border: 'none',
+                        background: palette.accent,
+                        color: '#fff',
+                        borderRadius: 999,
+                        padding: '6px 14px',
+                        fontSize: 12,
+                        cursor: editingProjectSaving || !editingProjectName.trim() ? 'not-allowed' : 'pointer',
+                        boxShadow:
+                          editingProjectSaving || !editingProjectName.trim()
+                            ? 'none'
+                            : '0 8px 18px rgba(108,92,231,0.25)',
+                      }}
+                    >
+                      {editingProjectSaving ? 'Saving…' : 'Save'}
+                    </button>
                   </div>
                 </div>
-              </div>
-            </button>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {manageProjectsMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedProjectIds.includes(project.id)}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => toggleProjectSelection(project.id)}
+                      />
+                    )}
+                    <div>
+                      <strong>{project.name}</strong>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          color: active ? 'rgba(255,255,255,0.8)' : palette.accentMuted,
+                        }}
+                      >
+                        #{project.id}
+                      </p>
+                    </div>
+                  </div>
+                  {!manageProjectsMode && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        beginProjectEdit(project);
+                      }}
+                      style={{
+                        border: `1px solid ${palette.border}`,
+                        borderRadius: 999,
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        background: '#fff',
+                        color: palette.text,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
         {manageProjectsMode && (

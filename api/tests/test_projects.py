@@ -50,6 +50,26 @@ def test_project_name_unique_constraint(client):
     assert "already exists" in duplicate_resp.text
 
 
+def test_project_patch_updates_name(client):
+    project_id, _ = create_project(client, "Original Plaza")
+    resp = client.patch(
+        f"/api/projects/{project_id}",
+        json={"name": "Updated Plaza"},
+        headers=ADMIN_HEADERS,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "Updated Plaza"
+
+    conflict_id, _ = create_project(client, "Another Plaza")
+    conflict_resp = client.patch(
+        f"/api/projects/{conflict_id}",
+        json={"name": "Updated Plaza"},
+        headers=ADMIN_HEADERS,
+    )
+    assert conflict_resp.status_code == 409
+
+
 def upload_document(client, project_id, filename="sample.pdf", content=b"%PDF-1.4 test"):
     response = client.post(
         f"/api/projects/{project_id}/documents",

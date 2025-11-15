@@ -59,3 +59,8 @@ class ProjectInvestorUpdate(BaseModel):
     routing_order: Optional[int] = None
     units_invested: Optional[float] = None
     metadata_json: Optional[str] = None
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, MouseEvent, FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, MouseEvent, FormEvent, CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
 
@@ -69,6 +69,41 @@ const completedChipStyle = {
   fontSize: 12,
   fontWeight: 600,
 };
+const awaitingChipStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  borderRadius: 999,
+  background: '#fffbeb',
+  color: '#92400e',
+  padding: '2px 8px',
+  fontSize: 12,
+  fontWeight: 600,
+};
+const usePrimaryButtonStyle = (
+  enabled: boolean,
+  hovered: boolean,
+): React.CSSProperties => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  minWidth: 84,
+  height: 44,
+  borderRadius: 12,
+  border: 'none',
+  padding: '0 20px',
+  background: enabled
+    ? hovered
+      ? 'rgba(37,99,235,0.9)'
+      : '#2563eb'
+    : '#cbd5f5',
+  color: enabled ? '#fff' : '#64748b',
+  fontSize: 14,
+  fontWeight: 700,
+  cursor: enabled ? 'pointer' : 'not-allowed',
+  boxShadow: enabled ? '0 2px 8px rgba(37,99,235,0.35)' : 'none',
+  transition: 'background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease',
+});
 
 const normalizeTimestamp = (value: string) => {
   if (!value) return value;
@@ -128,6 +163,7 @@ export default function AdminPage() {
   const [editingInvestorSaving, setEditingInvestorSaving] = useState(false);
   const [manageSignedMode, setManageSignedMode] = useState(false);
   const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
+  const [manageDocumentsMode, setManageDocumentsMode] = useState(false);
   const [hoveredFinalId, setHoveredFinalId] = useState<number | null>(null);
   const [hoveredEnvelopeId, setHoveredEnvelopeId] = useState<number | null>(null);
   const [hoveredProjectId, setHoveredProjectId] = useState<number | null>(null);
@@ -143,6 +179,7 @@ export default function AdminPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
   const [investorDrawerOpen, setInvestorDrawerOpen] = useState(false);
+  const [requestButtonHovered, setRequestButtonHovered] = useState(false);
   const closeDrawers = () => {
     setProjectDrawerOpen(false);
     setInvestorDrawerOpen(false);
@@ -334,6 +371,7 @@ useEffect(() => {
   const selectedProject = useMemo(() => {
     const project = projects.find((p) => p.id === selectedProjectId) || null;
     // Reset manage modes when switching projects so states don't leak.
+    setManageDocumentsMode(false);
     setManageSignedMode(false);
     setManageEnvelopesMode(false);
     setSelectedFinalIds([]);
@@ -372,7 +410,26 @@ useEffect(() => {
   const hasInvestors = investors.length > 0;
   const hasSignedDocuments = finals.length > 0;
   const hasOutstandingEnvelopes = outstandingEnvelopes.length > 0;
+  const documentEntries = useMemo(
+    () => [
+      ...outstandingEnvelopes.map((env) => ({ kind: 'awaiting' as const, env })),
+      ...finals.map((finalItem) => ({ kind: 'signed' as const, final: finalItem })),
+    ],
+    [outstandingEnvelopes, finals],
+  );
+  const hasDocuments = documentEntries.length > 0;
   const canRequestSignatures = Boolean(selectedProjectId && hasInvestors);
+
+  useEffect(() => {
+    if (!hasDocuments && manageDocumentsMode) {
+      setManageDocumentsMode(false);
+      setManageSignedMode(false);
+      setManageEnvelopesMode(false);
+      setSelectedFinalIds([]);
+      setSelectedEnvelopeIds([]);
+      setRevokingEnvelopes(false);
+    }
+  }, [hasDocuments, manageDocumentsMode]);
 
   const toggleFinalSelection = (id: number) => {
     setSelectedFinalIds((prev) => (prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]));
@@ -382,13 +439,16 @@ useEffect(() => {
     setSelectedEnvelopeIds((prev) => (prev.includes(id) ? prev.filter((eid) => eid !== id) : [...prev, id]));
   };
 
-  const revokeSelectedEnvelopes = async () => {
-    if (!selectedProjectId || !selectedEnvelopeIds.length) return;
+  const revokeSelectedEnvelopes = async (options?: { skipConfirm?: boolean }) => {
+    if (!selectedProjectId || !selectedEnvelopeIds.length) return false;
     const envelopeIds = [...selectedEnvelopeIds];
-    const confirmRemove = window.confirm(
-      `Revoke ${envelopeIds.length} envelope(s)? Pending signees will lose access immediately.`,
-    );
-    if (!confirmRemove) return;
+    let proceed = true;
+    if (!options?.skipConfirm) {
+      proceed = window.confirm(
+        `Revoke ${envelopeIds.length} envelope${envelopeIds.length > 1 ? 's' : ''}? Pending signees will lose access immediately.`,
+      );
+    }
+    if (!proceed) return false;
     setRevokingEnvelopes(true);
     try {
       for (const envelopeId of envelopeIds) {
@@ -408,34 +468,59 @@ useEffect(() => {
         });
         return next;
       });
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke envelopes');
+      return false;
     } finally {
       setRevokingEnvelopes(false);
     }
   };
 
-  const toggleSignedManage = () => {
-    setManageSignedMode((prev) => {
-      if (prev) setSelectedFinalIds([]);
-      return !prev;
-    });
-  };
-
-  const toggleEnvelopeManage = () => {
-    setManageEnvelopesMode((prev) => {
-      if (prev) {
+  const toggleDocumentsManage = () => {
+    setManageDocumentsMode((prev) => {
+      const next = !prev;
+      if (next) {
+        setManageSignedMode(true);
+        setManageEnvelopesMode(true);
+      } else {
+        setManageSignedMode(false);
+        setManageEnvelopesMode(false);
+        setSelectedFinalIds([]);
         setSelectedEnvelopeIds([]);
         setRevokingEnvelopes(false);
       }
-      return !prev;
+      return next;
     });
   };
 
-  const deleteSelectedFinals = async () => {
-    if (!selectedProjectId || !selectedFinalIds.length) return;
-    const confirmRemove = window.confirm(`Delete ${selectedFinalIds.length} signed packet(s)? This cannot be undone.`);
+  const deleteSelectedDocuments = async () => {
+    if (!selectedProjectId) return;
+    const signedCount = selectedFinalIds.length;
+    const awaitingCount = selectedEnvelopeIds.length;
+    if (!signedCount && !awaitingCount) return;
+    const parts: string[] = [];
+    if (signedCount) parts.push(`${signedCount} completed document${signedCount > 1 ? 's' : ''}`);
+    if (awaitingCount) parts.push(`${awaitingCount} awaiting document${awaitingCount > 1 ? 's' : ''}`);
+    const confirmRemove = window.confirm(
+      `Delete ${parts.join(' and ')}? This cannot be undone. Awaiting documents will be revoked.`,
+    );
     if (!confirmRemove) return;
+    if (signedCount) {
+      await deleteSelectedFinals({ skipConfirm: true });
+    }
+    if (awaitingCount) {
+      await revokeSelectedEnvelopes({ skipConfirm: true });
+    }
+  };
+
+  const deleteSelectedFinals = async (options?: { skipConfirm?: boolean }) => {
+    if (!selectedProjectId || !selectedFinalIds.length) return false;
+    let proceed = true;
+    if (!options?.skipConfirm) {
+      proceed = window.confirm(`Delete ${selectedFinalIds.length} signed packet${selectedFinalIds.length > 1 ? 's' : ''}? This cannot be undone.`);
+    }
+    if (!proceed) return false;
     setActionLoading(true);
     try {
       for (const id of selectedFinalIds) {
@@ -447,8 +532,10 @@ useEffect(() => {
       }
       setFinals((prev) => prev.filter((item) => !selectedFinalIds.includes(item.envelope_id)));
       setSelectedFinalIds([]);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete signed packets');
+      return false;
     } finally {
       setActionLoading(false);
     }
@@ -1137,44 +1224,23 @@ useEffect(() => {
           </div>
           {centerTab === 'documents' && selectedProject && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 12 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginTop: 12,
+                }}
+              >
                 <button
                   type="button"
                   onClick={goToRequestSign}
                   disabled={!canRequestSignatures}
-                  style={{
-                    border: `1px solid ${palette.accent}`,
-                    borderRadius: 10,
-                    padding: '12px 22px',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    background: '#fff',
-                    color: canRequestSignatures ? palette.accent : palette.accentMuted,
-                    cursor: canRequestSignatures ? 'pointer' : 'not-allowed',
-                    opacity: canRequestSignatures ? 1 : 0.5,
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 14,
-                    boxShadow: canRequestSignatures ? '0 6px 14px rgba(37,99,235,0.12)' : 'none',
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease',
-                  }}
-                  onMouseEnter={(event) => {
-                    const target = event.currentTarget;
-                    if (!canRequestSignatures) return;
-                    target.style.transform = 'translateY(-1px)';
-                    target.style.boxShadow = '0 10px 20px rgba(37,99,235,0.18)';
-                    target.style.background = 'rgba(37,99,235,0.05)';
-                    target.style.color = '#1d4ed8';
-                  }}
-                  onMouseLeave={(event) => {
-                    const target = event.currentTarget;
-                    if (!canRequestSignatures) return;
-                    target.style.transform = 'translateY(0)';
-                    target.style.boxShadow = '0 6px 14px rgba(37,99,235,0.12)';
-                    target.style.background = '#fff';
-                    target.style.color = palette.accent;
-                  }}
+                  style={usePrimaryButtonStyle(canRequestSignatures, requestButtonHovered)}
+                  onMouseEnter={() => canRequestSignatures && setRequestButtonHovered(true)}
+                  onMouseLeave={() => canRequestSignatures && setRequestButtonHovered(false)}
                   title={
                     canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
                   }
@@ -1182,152 +1248,327 @@ useEffect(() => {
                   <span
                     aria-hidden="true"
                     style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '50%',
-                      background: canRequestSignatures ? 'rgba(37,99,235,0.15)' : 'rgba(148,163,184,0.25)',
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 18,
+                      fontSize: 20,
+                      lineHeight: 1,
                     }}
                   >
-                    👥
+                    ✍️
                   </span>
-                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 14, letterSpacing: 0.3, color: palette.text }}>
-                      Request signatures
-                    </span>
-                    <span style={{ fontSize: 12, color: palette.accentMuted }}>
-                      Invite investors to sign PDF packet
-                    </span>
-                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>Request signatures</span>
                 </button>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={toggleDocumentsManage}
+                    data-testid="documents-manage-toggle"
+                    disabled={!hasDocuments}
+                    style={{
+                      border: `1px solid ${palette.border}`,
+                      background: manageDocumentsMode ? palette.accent : '#fff',
+                      color: manageDocumentsMode ? '#fff' : palette.text,
+                      borderRadius: 999,
+                      padding: '4px 12px',
+                      fontSize: 12,
+                      cursor: hasDocuments ? 'pointer' : 'not-allowed',
+                      opacity: hasDocuments ? 1 : 0.5,
+                      boxShadow: manageDocumentsMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
+                    }}
+                  >
+                    {manageDocumentsMode ? 'Done' : 'Manage'}
+                  </button>
+                  {manageDocumentsMode && (
+                    <button
+                      type="button"
+                      onClick={deleteSelectedDocuments}
+                      data-testid="documents-delete-selected"
+                      disabled={
+                        !hasDocuments ||
+                        (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
+                        actionLoading ||
+                        revokingEnvelopes
+                      }
+                      style={{
+                        border: '1px solid rgba(248,113,113,0.8)',
+                        color: '#fca5a5',
+                        background: 'transparent',
+                        borderRadius: 999,
+                        padding: '6px 12px',
+                        fontSize: 13,
+                        cursor:
+                          !hasDocuments ||
+                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
+                          actionLoading ||
+                          revokingEnvelopes
+                            ? 'not-allowed'
+                            : 'pointer',
+                        opacity:
+                          !hasDocuments ||
+                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
+                          actionLoading ||
+                          revokingEnvelopes
+                            ? 0.5
+                            : 1,
+                      }}
+                    >
+                      {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete'}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {hasSignedDocuments && (
-                <div data-testid="signed-documents-section" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <h4 style={{ margin: 0 }}>Signed Documents</h4>
-                      <button
-                        type="button"
-                        onClick={toggleSignedManage}
-                        data-testid="signed-manage-toggle"
-                        style={{
-                          border: `1px solid ${palette.border}`,
-                          background: manageSignedMode ? palette.accent : '#fff',
-                          color: manageSignedMode ? '#fff' : palette.text,
-                          borderRadius: 999,
-                          padding: '4px 12px',
-                          fontSize: 12,
-                          cursor: 'pointer',
-                          boxShadow: manageSignedMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
-                        }}
-                      >
-                        {manageSignedMode ? 'Done' : 'Manage'}
-                      </button>
-                    </div>
-                    {manageSignedMode && (
-                      <button
-                        type="button"
-                        onClick={deleteSelectedFinals}
-                        disabled={!selectedFinalIds.length || actionLoading}
-                        data-testid="signed-delete-selected"
-                        style={{
-                          border: '1px solid rgba(248,113,113,0.8)',
-                          color: '#fca5a5',
-                          background: 'transparent',
-                          borderRadius: 999,
-                          padding: '6px 12px',
-                          fontSize: 13,
-                          cursor: !selectedFinalIds.length || actionLoading ? 'not-allowed' : 'pointer',
-                          opacity: !selectedFinalIds.length || actionLoading ? 0.5 : 1,
-                        }}
-                      >
-                        Delete Selected
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {finals.map((item, idx) => {
+              {hasDocuments && (
+                <div data-testid="documents-list-section" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {documentEntries.map((entry, idx) => {
+                      if (entry.kind === 'awaiting') {
+                        const env = entry.env;
+                        const expanded = expandedEnvelopes[env.id] ?? false;
+                        const hasSigners = env.total_signers > 0;
+                        const progressLabel = hasSigners
+                          ? `${env.completed_signers}/${env.total_signers} signed`
+                          : 'Incomplete setup';
+                        const buttonLabel = expanded ? 'Hide signees' : progressLabel;
+                        const documentUrl =
+                          selectedProjectId && env.document?.id
+                            ? `${baseApi}/api/projects/${selectedProjectId}/documents/${env.document.id}/pdf${tokenParam}`
+                            : null;
+                        const fileLabel = env.document?.filename || 'Untitled PDF';
+                        const envelopeHovered = hoveredEnvelopeId === env.id;
+                        const envelopeSelected = selectedEnvelopeIds.includes(env.id);
+                        return (
+                          <div
+                            key={`env-${env.id}`}
+                            data-document-kind="awaiting"
+                            onClick={(event) => documentUrl && handleCardDownload(event, documentUrl)}
+                            onMouseEnter={() => setHoveredEnvelopeId(env.id)}
+                            onMouseLeave={() =>
+                              setHoveredEnvelopeId((prev) => (prev === env.id ? null : prev))
+                            }
+                            style={{
+                              border:
+                                envelopeSelected || envelopeHovered
+                                  ? `1px solid ${palette.accent}`
+                                  : `1px solid ${palette.border}`,
+                              borderRadius: 18,
+                              padding: 16,
+                              background: envelopeSelected
+                                ? envelopeHovered
+                                  ? '#e4ddff'
+                                  : '#ede9ff'
+                                : envelopeHovered
+                                ? '#f5f2ff'
+                                : '#fff',
+                              boxShadow: envelopeSelected
+                                ? '0 12px 28px rgba(108,92,231,0.25)'
+                                : envelopeHovered
+                                ? '0 12px 28px rgba(15,23,42,0.14)'
+                                : '0 10px 24px rgba(15,23,42,0.08)',
+                              cursor: documentUrl ? 'pointer' : 'default',
+                              transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                {manageEnvelopesMode && (
+                                  <input
+                                    type="checkbox"
+                                    checked={envelopeSelected}
+                                    onChange={() => toggleEnvelopeSelection(env.id)}
+                                    onClick={(event) => event.stopPropagation()}
+                                  />
+                                )}
+                                <div>
+                                  <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
+                                  <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
+                                    {formatSentLabel(env.created_at)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <span style={awaitingChipStyle}>Awaiting</span>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setExpandedEnvelopes((prev) => ({
+                                      ...prev,
+                                      [env.id]: !expanded,
+                                    }));
+                                  }}
+                                  style={{
+                                    border: `1px solid ${palette.border}`,
+                                    borderRadius: 999,
+                                    padding: '4px 12px',
+                                    background: '#fff',
+                                    cursor: 'pointer',
+                                    fontSize: 12,
+                                  }}
+                                >
+                                  {buttonLabel}
+                                </button>
+                              </div>
+                            </div>
+                            {expanded && (
+                              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {env.signers.map((signer) => {
+                                  const completed = signer.status === 'completed';
+                                  const completionLabel =
+                                    completed && signer.completed_at
+                                      ? formatLocalDateTime(signer.completed_at) || 'time unavailable'
+                                      : null;
+                                  const signerKey = `outstanding-signer-${env.id}-${signer.id}`;
+                                  const signerHovered = hoveredSignerKey === signerKey;
+                                  return (
+                                    <div
+                                      key={signerKey}
+                                      onMouseEnter={() => setHoveredSignerKey(signerKey)}
+                                      onMouseLeave={() =>
+                                        setHoveredSignerKey((prev) => (prev === signerKey ? null : prev))
+                                      }
+                                      style={{
+                                        padding: 12,
+                                        borderRadius: 12,
+                                        border: signerHovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        background: signerHovered ? '#f5f2ff' : '#fff',
+                                        boxShadow: signerHovered ? '0 8px 18px rgba(15,23,42,0.12)' : 'none',
+                                        transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                                      }}
+                                    >
+                                      <div>
+                                        <strong>{signer.name}</strong>
+                                        <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
+                                        {completionLabel && (
+                                          <span style={{ fontSize: 11, color: palette.accentMuted }}>Completed {completionLabel}</span>
+                                        )}
+                                      </div>
+                                      <span
+                                        style={{
+                                          borderRadius: 999,
+                                          padding: '4px 10px',
+                                          fontSize: 12,
+                                          color: completed ? '#065f46' : '#92400e',
+                                          background: completed ? '#dcfce7' : '#fffbeb',
+                                          border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                                        }}
+                                      >
+                                        {completed ? 'Signed' : 'Pending'}
+                                      </span>
+                                      {signer.magic_link && (
+                                        <button
+                                          type="button"
+                                          onClick={() => navigator.clipboard.writeText(signer.magic_link)}
+                                          style={{
+                                            border: `1px solid ${palette.border}`,
+                                            borderRadius: 999,
+                                            padding: '4px 10px',
+                                            fontSize: 12,
+                                            cursor: 'pointer',
+                                            background: '#fff',
+                                            marginLeft: 8,
+                                          }}
+                                        >
+                                          Copy link
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      const item = entry.final;
                       const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${item.envelope_id}/pdf${tokenParam}`;
                       const finalEnvelope = envelopeMap[item.envelope_id];
                       const signerList = finalEnvelope?.signers ?? [];
                       const expanded = expandedFinals[item.envelope_id] ?? false;
                       const hasSigners = signerList.length > 0;
+                      const completedAtLabel = formatLocalDateTime(item.completed_at) ?? 'time unavailable';
+                      const cardSelected = selectedFinalIds.includes(item.envelope_id);
+                      const cardHovered = hoveredFinalId === item.envelope_id;
+                      const cardBackground = cardSelected
+                        ? cardHovered
+                          ? '#e4ddff'
+                          : '#ede9ff'
+                        : cardHovered
+                        ? '#f5f2ff'
+                        : '#fff';
                       return (
-                        <div key={`final-${selectedProjectId}-${item.envelope_id ?? `idx-${idx}`}-${item.sha256_final ?? 'na'}`}>
-                          <div
-                            onClick={(event) => handleCardDownload(event, downloadUrl)}
-                            onMouseEnter={() => setHoveredFinalId(item.envelope_id)}
-                            onMouseLeave={() => setHoveredFinalId((prev) => (prev === item.envelope_id ? null : prev))}
-                            style={{
-                              background:
-                                selectedFinalIds.includes(item.envelope_id) && hoveredFinalId === item.envelope_id
-                                  ? '#e4ddff'
-                                  : selectedFinalIds.includes(item.envelope_id)
-                                  ? '#ede9ff'
-                                  : hoveredFinalId === item.envelope_id
-                                  ? '#f5f2ff'
-                                  : '#fbfbfe',
-                              borderRadius: 12,
-                              padding: 12,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: 12,
-                              cursor: 'pointer',
-                              border: selectedFinalIds.includes(item.envelope_id)
-                                ? `1px solid ${palette.accent}`
-                                : `1px solid ${palette.border}`,
-                            }}
-                          >
+                        <div
+                          key={`final-${selectedProjectId}-${item.envelope_id ?? `idx-${idx}`}-${item.sha256_final ?? 'na'}`}
+                          data-document-kind="signed"
+                          onClick={(event) => handleCardDownload(event, downloadUrl)}
+                          onMouseEnter={() => setHoveredFinalId(item.envelope_id)}
+                          onMouseLeave={() => setHoveredFinalId((prev) => (prev === item.envelope_id ? null : prev))}
+                          style={{
+                            border: cardSelected ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                            borderRadius: 18,
+                            padding: 16,
+                            background: cardBackground,
+                            boxShadow: cardSelected
+                              ? '0 12px 28px rgba(108,92,231,0.25)'
+                              : cardHovered
+                              ? '0 12px 28px rgba(15,23,42,0.14)'
+                              : '0 10px 24px rgba(15,23,42,0.08)',
+                            cursor: 'pointer',
+                            transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                               {manageSignedMode && (
                                 <input
                                   type="checkbox"
-                                  checked={selectedFinalIds.includes(item.envelope_id)}
+                                  checked={cardSelected}
                                   onChange={() => toggleFinalSelection(item.envelope_id)}
+                                  onClick={(event) => event.stopPropagation()}
                                 />
                               )}
                               <div>
-                                <strong>{item.document_name}</strong>
-                                <div style={{ margin: '6px 0 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={completedChipStyle}>Completed</span>
-                                  <span style={{ fontSize: 12, color: palette.accentMuted }}>
-                                    {formatLocalDateTime(item.completed_at) ?? 'time unavailable'}
-                                  </span>
-                                </div>
+                                <strong style={{ fontSize: 16 }}>{item.document_name}</strong>
+                                <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
+                                  Completed {completedAtLabel}
+                                </p>
                               </div>
                             </div>
-                            {hasSigners && (
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setExpandedFinals((prev) => ({
-                                    ...prev,
-                                    [item.envelope_id]: !expanded,
-                                  }));
-                                }}
-                                style={{
-                                  border: `1px solid ${palette.border}`,
-                                  borderRadius: 999,
-                                  padding: '4px 12px',
-                                  background: '#fff',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                }}
-                              >
-                                {expanded ? 'Hide signees' : 'Signees'}
-                              </button>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <span style={completedChipStyle}>Completed</span>
+                              {hasSigners && (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setExpandedFinals((prev) => ({
+                                      ...prev,
+                                      [item.envelope_id]: !expanded,
+                                    }));
+                                  }}
+                                  style={{
+                                    border: `1px solid ${palette.border}`,
+                                    borderRadius: 999,
+                                    padding: '4px 12px',
+                                    background: '#fff',
+                                    cursor: 'pointer',
+                                    fontSize: 12,
+                                  }}
+                                >
+                                  {expanded ? 'Hide signees' : 'Signees'}
+                                </button>
+                              )}
+                            </div>
                           </div>
                           {expanded && hasSigners && (
                             <div
                               style={{
-                                marginTop: 8,
+                                marginTop: 16,
                                 marginLeft: manageSignedMode ? 32 : 0,
                                 display: 'flex',
                                 flexDirection: 'column',
@@ -1391,220 +1632,7 @@ useEffect(() => {
                   </div>
                 </div>
               )}
-
-              {hasOutstandingEnvelopes && (
-                <div
-                  data-testid="outstanding-envelopes-section"
-                  style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: hasSignedDocuments ? 20 : 0 }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                    <div>
-                      <h4 style={{ margin: 0 }}>Awaiting Signature</h4>
-                      <span style={{ fontSize: 12, color: palette.accentMuted }}>
-                        {outstandingEnvelopes.length} open envelopes
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <button
-                        type="button"
-                        onClick={toggleEnvelopeManage}
-                        data-testid="envelope-manage-toggle"
-                        style={{
-                          border: `1px solid ${palette.border}`,
-                          background: manageEnvelopesMode ? palette.accent : '#fff',
-                          color: manageEnvelopesMode ? '#fff' : palette.text,
-                          borderRadius: 999,
-                          padding: '4px 10px',
-                          fontSize: 12,
-                          cursor: 'pointer',
-                          boxShadow: manageEnvelopesMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
-                        }}
-                      >
-                        {manageEnvelopesMode ? 'Done' : 'Manage'}
-                      </button>
-                      {manageEnvelopesMode && (
-                        <button
-                          type="button"
-                          onClick={revokeSelectedEnvelopes}
-                          data-testid="envelope-revoke-selected"
-                          disabled={!selectedEnvelopeIds.length || revokingEnvelopes}
-                          style={{
-                            border: '1px solid rgba(220,38,38,0.8)',
-                            background: 'rgba(254,226,226,0.3)',
-                            color: '#dc2626',
-                            borderRadius: 999,
-                            padding: '6px 12px',
-                            fontSize: 13,
-                            cursor:
-                              !selectedEnvelopeIds.length || revokingEnvelopes ? 'not-allowed' : 'pointer',
-                            opacity: !selectedEnvelopeIds.length || revokingEnvelopes ? 0.5 : 1,
-                          }}
-                        >
-                          {revokingEnvelopes ? 'Revoking…' : 'Revoke Selected'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {outstandingEnvelopes.map((env) => {
-                      const expanded = expandedEnvelopes[env.id] ?? false;
-                      const hasSigners = env.total_signers > 0;
-                      const progressLabel = hasSigners
-                        ? `${env.completed_signers}/${env.total_signers} signed`
-                        : 'Incomplete setup';
-                      const buttonLabel = expanded ? 'Hide signees' : progressLabel;
-                      const documentUrl =
-                        selectedProjectId && env.document?.id
-                          ? `${baseApi}/api/projects/${selectedProjectId}/documents/${env.document.id}/pdf${tokenParam}`
-                          : null;
-                      const fileLabel = env.document?.filename || 'Untitled PDF';
-                      const envelopeHovered = hoveredEnvelopeId === env.id;
-                      const envelopeSelected = selectedEnvelopeIds.includes(env.id);
-                      return (
-                        <div
-                          key={`env-${env.id}`}
-                          onClick={(event) => documentUrl && handleCardDownload(event, documentUrl)}
-                          onMouseEnter={() => setHoveredEnvelopeId(env.id)}
-                          onMouseLeave={() =>
-                            setHoveredEnvelopeId((prev) => (prev === env.id ? null : prev))
-                          }
-                          style={{
-                            border:
-                              envelopeSelected || envelopeHovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
-                            borderRadius: 18,
-                            padding: 16,
-                            background: envelopeSelected
-                              ? envelopeHovered
-                                ? '#e4ddff'
-                                : '#ede9ff'
-                              : envelopeHovered
-                              ? '#f5f2ff'
-                              : '#fff',
-                            boxShadow: envelopeSelected
-                              ? '0 12px 28px rgba(108,92,231,0.25)'
-                              : envelopeHovered
-                              ? '0 12px 28px rgba(15,23,42,0.14)'
-                              : '0 10px 24px rgba(15,23,42,0.08)',
-                            cursor: documentUrl ? 'pointer' : 'default',
-                            transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              {manageEnvelopesMode && (
-                                <input
-                                  type="checkbox"
-                                  checked={envelopeSelected}
-                                  onChange={() => toggleEnvelopeSelection(env.id)}
-                                />
-                              )}
-                              <div>
-                                <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
-                                <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
-                                  {formatSentLabel(env.created_at)}
-                                </p>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setExpandedEnvelopes((prev) => ({
-                                    ...prev,
-                                    [env.id]: !expanded,
-                                  }))
-                                }
-                                style={{
-                                  border: `1px solid ${palette.border}`,
-                                  borderRadius: 999,
-                                  padding: '4px 12px',
-                                  background: '#fff',
-                                  cursor: 'pointer',
-                                  fontSize: 12,
-                                }}
-                                  >
-                                    {buttonLabel}
-                                  </button>
-                            </div>
-                          </div>
-                          {expanded && (
-                            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {env.signers.map((signer) => {
-                                const completed = signer.status === 'completed';
-                                const completionLabel =
-                                  completed && signer.completed_at
-                                    ? formatLocalDateTime(signer.completed_at) || 'time unavailable'
-                                    : null;
-                                const signerKey = `outstanding-signer-${env.id}-${signer.id}`;
-                                const signerHovered = hoveredSignerKey === signerKey;
-                                return (
-                                  <div
-                                    key={signerKey}
-                                    onMouseEnter={() => setHoveredSignerKey(signerKey)}
-                                    onMouseLeave={() =>
-                                      setHoveredSignerKey((prev) => (prev === signerKey ? null : prev))
-                                    }
-                                    style={{
-                                      padding: 12,
-                                      borderRadius: 12,
-                                      border: signerHovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center',
-                                      background: signerHovered ? '#f5f2ff' : '#fff',
-                                      boxShadow: signerHovered ? '0 8px 18px rgba(15,23,42,0.12)' : 'none',
-                                      transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
-                                    }}
-                                  >
-                                    <div>
-                                      <strong>{signer.name}</strong>
-                                      <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
-                                      {completionLabel && (
-                                        <span style={{ fontSize: 11, color: palette.accentMuted }}>Completed {completionLabel}</span>
-                                      )}
-                                    </div>
-                                    <span
-                                      style={{
-                                        borderRadius: 999,
-                                        padding: '4px 10px',
-                                        fontSize: 12,
-                                        color: completed ? '#065f46' : '#92400e',
-                                        background: completed ? '#dcfce7' : '#fffbeb',
-                                        border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
-                                      }}
-                                    >
-                                      {completed ? 'Signed' : 'Pending'}
-                                    </span>
-                                    {signer.magic_link && (
-                                      <button
-                                        type="button"
-                                        onClick={() => navigator.clipboard.writeText(signer.magic_link)}
-                                        style={{
-                                          border: `1px solid ${palette.border}`,
-                                          borderRadius: 999,
-                                          padding: '4px 10px',
-                                          fontSize: 12,
-                                          cursor: 'pointer',
-                                          background: '#fff',
-                                          marginLeft: 8,
-                                        }}
-                                      >
-                                        Copy link
-                                      </button>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {!hasSignedDocuments && !hasOutstandingEnvelopes && (
+              {!hasDocuments && (
                 <div
                   style={{
                     border: `1px dashed ${palette.border}`,
@@ -1876,7 +1904,7 @@ useEffect(() => {
                     opacity: !selectedInvestorIds.length && !deletingInvestors ? 0.5 : 1,
                   }}
                 >
-                  {deletingInvestors ? 'Removing…' : 'Remove'}
+                  {deletingInvestors ? 'Deleting…' : 'Delete'}
                 </button>
               )}
             </div>

@@ -236,11 +236,13 @@ test.describe('Admin portal', () => {
     await completeLogin(page);
     await waitForDashboard(page);
 
-    const signedSection = page.getByTestId('signed-documents-section');
-    await signedSection.getByTestId('signed-manage-toggle').click();
-    const signedCheckbox = signedSection.getByRole('checkbox').first();
+    const documentsManageToggle = page.getByTestId('documents-manage-toggle');
+    await documentsManageToggle.click();
+    const deleteButton = page.getByTestId('documents-delete-selected');
+    await expect(deleteButton).toBeDisabled();
+    const signedCheckbox = page.locator('[data-document-kind="signed"]').getByRole('checkbox').first();
     await signedCheckbox.check();
-    await expect(signedSection.getByTestId('signed-delete-selected')).toBeEnabled();
+    await expect(deleteButton).toBeEnabled();
 
     await page.route('**/api/projects/*/final-artifacts/*', async (route) => {
       await route.fulfill(jsonResponse({ removed: true }));
@@ -249,17 +251,14 @@ test.describe('Admin portal', () => {
     const deleteDialog = page.waitForEvent('dialog');
     await Promise.all([
       deleteDialog.then((dialog) => dialog.accept()),
-      signedSection.getByTestId('signed-delete-selected').click(),
+      deleteButton.click(),
     ]);
 
-    await expect(page.getByTestId('signed-documents-section')).toHaveCount(0);
+    await expect(page.locator('[data-document-kind="signed"]')).toHaveCount(0);
 
-    const envelopeSection = page.getByTestId('outstanding-envelopes-section');
-    await envelopeSection.getByTestId('envelope-manage-toggle').click();
-    const envelopeCheckbox = envelopeSection.getByRole('checkbox').first();
+    const envelopeCheckbox = page.locator('[data-document-kind="awaiting"]').getByRole('checkbox').first();
     await envelopeCheckbox.check();
-    const revokeSelectedButton = envelopeSection.getByTestId('envelope-revoke-selected');
-    await expect(revokeSelectedButton).toBeEnabled();
+    await expect(deleteButton).toBeEnabled();
 
     await page.route('**/api/projects/*/envelopes/*', async (route) => {
       await route.fulfill(jsonResponse({ revoked: true }));
@@ -268,10 +267,11 @@ test.describe('Admin portal', () => {
     const revokeDialog = page.waitForEvent('dialog');
     await Promise.all([
       revokeDialog.then((dialog) => dialog.accept()),
-      revokeSelectedButton.click(),
+      deleteButton.click(),
     ]);
 
-    await expect(page.getByTestId('outstanding-envelopes-section')).toHaveCount(0);
+    await expect(page.locator('[data-document-kind="awaiting"]')).toHaveCount(0);
+    await expect(page.getByTestId('documents-list-section')).toHaveCount(0);
   });
 
   test('request sign only creates envelope after final submit', async ({ page }) => {

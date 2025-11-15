@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, MouseEvent, FormEvent, CSSProperties, KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, FormEvent, CSSProperties, KeyboardEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
 
@@ -78,6 +78,15 @@ const awaitingChipStyle = {
   padding: '2px 8px',
   fontSize: 12,
   fontWeight: 600,
+};
+const documentLinkStyle: CSSProperties = {
+  fontSize: 16,
+  color: palette.accent,
+  textDecoration: 'underline',
+  fontWeight: 600,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
 };
 const usePrimaryButtonStyle = (
   enabled: boolean,
@@ -798,12 +807,6 @@ useEffect(() => {
   const goToRequestSign = () => {
     if (!canRequestSignatures || !selectedProjectId) return;
     window.location.href = `/request-sign?project=${selectedProjectId}`;
-  };
-
-  const handleCardDownload = (event: MouseEvent<HTMLElement>, url: string) => {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('input') || target?.closest('button') || target?.closest('a')) return;
-    window.open(url, '_blank');
   };
 
   const createProject = async () => {
@@ -1587,7 +1590,6 @@ useEffect(() => {
                           <div
                             key={`env-${env.id}`}
                             data-document-kind="awaiting"
-                            onClick={(event) => documentUrl && handleCardDownload(event, documentUrl)}
                             onMouseEnter={() => setHoveredEnvelopeId(env.id)}
                             onMouseLeave={() =>
                               setHoveredEnvelopeId((prev) => (prev === env.id ? null : prev))
@@ -1611,7 +1613,6 @@ useEffect(() => {
                                 : envelopeHovered
                                 ? '0 12px 28px rgba(15,23,42,0.14)'
                                 : '0 10px 24px rgba(15,23,42,0.08)',
-                              cursor: documentUrl ? 'pointer' : 'default',
                               transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                             }}
                           >
@@ -1634,7 +1635,13 @@ useEffect(() => {
                                   />
                                 )}
                                 <div>
-                                  <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
+                                  {documentUrl ? (
+                                    <a href={documentUrl} target="_blank" rel="noreferrer" style={documentLinkStyle}>
+                                      <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
+                                    </a>
+                                  ) : (
+                                    <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
+                                  )}
                                   <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
                                     {formatSentLabel(env.created_at)}
                                   </p>
@@ -1758,7 +1765,6 @@ useEffect(() => {
                         <div
                           key={`final-${selectedProjectId}-${item.envelope_id ?? `idx-${idx}`}-${item.sha256_final ?? 'na'}`}
                           data-document-kind="signed"
-                          onClick={(event) => handleCardDownload(event, downloadUrl)}
                           onMouseEnter={() => setHoveredFinalId(item.envelope_id)}
                           onMouseLeave={() => setHoveredFinalId((prev) => (prev === item.envelope_id ? null : prev))}
                           style={{
@@ -1771,7 +1777,6 @@ useEffect(() => {
                               : cardHovered
                               ? '0 12px 28px rgba(15,23,42,0.14)'
                               : '0 10px 24px rgba(15,23,42,0.08)',
-                            cursor: 'pointer',
                             transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                           }}
                         >
@@ -1794,7 +1799,9 @@ useEffect(() => {
                                 />
                               )}
                               <div>
-                                <strong style={{ fontSize: 16 }}>{item.document_name}</strong>
+                                <a href={downloadUrl} target="_blank" rel="noreferrer" style={documentLinkStyle}>
+                                  <strong style={{ fontSize: 16 }}>{item.document_name}</strong>
+                                </a>
                                 <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
                                   Completed {completedAtLabel}
                                 </p>

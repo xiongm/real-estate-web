@@ -30,6 +30,18 @@ Services:
 - Redis: localhost:6379
 - Tests: `docker compose run --rm api-tests`
 
+## Local dev loop (Docker backend + local Next.js)
+- Start supporting services (API worker, DB, Redis, MinIO) inside Docker while running `npm run dev` locally:
+  ```bash
+  ./scripts/dev-services.sh start
+  cd web && npm run dev
+  ```
+- Stop the Docker-managed services when you’re done:
+  ```bash
+  ./scripts/dev-services.sh stop
+  ```
+- Check their status anytime with `./scripts/dev-services.sh status`.
+
 ## Workflow
 1. **Manage projects:** Use the Admin sidebar inside the web app (you'll be prompted for the admin access token) to create projects. Investor management now lives exclusively in Admin; the request-sign builder is read-only and simply reflects the investors tied to the currently selected project. Each project automatically gets its own access token, visible inside the **Share** tab in the center pane—share that token with investors when you want to grant read-only API access.
 2. **Upload documents:** Call `POST /api/projects/{id}/documents` (or use whatever admin UI you build) to upload PDFs into MinIO for that project.

@@ -1328,23 +1328,6 @@ useEffect(() => {
           </div>
         )}
       </div>
-      <button
-        type="button"
-        onClick={logout}
-        style={{
-          marginTop: 8,
-          border: `1px solid ${palette.accent}`,
-          background: '#fff',
-          color: palette.accent,
-          borderRadius: 999,
-          padding: '6px 12px',
-          fontSize: 12,
-          cursor: 'pointer',
-          fontWeight: 600,
-        }}
-      >
-        Sign out
-      </button>
     </>
   );
 
@@ -1406,8 +1389,23 @@ useEffect(() => {
           boxShadow: '0 10px 30px rgba(17, 24, 39, 0.05)',
         }}
       >
-        {projectSidebarContent}
-      
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>{projectSidebarContent}</div>
+        <button
+          type="button"
+          onClick={logout}
+          style={{
+            border: `1px solid ${palette.accent}`,
+            background: '#fff',
+            color: palette.accent,
+            borderRadius: 999,
+            padding: '6px 12px',
+            fontSize: 12,
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          Sign out
+        </button>
       </aside>
       <main className="admin-main" style={{ flex: 1, display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24, padding: 32 }}>
         <section

@@ -77,8 +77,21 @@ class ProjectInvestor(SQLModel, table=True):
     role: str = "Investor"
     routing_order: int = 1
     units_invested: float = 0.0
+    mailing_address: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_routing_number: Optional[str] = None
     metadata_json: str = "{}"
     created_at: datetime = ORMField(default_factory=datetime.utcnow)
+
+class ProjectFile(SQLModel, table=True):
+    id: Optional[int] = ORMField(default=None, primary_key=True)
+    project_id: int
+    display_name: str
+    stored_filename: str
+    content_type: Optional[str] = None
+    s3_key: str
+    uploaded_at: datetime = ORMField(default_factory=datetime.utcnow)
 
 class SigningSession(SQLModel, table=True):
     id: Optional[int] = ORMField(default=None, primary_key=True)

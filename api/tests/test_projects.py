@@ -84,12 +84,29 @@ def test_project_summary_with_project_token(client):
     project_id, token = create_project(client, "Investor Pack")
     assert token
     document = upload_document(client, project_id, filename="pack.pdf", content=b"bytes")
+    investor_payload = {
+        "name": "Investor 1",
+        "email": "investor1@example.com",
+        "units_invested": 100,
+        "mailing_address": "123 Anywhere St, Springfield",
+        "bank_name": "Figma Bank",
+        "bank_account_number": "123456789",
+        "bank_routing_number": "021000021",
+    }
     inv_response = client.post(
         f"/api/projects/{project_id}/investors",
-        json={"name": "Investor 1", "email": "investor1@example.com", "units_invested": 100},
+        json=investor_payload,
         headers=ADMIN_HEADERS,
     )
     assert inv_response.status_code == 201
+
+    file_resp = client.post(
+        f"/api/projects/{project_id}/files",
+        data={"label": "Offering Memo"},
+        files={"file": ("memo.pdf", b"memo-data", "application/pdf")},
+        headers=ADMIN_HEADERS,
+    )
+    assert file_resp.status_code == 201
 
     summary_resp = client.get(
         f"/api/projects/{project_id}/summary",
@@ -100,6 +117,13 @@ def test_project_summary_with_project_token(client):
     assert body["project"]["name"] == "Investor Pack"
     assert any(doc["id"] == document["id"] for doc in body["documents"])
     assert len(body["investors"]) == 1
+    investor_view = body["investors"][0]
+    assert investor_view["mailing_address"] == investor_payload["mailing_address"]
+    assert investor_view["bank_name"] == investor_payload["bank_name"]
+    assert investor_view["bank_account_number"] == investor_payload["bank_account_number"]
+    assert investor_view["bank_routing_number"] == investor_payload["bank_routing_number"]
+    assert len(body["project_files"]) == 1
+    assert body["project_files"][0]["display_name"] == "Offering Memo"
 
 
 def test_document_download_allows_query_token(client, mock_storage):
@@ -124,6 +148,42 @@ def test_document_download_returns_original_file(client, mock_storage):
     assert response.status_code == 200
     assert response.content == b"pdf-bytes"
     assert "investor-pack.pdf" in response.headers.get("content-disposition", "")
+
+
+def test_project_files_upload_list_delete(client, mock_storage):
+    project_id, _ = create_project(client, "General Docs")
+    upload_resp = client.post(
+        f"/api/projects/{project_id}/files",
+        data={"label": "Pitch Deck"},
+        files={"file": ("deck.pdf", b"deck-bytes", "application/pdf")},
+        headers=ADMIN_HEADERS,
+    )
+    assert upload_resp.status_code == 201
+    file_doc = upload_resp.json()
+    assert file_doc["display_name"] == "Pitch Deck"
+
+    list_resp = client.get(f"/api/projects/{project_id}/files", headers=ADMIN_HEADERS)
+    assert list_resp.status_code == 200
+    files = list_resp.json()
+    assert len(files) == 1
+    file_id = files[0]["id"]
+
+    download_resp = client.get(
+        f"/api/projects/{project_id}/files/{file_id}/download",
+        headers=ADMIN_HEADERS,
+    )
+    assert download_resp.status_code == 200
+    assert download_resp.content == b"deck-bytes"
+
+    delete_resp = client.delete(
+        f"/api/projects/{project_id}/files/{file_id}",
+        headers=ADMIN_HEADERS,
+    )
+    assert delete_resp.status_code == 204
+
+    list_after = client.get(f"/api/projects/{project_id}/files", headers=ADMIN_HEADERS)
+    assert list_after.status_code == 200
+    assert list_after.json() == []
 
 
 def test_project_delete_cascades_all_records(client, test_engine, mock_storage):

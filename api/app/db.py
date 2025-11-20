@@ -6,10 +6,11 @@ from .config import DATABASE_URL
 engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
 
 def init_db():
-    from .models import Tenant, User, Project, Document, Envelope, Signer, Field, SigningSession, Event, FinalArtifact, SignerFieldValue, ProjectInvestor
+    from .models import Tenant, User, Project, Document, Envelope, Signer, Field, SigningSession, Event, FinalArtifact, SignerFieldValue, ProjectInvestor, ProjectFile
     SQLModel.metadata.create_all(engine)
     _ensure_project_access_column()
     _ensure_project_name_unique_index()
+    _ensure_investor_contact_columns()
 
 def get_session():
     with Session(engine) as session:
@@ -47,3 +48,24 @@ def _ensure_project_name_unique_index():
             )
             return
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_project_name ON project(name)"))
+
+
+def _ensure_investor_contact_columns():
+    inspector = inspect(engine)
+    try:
+        columns = [col["name"] for col in inspector.get_columns("projectinvestor")]
+    except Exception:
+        return
+    required = {
+        "mailing_address": "TEXT",
+        "bank_name": "TEXT",
+        "bank_account_number": "TEXT",
+        "bank_routing_number": "TEXT",
+    }
+    missing = [col for col in required if col not in columns]
+    if not missing:
+        return
+    with engine.begin() as conn:
+        for column, column_type in required.items():
+            if column not in columns:
+                conn.execute(text(f"ALTER TABLE projectinvestor ADD COLUMN {column} {column_type}"))

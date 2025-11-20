@@ -17,7 +17,22 @@ type ProjectSummary = {
   project: { id: number; name: string; status: string };
   documents: Array<{ id: number; filename: string; created_at: string }>;
   signed_documents: Array<{ envelope_id: number; document_id: number; document_name: string; completed_at: string }>;
-  investors: Array<{ id: number; name: string; email: string; units_invested: number }>;
+  project_files: Array<{
+    id: number;
+    display_name: string;
+    stored_filename: string;
+    uploaded_at: string;
+  }>;
+  investors: Array<{
+    id: number;
+    name: string;
+    email: string;
+    units_invested: number;
+    mailing_address?: string | null;
+    bank_name?: string | null;
+    bank_account_number?: string | null;
+    bank_routing_number?: string | null;
+  }>;
 };
 
 type RouteParams = { id: string; token: string };
@@ -153,6 +168,45 @@ export default function ProjectViewerPage() {
                             </span>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <h3 style={{ margin: 0 }}>Project Documents</h3>
+                    <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                      {summary.project_files.length || 0} file{summary.project_files.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <p style={{ margin: '6px 0 16px', color: palette.accentMuted }}>
+                    Download general project materials shared by the sponsor.
+                  </p>
+                  {summary.project_files.length === 0 ? (
+                    <p style={{ color: palette.accentMuted }}>No files available.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {summary.project_files.map((file) => (
+                        <a
+                          key={file.id}
+                          href={`${baseApi}/api/projects/${projectId}/files/${file.id}/download?token=${token}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            borderRadius: 16,
+                            border: `1px solid ${palette.border}`,
+                            padding: 16,
+                            background: 'rgba(15,23,42,0.65)',
+                            color: palette.accent,
+                            textDecoration: 'none',
+                          }}
+                          className="admin-document-link"
+                        >
+                          <strong style={{ display: 'block', fontSize: 15, color: '#fff' }}>{file.display_name}</strong>
+                          <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                            Uploaded {new Date(file.uploaded_at).toLocaleString()}
+                          </span>
+                        </a>
                       ))}
                     </div>
                   )}

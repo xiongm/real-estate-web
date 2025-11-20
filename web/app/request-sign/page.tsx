@@ -68,6 +68,10 @@ type ProjectInvestor = {
   role: string;
   routing_order: number;
   units_invested: number;
+  mailing_address?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
+  bank_routing_number?: string | null;
 };
 
 type EnvelopeSignerPayload = {

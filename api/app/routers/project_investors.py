@@ -40,6 +40,10 @@ def create_investor(
         role=payload.role,
         routing_order=payload.routing_order,
         units_invested=payload.units_invested,
+        mailing_address=payload.mailing_address,
+        bank_name=payload.bank_name,
+        bank_account_number=payload.bank_account_number,
+        bank_routing_number=payload.bank_routing_number,
         metadata_json=payload.metadata_json or "{}",
     )
     session.add(investor)

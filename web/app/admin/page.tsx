@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, FormEvent, CSSProperties, KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, FormEvent, CSSProperties, KeyboardEvent, ChangeEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
 
@@ -45,6 +45,18 @@ type Investor = {
   email: string;
   units_invested: number;
   role: string;
+  mailing_address?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
+  bank_routing_number?: string | null;
+};
+
+type ProjectFile = {
+  id: number;
+  display_name: string;
+  stored_filename: string;
+  content_type: string | null;
+  uploaded_at: string;
 };
 
 const palette = {
@@ -160,17 +172,33 @@ export default function AdminPage() {
   const [loadingInvestors, setLoadingInvestors] = useState(false);
   const [manageInvestorsMode, setManageInvestorsMode] = useState(false);
   const [selectedInvestorIds, setSelectedInvestorIds] = useState<number[]>([]);
-  const [showInvestorForm, setShowInvestorForm] = useState(false);
-  const [newInvestorName, setNewInvestorName] = useState('');
-  const [newInvestorEmail, setNewInvestorEmail] = useState('');
-  const [newInvestorUnits, setNewInvestorUnits] = useState<string>('');
-  const [creatingInvestor, setCreatingInvestor] = useState(false);
-  const [hoveredInvestorId, setHoveredInvestorId] = useState<number | null>(null);
-  const [editingInvestorId, setEditingInvestorId] = useState<number | null>(null);
-  const [editingInvestorName, setEditingInvestorName] = useState('');
-  const [editingInvestorEmail, setEditingInvestorEmail] = useState('');
-  const [editingInvestorUnits, setEditingInvestorUnits] = useState<string>('');
-  const [editingInvestorSaving, setEditingInvestorSaving] = useState(false);
+const [showInvestorForm, setShowInvestorForm] = useState(false);
+const [newInvestorName, setNewInvestorName] = useState('');
+const [newInvestorEmail, setNewInvestorEmail] = useState('');
+const [newInvestorUnits, setNewInvestorUnits] = useState<string>('');
+const [newInvestorMailing, setNewInvestorMailing] = useState('');
+const [newInvestorBankName, setNewInvestorBankName] = useState('');
+const [newInvestorBankAccount, setNewInvestorBankAccount] = useState('');
+const [newInvestorBankRouting, setNewInvestorBankRouting] = useState('');
+const [creatingInvestor, setCreatingInvestor] = useState(false);
+const [hoveredInvestorId, setHoveredInvestorId] = useState<number | null>(null);
+const [editingInvestorId, setEditingInvestorId] = useState<number | null>(null);
+const [editingInvestorName, setEditingInvestorName] = useState('');
+const [editingInvestorEmail, setEditingInvestorEmail] = useState('');
+const [editingInvestorUnits, setEditingInvestorUnits] = useState<string>('');
+const [editingInvestorMailing, setEditingInvestorMailing] = useState('');
+const [editingInvestorBankName, setEditingInvestorBankName] = useState('');
+const [editingInvestorBankAccount, setEditingInvestorBankAccount] = useState('');
+const [editingInvestorBankRouting, setEditingInvestorBankRouting] = useState('');
+const [editingInvestorSaving, setEditingInvestorSaving] = useState(false);
+const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
+const [projectFilesLoading, setProjectFilesLoading] = useState(false);
+const [projectFileUploadName, setProjectFileUploadName] = useState('');
+const [projectFileUploadFile, setProjectFileUploadFile] = useState<File | null>(null);
+const [projectFileUploading, setProjectFileUploading] = useState(false);
+const [projectFileDeletingId, setProjectFileDeletingId] = useState<number | null>(null);
+const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+const [hoveredProjectFileId, setHoveredProjectFileId] = useState<number | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
   const [editingProjectName, setEditingProjectName] = useState('');
   const [editingProjectSaving, setEditingProjectSaving] = useState(false);
@@ -187,7 +215,7 @@ export default function AdminPage() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [manageProjectsMode, setManageProjectsMode] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
-  const [centerTab, setCenterTab] = useState<'documents' | 'share' | 'investors'>('documents');
+const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors'>('documents');
   const [deletingInvestors, setDeletingInvestors] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
@@ -430,9 +458,17 @@ useEffect(() => {
     };
   }, [selectedProjectId, adminToken]);
 
-  useEffect(() => {
-    setCenterTab('documents');
-  }, [selectedProjectId]);
+useEffect(() => {
+  if (!selectedProjectId || !adminToken) {
+    setProjectFiles([]);
+    return;
+  }
+  loadProjectFiles(selectedProjectId);
+}, [selectedProjectId, adminToken]);
+
+useEffect(() => {
+  setCenterTab('documents');
+}, [selectedProjectId]);
 
   useEffect(() => {
     if (initialPageReady) return;
@@ -448,6 +484,84 @@ useEffect(() => {
     setNewInvestorName('');
     setNewInvestorEmail('');
     setNewInvestorUnits('');
+    setNewInvestorMailing('');
+    setNewInvestorBankName('');
+    setNewInvestorBankAccount('');
+    setNewInvestorBankRouting('');
+  };
+
+  const loadProjectFiles = async (projectId: number) => {
+    if (!adminToken) return;
+    setProjectFilesLoading(true);
+    try {
+      const resp = await fetch(`${baseApi}/api/projects/${projectId}/files`, {
+        headers: { 'X-Access-Token': adminToken },
+      });
+      if (!resp.ok) throw new Error(`Failed to load documents (${resp.status})`);
+      const list = await resp.json();
+      setProjectFiles(list || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load documents');
+    } finally {
+      setProjectFilesLoading(false);
+    }
+  };
+
+  const handleProjectFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setProjectFileUploadFile(file);
+    if (file) {
+      setProjectFileUploadName(file.name);
+      setShowDocumentUpload(true);
+    }
+    setHoveredProjectFileId(null);
+  };
+
+  const uploadProjectFile = async () => {
+    if (!selectedProjectId || !adminToken || !projectFileUploadFile) {
+      setError('Select a project and document to upload.');
+      return;
+    }
+    const label = projectFileUploadName.trim() || projectFileUploadFile.name || 'Project document';
+    const formData = new FormData();
+    formData.append('file', projectFileUploadFile);
+    formData.append('label', label);
+    setProjectFileUploading(true);
+    try {
+      const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/files`, {
+        method: 'POST',
+        headers: { 'X-Access-Token': adminToken },
+        body: formData,
+      });
+      if (!resp.ok) throw new Error(`Failed to upload document (${resp.status})`);
+      const created = await resp.json();
+      setProjectFiles((prev) => [created, ...prev]);
+      setProjectFileUploadFile(null);
+      setProjectFileUploadName('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload document');
+    } finally {
+      setProjectFileUploading(false);
+    }
+  };
+
+  const deleteProjectFile = async (fileId: number) => {
+    if (!selectedProjectId || !adminToken) return;
+    const confirmed = window.confirm('Delete this document?');
+    if (!confirmed) return;
+    setProjectFileDeletingId(fileId);
+    try {
+      const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/files/${fileId}`, {
+        method: 'DELETE',
+        headers: { 'X-Access-Token': adminToken },
+      });
+      if (!resp.ok) throw new Error(`Failed to delete document (${resp.status})`);
+      setProjectFiles((prev) => prev.filter((file) => file.id !== fileId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete document');
+    } finally {
+      setProjectFileDeletingId((prev) => (prev === fileId ? null : prev));
+    }
   };
 
   const loadInvestors = async (projectId: number) => {
@@ -467,6 +581,10 @@ useEffect(() => {
       setEditingInvestorName('');
       setEditingInvestorEmail('');
       setEditingInvestorUnits('');
+      setEditingInvestorMailing('');
+      setEditingInvestorBankName('');
+      setEditingInvestorBankAccount('');
+      setEditingInvestorBankRouting('');
       setEditingInvestorSaving(false);
       setHoveredInvestorId(null);
     } catch (err) {
@@ -494,8 +612,18 @@ useEffect(() => {
     setEditingInvestorName('');
     setEditingInvestorEmail('');
     setEditingInvestorUnits('');
+    setEditingInvestorMailing('');
+    setEditingInvestorBankName('');
+    setEditingInvestorBankAccount('');
+    setEditingInvestorBankRouting('');
     setEditingInvestorSaving(false);
     setHoveredInvestorId(null);
+    setProjectFiles([]);
+    setProjectFileUploadFile(null);
+    setProjectFileUploadName('');
+    setProjectFileUploading(false);
+    setProjectFileDeletingId(null);
+    setHoveredProjectFileId(null);
     return project;
   }, [projects, selectedProjectId]);
   const selectedProjectToken = selectedProject?.access_token ?? null;
@@ -516,7 +644,6 @@ useEffect(() => {
     return `${base}/projects/${selectedProject.id}/${selectedProjectToken}`;
   }, [selectedProject, selectedProjectToken]);
   const hasInvestors = investors.length > 0;
-  const hasSignedDocuments = finals.length > 0;
   const hasOutstandingEnvelopes = outstandingEnvelopes.length > 0;
   const documentEntries = useMemo(
     () => [
@@ -525,20 +652,22 @@ useEffect(() => {
     ],
     [outstandingEnvelopes, finals],
   );
-  const hasDocuments = documentEntries.length > 0;
+  const hasSignaturesAvailable = documentEntries.length > 0;
+  const hasProjectFiles = projectFiles.length > 0;
   const canRequestSignatures = Boolean(selectedProjectId && hasInvestors);
   const totalInvestorUnits = useMemo(
     () => investors.reduce((sum, investor) => sum + (investor.units_invested || 0), 0),
     [investors],
   );
+  const totalDocumentsCount = documentEntries.length + projectFiles.length;
   const docStats = useMemo(
     () => [
       { label: 'Investors', value: investors.length.toString() },
       { label: 'Shares committed', value: `$${totalInvestorUnits.toLocaleString('en-US')}` },
-      { label: 'Documents', value: documentEntries.length.toString() },
-      { label: 'Awaiting', value: outstandingEnvelopes.length.toString() },
+      { label: 'Documents', value: totalDocumentsCount.toString() },
+      { label: 'Awaiting signatures', value: outstandingEnvelopes.length.toString() },
     ],
-    [documentEntries.length, outstandingEnvelopes.length, investors.length, totalInvestorUnits],
+    [totalDocumentsCount, outstandingEnvelopes.length, investors.length, totalInvestorUnits],
   );
   const pageTitle = useMemo(
     () => (selectedProject ? `${selectedProject.name} | Admin` : 'Admin Portal'),
@@ -551,7 +680,7 @@ useEffect(() => {
   }, [pageTitle]);
 
   useEffect(() => {
-    if (!hasDocuments && manageDocumentsMode) {
+    if (!hasSignaturesAvailable && manageDocumentsMode) {
       setManageDocumentsMode(false);
       setManageSignedMode(false);
       setManageEnvelopesMode(false);
@@ -559,7 +688,7 @@ useEffect(() => {
       setSelectedEnvelopeIds([]);
       setRevokingEnvelopes(false);
     }
-  }, [hasDocuments, manageDocumentsMode]);
+  }, [hasSignaturesAvailable, manageDocumentsMode]);
 
   const toggleFinalSelection = (id: number) => {
     setSelectedFinalIds((prev) => (prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]));
@@ -688,6 +817,32 @@ useEffect(() => {
     });
   };
 
+  const exportInvestorsCsv = () => {
+    if (!investors.length) return;
+    const headers = ['Name', 'Email', 'Units', 'Mailing Address', 'Bank Name', 'Account Number', 'Routing Number'];
+    const rows = investors.map((inv) => [
+      inv.name,
+      inv.email,
+      typeof inv.units_invested === 'number' ? inv.units_invested.toString() : '',
+      inv.mailing_address ?? '',
+      inv.bank_name ?? '',
+      inv.bank_account_number ?? '',
+      inv.bank_routing_number ?? '',
+    ]);
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = selectedProject?.name ? `${selectedProject.name}-investors.csv` : 'investors.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const toggleInvestorSelection = (id: number) => {
     setSelectedInvestorIds((prev) => (prev.includes(id) ? prev.filter((iid) => iid !== id) : [...prev, id]));
   };
@@ -725,6 +880,10 @@ useEffect(() => {
     setEditingInvestorUnits(
       typeof investor.units_invested === 'number' ? String(investor.units_invested) : '',
     );
+    setEditingInvestorMailing(investor.mailing_address ?? '');
+    setEditingInvestorBankName(investor.bank_name ?? '');
+    setEditingInvestorBankAccount(investor.bank_account_number ?? '');
+    setEditingInvestorBankRouting(investor.bank_routing_number ?? '');
   };
 
   const cancelInvestorEdit = () => {
@@ -732,6 +891,10 @@ useEffect(() => {
     setEditingInvestorName('');
     setEditingInvestorEmail('');
     setEditingInvestorUnits('');
+    setEditingInvestorMailing('');
+    setEditingInvestorBankName('');
+    setEditingInvestorBankAccount('');
+    setEditingInvestorBankRouting('');
     setEditingInvestorSaving(false);
   };
 
@@ -743,7 +906,14 @@ useEffect(() => {
       setError('Name and email are required to update an investor.');
       return;
     }
-    const payload: Record<string, unknown> = { name, email };
+    const payload: Record<string, unknown> = {
+      name,
+      email,
+      mailing_address: editingInvestorMailing.trim(),
+      bank_name: editingInvestorBankName.trim(),
+      bank_account_number: editingInvestorBankAccount.trim(),
+      bank_routing_number: editingInvestorBankRouting.trim(),
+    };
     const unitsTrimmed = editingInvestorUnits.trim();
     if (unitsTrimmed.length) {
       const parsedUnits = Number(unitsTrimmed);
@@ -794,6 +964,10 @@ useEffect(() => {
         role: 'Investor',
         routing_order: investors.length + 1,
         units_invested: units,
+        mailing_address: newInvestorMailing.trim(),
+        bank_name: newInvestorBankName.trim(),
+        bank_account_number: newInvestorBankAccount.trim(),
+        bank_routing_number: newInvestorBankRouting.trim(),
         metadata_json: '{}',
       };
       const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/investors`, {
@@ -1495,7 +1669,7 @@ useEffect(() => {
             <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
               <div>
                 <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Workflow</p>
-                <h3 style={{ margin: 0, fontSize: 20 }}>Documents & Tokens</h3>
+                <h3 style={{ margin: 0, fontSize: 20 }}>Signatures & Tokens</h3>
               </div>
               <div
                 style={{
@@ -1511,10 +1685,11 @@ useEffect(() => {
               >
                 {(
                   [
-                    { id: 'documents', label: 'Documents', icon: '📄' },
+                    { id: 'documents', label: 'Documents', icon: '📁' },
+                    { id: 'signatures', label: 'Signatures', icon: '✍️' },
                     { id: 'investors', label: 'Investors', icon: '👥' },
                     { id: 'share', label: 'Share', icon: '🔐' },
-                  ] as Array<{ id: 'documents' | 'share' | 'investors'; label: string; icon: string }>
+                  ] as Array<{ id: 'signatures' | 'documents' | 'share' | 'investors'; label: string; icon: string }>
                 ).map((tab) => {
                   const active = centerTab === tab.id;
                   return (
@@ -1547,7 +1722,7 @@ useEffect(() => {
               </div>
             </header>
             {error && <div style={{ color: '#fca5a5' }}>{error}</div>}
-            {centerTab === 'documents' && selectedProject && (
+            {centerTab === 'signatures' && selectedProject && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div
                   style={{
@@ -1558,108 +1733,108 @@ useEffect(() => {
                     gap: 12,
                   }}
                 >
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 12,
+                      width: isMobile ? '100%' : 'auto',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={toggleDocumentsManage}
+                      data-testid="signatures-manage-toggle"
+                    disabled={!hasSignaturesAvailable}
+                      style={{
+                        border: `1px solid ${palette.border}`,
+                        background: manageDocumentsMode ? palette.accent : '#fff',
+                        color: manageDocumentsMode ? '#fff' : palette.text,
+                        borderRadius: 999,
+                        padding: '4px 12px',
+                        fontSize: 12,
+                      cursor: hasSignaturesAvailable ? 'pointer' : 'not-allowed',
+                      opacity: hasSignaturesAvailable ? 1 : 0.5,
+                        boxShadow: manageDocumentsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
+                      }}
+                    >
+                      {manageDocumentsMode ? 'Done' : 'Manage'}
+                    </button>
+                    {manageDocumentsMode && (
+                      <button
+                        type="button"
+                        onClick={deleteSelectedDocuments}
+                        data-testid="signatures-delete-selected"
+                      disabled={
+                        !hasSignaturesAvailable ||
+                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
+                          actionLoading ||
+                          revokingEnvelopes
+                        }
+                        style={{
+                          border: '1px solid #dc2626',
+                          color: '#fff',
+                          background: '#dc2626',
+                          borderRadius: 999,
+                          padding: '6px 12px',
+                          fontSize: 13,
+                        cursor:
+                          !hasSignaturesAvailable ||
+                            (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
+                            actionLoading ||
+                            revokingEnvelopes
+                              ? 'not-allowed'
+                              : 'pointer',
+                        opacity:
+                          !hasSignaturesAvailable ||
+                            (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
+                            actionLoading ||
+                            revokingEnvelopes
+                              ? 0.5
+                              : 1,
+                        boxShadow:
+                          !hasSignaturesAvailable ||
+                            (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
+                            actionLoading ||
+                            revokingEnvelopes
+                              ? 'none'
+                              : '0 10px 18px rgba(220,38,38,0.25)',
+                        }}
+                      >
+                        {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete'}
+                      </button>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={goToRequestSign}
-                  disabled={!canRequestSignatures}
-                  style={usePrimaryButtonStyle(canRequestSignatures, requestButtonHovered)}
+                    disabled={!canRequestSignatures}
+                    style={usePrimaryButtonStyle(canRequestSignatures, requestButtonHovered)}
                     onMouseEnter={() => canRequestSignatures && setRequestButtonHovered(true)}
                     onMouseLeave={() => canRequestSignatures && setRequestButtonHovered(false)}
                     title={
                       canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
                     }
                   >
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 20,
-                      lineHeight: 1,
-                    }}
-                  >
-                    ✍️
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 700 }}>Request signatures</span>
-                </button>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    gap: 12,
-                    width: isMobile ? '100%' : 'auto',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={toggleDocumentsManage}
-                    data-testid="documents-manage-toggle"
-                    disabled={!hasDocuments}
-                    style={{
-                      border: `1px solid ${palette.border}`,
-                      background: manageDocumentsMode ? palette.accent : '#fff',
-                      color: manageDocumentsMode ? '#fff' : palette.text,
-                      borderRadius: 999,
-                      padding: '4px 12px',
-                      fontSize: 12,
-                      cursor: hasDocuments ? 'pointer' : 'not-allowed',
-                      opacity: hasDocuments ? 1 : 0.5,
-                      boxShadow: manageDocumentsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
-                    }}
-                  >
-                    {manageDocumentsMode ? 'Done' : 'Manage'}
-                  </button>
-                  {manageDocumentsMode && (
-                    <button
-                      type="button"
-                      onClick={deleteSelectedDocuments}
-                      data-testid="documents-delete-selected"
-                      disabled={
-                        !hasDocuments ||
-                        (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
-                        actionLoading ||
-                        revokingEnvelopes
-                      }
+                    <span
+                      aria-hidden="true"
                       style={{
-                        border: '1px solid #dc2626',
-                        color: '#fff',
-                        background: '#dc2626',
-                        borderRadius: 999,
-                        padding: '6px 12px',
-                        fontSize: 13,
-                        cursor:
-                          !hasDocuments ||
-                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
-                          actionLoading ||
-                          revokingEnvelopes
-                            ? 'not-allowed'
-                            : 'pointer',
-                        opacity:
-                          !hasDocuments ||
-                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
-                          actionLoading ||
-                          revokingEnvelopes
-                            ? 0.5
-                            : 1,
-                        boxShadow:
-                          !hasDocuments ||
-                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
-                          actionLoading ||
-                          revokingEnvelopes
-                            ? 'none'
-                            : '0 10px 18px rgba(220,38,38,0.25)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 20,
+                        lineHeight: 1,
                       }}
                     >
-                      {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete'}
-                    </button>
-                  )}
+                      ✍️
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 700 }}>Request signatures</span>
+                  </button>
                 </div>
-              </div>
 
-              {hasDocuments && (
-                <div data-testid="documents-list-section" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {hasSignaturesAvailable && (
+                <div data-testid="signatures-list-section" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {documentEntries.map((entry, idx) => {
                       if (entry.kind === 'awaiting') {
@@ -2003,7 +2178,7 @@ useEffect(() => {
                   </div>
                 </div>
               )}
-              {!hasDocuments && (
+              {!hasSignaturesAvailable && (
                 <div
                   style={{
                     border: `1px dashed ${palette.border}`,
@@ -2021,7 +2196,7 @@ useEffect(() => {
               )}
             </div>
           )}
-          {centerTab === 'documents' && !selectedProject && (
+          {centerTab === 'signatures' && !selectedProject && (
             <div
               style={{
                 padding: 32,
@@ -2032,6 +2207,208 @@ useEffect(() => {
               }}
             >
               Select a project on the left to review its uploaded PDFs and signed packets.
+            </div>
+          )}
+          {centerTab === 'documents' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {!selectedProjectId ? (
+                <div
+                  style={{
+                    padding: 32,
+                    border: '1px dashed rgba(148,163,184,0.4)',
+                    borderRadius: 16,
+                    textAlign: 'center',
+                    color: palette.accentMuted,
+                  }}
+                >
+                  Select a project to upload documents.
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: 20,
+                      padding: 20,
+                      background: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      boxShadow: shadows.subtle,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 12,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div>
+                        <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Documents</p>
+                        <h4 style={{ margin: '4px 0 0' }}>Share project files with your team</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowDocumentUpload((prev) => !prev)}
+                        style={{
+                          border: 'none',
+                          borderRadius: 999,
+                          padding: '8px 16px',
+                          background: palette.accent,
+                          color: '#fff',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <svg
+                          aria-hidden="true"
+                          width={18}
+                          height={18}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M12 16V4" />
+                          <path d="M6 10l6-6 6 6" />
+                          <rect x="4" y="16" width="16" height="4" rx="1" />
+                        </svg>
+                        {showDocumentUpload ? 'Close' : 'Upload document'}
+                      </button>
+                    </div>
+                    {showDocumentUpload && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <input
+                          type="text"
+                          placeholder="Document name"
+                          value={projectFileUploadName}
+                          onChange={(event) => setProjectFileUploadName(event.target.value)}
+                          style={{
+                            padding: 10,
+                            borderRadius: 10,
+                            border: `1px solid ${palette.border}`,
+                          }}
+                        />
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,application/pdf,application/msword,application/vnd.ms-powerpoint,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                          onChange={handleProjectFileSelection}
+                          style={{ padding: 6 }}
+                        />
+                        {projectFileUploadFile && (
+                          <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
+                            Selected: {projectFileUploadFile.name} ({Math.round(projectFileUploadFile.size / 1024)} KB)
+                          </p>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={uploadProjectFile}
+                            disabled={!projectFileUploadFile || projectFileUploading}
+                            style={{
+                              border: 'none',
+                              borderRadius: 999,
+                              padding: '8px 18px',
+                              background:
+                                !projectFileUploadFile || projectFileUploading ? 'rgba(37,99,235,0.3)' : palette.accent,
+                              color: '#fff',
+                              fontWeight: 600,
+                              cursor: !projectFileUploadFile || projectFileUploading ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            {projectFileUploading ? 'Uploading…' : 'Upload'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p style={{ margin: '0 0 8px', fontSize: 13, color: palette.accentMuted }}>Uploaded documents</p>
+                    {projectFilesLoading ? (
+                      <p style={{ color: palette.accentMuted }}>Loading documents…</p>
+                    ) : hasProjectFiles ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {projectFiles.map((file) => {
+                          const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/files/${file.id}/download${tokenParam}`;
+                          const deleting = projectFileDeletingId === file.id;
+                          const hovered = hoveredProjectFileId === file.id;
+                          return (
+                            <div
+                              key={file.id}
+                              style={{
+                                borderRadius: 16,
+                                border: hovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                                padding: 16,
+                                background: hovered ? '#f5f2ff' : '#fff',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                gap: 16,
+                                flexWrap: 'wrap',
+                                boxShadow: hovered ? '0 12px 28px rgba(37,99,235,0.18)' : '0 4px 12px rgba(15,23,42,0.05)',
+                                transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                              }}
+                              onMouseEnter={() => setHoveredProjectFileId(file.id)}
+                              onMouseLeave={() =>
+                                setHoveredProjectFileId((prev) => (prev === file.id ? null : prev))
+                              }
+                            >
+                              <div style={{ flex: 1, minWidth: 200 }}>
+                                <a
+                                  href={downloadUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="admin-document-link"
+                                  style={{
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    color: palette.accent,
+                                  }}
+                                >
+                                  {file.display_name}
+                                </a>
+                                <p style={{ margin: '4px 0', fontSize: 12, color: palette.accentMuted }}>
+                                  Original: {file.stored_filename}
+                                </p>
+                                <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
+                                  Uploaded {formatLocalDateTime(file.uploaded_at) ?? 'time unavailable'}
+                                </p>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteProjectFile(file.id)}
+                                  disabled={deleting}
+                                  style={{
+                                    border: '1px solid #dc2626',
+                                    borderRadius: 999,
+                                    padding: '6px 12px',
+                                    fontSize: 12,
+                                    background: deleting ? 'rgba(220,38,38,0.2)' : '#fff',
+                                    color: '#dc2626',
+                                    cursor: deleting ? 'not-allowed' : 'pointer',
+                                  }}
+                                >
+                                  {deleting ? 'Deleting…' : 'Delete'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p style={{ color: palette.accentMuted }}>No documents uploaded yet.</p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
           {centerTab === 'share' && (
@@ -2226,7 +2603,23 @@ useEffect(() => {
                     <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Investors</p>
                     <h3 style={{ margin: 0 }}>{investors.length} contacts</h3>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={exportInvestorsCsv}
+                      disabled={!investors.length}
+                      style={{
+                        border: `1px solid ${palette.border}`,
+                        background: investors.length ? '#fff' : '#f1f5f9',
+                        color: investors.length ? palette.text : palette.accentMuted,
+                        borderRadius: 999,
+                        padding: '4px 12px',
+                        fontSize: 12,
+                        cursor: investors.length ? 'pointer' : 'not-allowed',
+                      }}
+                    >
+                      Export CSV
+                    </button>
                     <button
                       type="button"
                       onClick={toggleInvestorsManage}
@@ -2281,7 +2674,8 @@ useEffect(() => {
                   {investors.map((investor) => {
                     const selected = selectedInvestorIds.includes(investor.id);
                     const editing = editingInvestorId === investor.id;
-                    const cardBorder = selected || editing ? palette.accent : palette.border;
+                    const hovered = hoveredInvestorId === investor.id;
+                    const cardBorder = selected || editing || hovered ? palette.accent : palette.border;
                     return (
                       <div
                         key={investor.id}
@@ -2289,19 +2683,48 @@ useEffect(() => {
                           borderRadius: 16,
                           border: `1px solid ${cardBorder}`,
                           padding: 16,
-                          background: '#fff',
-                          boxShadow: selected ? '0 12px 28px rgba(37,99,235,0.2)' : '0 4px 12px rgba(15,23,42,0.05)',
+                          background: hovered || selected ? '#f5f2ff' : '#fff',
+                          boxShadow: selected || hovered ? '0 12px 28px rgba(37,99,235,0.2)' : '0 4px 12px rgba(15,23,42,0.05)',
+                          transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                         }}
+                        onMouseEnter={() => setHoveredInvestorId(investor.id)}
+                        onMouseLeave={() => setHoveredInvestorId((prev) => (prev === investor.id ? null : prev))}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                           <div style={{ flex: 1 }}>
                             <strong style={{ display: 'block', fontSize: 15 }}>{investor.name}</strong>
                             <p style={{ margin: '4px 0', fontSize: 13, color: palette.accentMuted }}>{investor.email}</p>
-                            <span style={{ fontSize: 12, color: palette.accentMuted }}>
-                              {typeof investor.units_invested === 'number'
-                                ? `${investor.units_invested.toLocaleString()} units`
-                                : investor.role}
-                            </span>
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                                gap: 8,
+                                marginTop: 8,
+                              }}
+                            >
+                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
+                                <strong style={{ display: 'block', color: palette.text }}>Investment</strong>
+                                {typeof investor.units_invested === 'number'
+                                  ? `${investor.units_invested.toLocaleString()} units`
+                                  : '—'}
+                              </div>
+                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
+                                <strong style={{ display: 'block', color: palette.text }}>Mailing</strong>
+                                {investor.mailing_address || '—'}
+                              </div>
+                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
+                                <strong style={{ display: 'block', color: palette.text }}>Bank</strong>
+                                {investor.bank_name || '—'}
+                              </div>
+                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
+                                <strong style={{ display: 'block', color: palette.text }}>Account #</strong>
+                                {investor.bank_account_number || '—'}
+                              </div>
+                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
+                                <strong style={{ display: 'block', color: palette.text }}>Routing #</strong>
+                                {investor.bank_routing_number || '—'}
+                              </div>
+                            </div>
                           </div>
                           {manageInvestorsMode && (
                             <input
@@ -2331,6 +2754,34 @@ useEffect(() => {
                               min="0"
                               value={editingInvestorUnits}
                               onChange={(event) => setEditingInvestorUnits(event.target.value)}
+                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                            />
+                            <textarea
+                              rows={3}
+                              placeholder="Mailing address"
+                              value={editingInvestorMailing}
+                              onChange={(event) => setEditingInvestorMailing(event.target.value)}
+                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}`, resize: 'vertical' }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Bank name"
+                              value={editingInvestorBankName}
+                              onChange={(event) => setEditingInvestorBankName(event.target.value)}
+                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Account number"
+                              value={editingInvestorBankAccount}
+                              onChange={(event) => setEditingInvestorBankAccount(event.target.value)}
+                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Routing number"
+                              value={editingInvestorBankRouting}
+                              onChange={(event) => setEditingInvestorBankRouting(event.target.value)}
                               style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
                             />
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -2426,6 +2877,51 @@ useEffect(() => {
                         placeholder="Units (e.g. 10000)"
                         value={newInvestorUnits}
                         onChange={(event) => setNewInvestorUnits(event.target.value)}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          border: `1px solid ${palette.border}`,
+                        }}
+                      />
+                      <textarea
+                        rows={3}
+                        placeholder="Mailing address"
+                        value={newInvestorMailing}
+                        onChange={(event) => setNewInvestorMailing(event.target.value)}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          border: `1px solid ${palette.border}`,
+                          resize: 'vertical',
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Bank name"
+                        value={newInvestorBankName}
+                        onChange={(event) => setNewInvestorBankName(event.target.value)}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          border: `1px solid ${palette.border}`,
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Bank account number"
+                        value={newInvestorBankAccount}
+                        onChange={(event) => setNewInvestorBankAccount(event.target.value)}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          border: `1px solid ${palette.border}`,
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Routing number"
+                        value={newInvestorBankRouting}
+                        onChange={(event) => setNewInvestorBankRouting(event.target.value)}
                         style={{
                           padding: 10,
                           borderRadius: 8,

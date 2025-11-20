@@ -50,6 +50,10 @@ class ProjectInvestorCreate(BaseModel):
     role: str = "Investor"
     routing_order: int = 1
     units_invested: float = 0.0
+    mailing_address: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_routing_number: Optional[str] = None
     metadata_json: Optional[str] = None
 
 class ProjectInvestorUpdate(BaseModel):
@@ -58,6 +62,10 @@ class ProjectInvestorUpdate(BaseModel):
     role: Optional[str] = None
     routing_order: Optional[int] = None
     units_invested: Optional[float] = None
+    mailing_address: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_routing_number: Optional[str] = None
     metadata_json: Optional[str] = None
 
 

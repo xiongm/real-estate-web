@@ -1,7 +1,7 @@
 
 import os
 import secrets
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Response, status
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Response, status
 from sqlmodel import Session, select
 from minio.error import S3Error
 from ..db import get_session
@@ -13,6 +13,7 @@ from ..models import (
     Signer,
     Field as FieldModel,
     ProjectInvestor,
+    ProjectFile,
     SigningSession,
     SignerFieldValue,
     Event,
@@ -37,6 +38,15 @@ def _serialize_final(entry):
         "document_name": document.filename,
         "completed_at": final.completed_at,
         "sha256_final": final.sha256_final,
+    }
+
+def _serialize_project_file(doc: ProjectFile):
+    return {
+        "id": doc.id,
+        "display_name": doc.display_name,
+        "stored_filename": doc.stored_filename,
+        "content_type": doc.content_type,
+        "uploaded_at": doc.uploaded_at,
     }
 
 router = APIRouter()
@@ -146,6 +156,91 @@ def download_document_pdf(
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
+@router.get("/{project_id}/files")
+def list_project_files(
+    project_id: int,
+    session: Session = Depends(get_session),
+    ctx=Depends(require_admin_access),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "project not found")
+    files = session.exec(
+        select(ProjectFile)
+        .where(ProjectFile.project_id == project_id)
+        .order_by(ProjectFile.uploaded_at.desc())
+    ).all()
+    return [_serialize_project_file(doc) for doc in files]
+
+@router.post("/{project_id}/files", status_code=201)
+async def upload_project_file(
+    project_id: int,
+    file: UploadFile = File(...),
+    label: str = Form(""),
+    session: Session = Depends(get_session),
+    ctx=Depends(require_admin_access),
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "project not found")
+    data = await file.read()
+    display_name = label.strip() or file.filename or "Project document"
+    stored_filename = file.filename or "upload.bin"
+    project_file = ProjectFile(
+        project_id=project_id,
+        display_name=display_name,
+        stored_filename=stored_filename,
+        content_type=file.content_type,
+        s3_key="pending",
+    )
+    session.add(project_file)
+    session.flush()
+    key = f"projects/{project_id}/files/{project_file.id}-{stored_filename}"
+    put_bytes(key, data, content_type=file.content_type or "application/octet-stream")
+    project_file.s3_key = key
+    session.add(project_file)
+    session.commit()
+    session.refresh(project_file)
+    return _serialize_project_file(project_file)
+
+@router.get("/{project_id}/files/{file_id}/download")
+def download_project_file(
+    project_id: int,
+    file_id: int,
+    session: Session = Depends(get_session),
+    ctx=Depends(require_project_or_admin),
+):
+    project_file = session.get(ProjectFile, file_id)
+    if not project_file or project_file.project_id != project_id:
+        raise HTTPException(404, "file not found")
+    try:
+        file_bytes = get_bytes(project_file.s3_key)
+    except S3Error:
+        raise HTTPException(404, "stored file missing for this document")
+    download_name = project_file.display_name or project_file.stored_filename or f"project-file-{file_id}"
+    if "." not in download_name and "." in (project_file.stored_filename or ""):
+        extension = project_file.stored_filename.rsplit(".", 1)[-1]
+        download_name = f"{download_name}.{extension}"
+    return Response(
+        content=file_bytes,
+        media_type=project_file.content_type or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
+    )
+
+@router.delete("/{project_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project_file(
+    project_id: int,
+    file_id: int,
+    session: Session = Depends(get_session),
+    ctx=Depends(require_admin_access),
+):
+    project_file = session.get(ProjectFile, file_id)
+    if not project_file or project_file.project_id != project_id:
+        raise HTTPException(404, "file not found")
+    delete_object(project_file.s3_key)
+    session.delete(project_file)
+    session.commit()
+
 @router.get("/{project_id}/final-artifacts")
 def list_project_final_artifacts(
     project_id: int,
@@ -192,6 +287,9 @@ def project_summary(
         select(Document).where(Document.project_id == project_id).order_by(Document.created_at.desc())
     ).all()
     investors = session.exec(select(ProjectInvestor).where(ProjectInvestor.project_id == project_id)).all()
+    project_files = session.exec(
+        select(ProjectFile).where(ProjectFile.project_id == project_id).order_by(ProjectFile.uploaded_at.desc())
+    ).all()
     finals_stmt = (
         select(FinalArtifact, Envelope, Document)
         .where(
@@ -210,12 +308,17 @@ def project_summary(
         },
         "documents": [_serialize_document(doc) for doc in documents],
         "signed_documents": [_serialize_final(row) for row in final_rows],
+        "project_files": [_serialize_project_file(pf) for pf in project_files],
         "investors": [
             {
                 "id": inv.id,
                 "name": inv.name,
                 "email": inv.email,
                 "units_invested": inv.units_invested,
+                "mailing_address": inv.mailing_address,
+                "bank_name": inv.bank_name,
+                "bank_account_number": inv.bank_account_number,
+                "bank_routing_number": inv.bank_routing_number,
             }
             for inv in investors
         ],

@@ -14,6 +14,10 @@ type InvestorFixture = {
   email: string;
   units_invested: number;
   role?: string;
+  mailing_address?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
+  bank_routing_number?: string | null;
 };
 
 type FinalArtifactFixture = {
@@ -35,11 +39,20 @@ type EnvelopeFixture = {
   signers: Array<{ id: number; name: string; email: string; status: string; role: string; routing_order: number }>;
 };
 
+type ProjectFileFixture = {
+  id: number;
+  display_name: string;
+  stored_filename: string;
+  uploaded_at: string;
+  content_type?: string | null;
+};
+
 type MockOptions = {
   projects?: ProjectFixture[];
   investorsByProject?: Record<number, InvestorFixture[]>;
   finalsByProject?: Record<number, FinalArtifactFixture[]>;
   envelopesByProject?: Record<number, EnvelopeFixture[]>;
+  filesByProject?: Record<number, ProjectFileFixture[]>;
 };
 
 const defaultProjects: ProjectFixture[] = [
@@ -59,7 +72,13 @@ const extractProjectId = (url: string): number | undefined => {
 };
 
 const mockAdminData = async (page: Page, options: MockOptions = {}) => {
-  const { projects = defaultProjects, investorsByProject = {}, finalsByProject = {}, envelopesByProject = {} } = options;
+  const {
+    projects = defaultProjects,
+    investorsByProject = {},
+    finalsByProject = {},
+    envelopesByProject = {},
+    filesByProject = {},
+  } = options;
 
   await page.route('**/api/projects', async (route) => {
     await route.fulfill(jsonResponse(projects));
@@ -78,6 +97,19 @@ const mockAdminData = async (page: Page, options: MockOptions = {}) => {
   await page.route('**/api/projects/*/investors', async (route) => {
     const projectId = extractProjectId(route.request().url());
     await route.fulfill(jsonResponse(investorsByProject[projectId ?? 0] ?? []));
+  });
+
+  await page.route('**/api/projects/*/files', async (route) => {
+    const projectId = extractProjectId(route.request().url());
+    if (route.request().method() === 'GET') {
+      await route.fulfill(jsonResponse(filesByProject[projectId ?? 0] ?? []));
+    } else {
+      await route.fulfill(jsonResponse({ ok: true }));
+    }
+  });
+
+  await page.route('**/api/projects/*/files/*', async (route) => {
+    await route.fulfill(jsonResponse({ ok: true }));
   });
 };
 
@@ -128,7 +160,7 @@ test.describe('Admin portal', () => {
     expect(stored.projectId).toBe('201');
   });
 
-  test('switching projects refreshes investors and resets to documents tab', async ({ page }) => {
+  test('switching projects refreshes investors and resets to signatures tab', async ({ page }) => {
     await mockAdminData(page, {
       investorsByProject: {
         201: [
@@ -243,9 +275,10 @@ test.describe('Admin portal', () => {
     await completeLogin(page);
     await waitForDashboard(page);
 
-    const documentsManageToggle = page.getByTestId('documents-manage-toggle');
-    await documentsManageToggle.click();
-    const deleteButton = page.getByTestId('documents-delete-selected');
+    await page.getByTestId('tab-signatures').click();
+    const signaturesManageToggle = page.getByTestId('signatures-manage-toggle');
+    await signaturesManageToggle.click();
+    const deleteButton = page.getByTestId('signatures-delete-selected');
     await expect(deleteButton).toBeDisabled();
     const signedCheckbox = page.locator('[data-document-kind="signed"]').getByRole('checkbox').first();
     await signedCheckbox.check();
@@ -278,7 +311,7 @@ test.describe('Admin portal', () => {
     ]);
 
     await expect(page.locator('[data-document-kind="awaiting"]')).toHaveCount(0);
-    await expect(page.getByTestId('documents-list-section')).toHaveCount(0);
+    await expect(page.getByTestId('signatures-list-section')).toHaveCount(0);
   });
 
   test('request sign only creates envelope after final submit', async ({ page }) => {

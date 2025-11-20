@@ -52,7 +52,9 @@ const palette = {
   panel: theme.colors.panel,
   accent: theme.colors.accent,
   accentMuted: theme.colors.textMuted,
+  accentSoft: theme.colors.accentSoft,
   text: theme.colors.text,
+  textStrong: theme.colors.text,
   border: theme.colors.border,
   chip: theme.colors.chip,
   overlay: theme.colors.overlay,
@@ -63,8 +65,8 @@ const completedChipStyle = {
   display: 'inline-flex',
   alignItems: 'center',
   borderRadius: 999,
-  background: '#dcfce7',
-  color: '#166534',
+  background: 'var(--color-success-soft)',
+  color: theme.colors.success,
   padding: '2px 8px',
   fontSize: 12,
   fontWeight: 600,
@@ -73,8 +75,8 @@ const awaitingChipStyle = {
   display: 'inline-flex',
   alignItems: 'center',
   borderRadius: 999,
-  background: '#fffbeb',
-  color: '#92400e',
+  background: 'var(--color-warning-soft)',
+  color: 'var(--color-warning)',
   padding: '2px 8px',
   fontSize: 12,
   fontWeight: 600,
@@ -103,7 +105,7 @@ const usePrimaryButtonStyle = (
   background: enabled
     ? hovered
       ? 'rgba(37,99,235,0.9)'
-      : '#2563eb'
+      : palette.accent
     : '#cbd5f5',
   color: enabled ? '#fff' : '#64748b',
   fontSize: 14,
@@ -185,18 +187,16 @@ export default function AdminPage() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [manageProjectsMode, setManageProjectsMode] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
-  const [centerTab, setCenterTab] = useState<'documents' | 'share'>('documents');
+  const [centerTab, setCenterTab] = useState<'documents' | 'share' | 'investors'>('documents');
   const [deletingInvestors, setDeletingInvestors] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
-  const [investorDrawerOpen, setInvestorDrawerOpen] = useState(false);
   const [requestButtonHovered, setRequestButtonHovered] = useState(false);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [projectDetailsLoaded, setProjectDetailsLoaded] = useState(false);
   const [initialPageReady, setInitialPageReady] = useState(false);
   const closeDrawers = () => {
     setProjectDrawerOpen(false);
-    setInvestorDrawerOpen(false);
   };
   const searchParams = useSearchParams();
   const projectParamRaw = searchParams?.get('project') ?? null;
@@ -527,6 +527,19 @@ useEffect(() => {
   );
   const hasDocuments = documentEntries.length > 0;
   const canRequestSignatures = Boolean(selectedProjectId && hasInvestors);
+  const totalInvestorUnits = useMemo(
+    () => investors.reduce((sum, investor) => sum + (investor.units_invested || 0), 0),
+    [investors],
+  );
+  const docStats = useMemo(
+    () => [
+      { label: 'Investors', value: investors.length.toString() },
+      { label: 'Shares committed', value: `$${totalInvestorUnits.toLocaleString('en-US')}` },
+      { label: 'Documents', value: documentEntries.length.toString() },
+      { label: 'Awaiting', value: outstandingEnvelopes.length.toString() },
+    ],
+    [documentEntries.length, outstandingEnvelopes.length, investors.length, totalInvestorUnits],
+  );
   const pageTitle = useMemo(
     () => (selectedProject ? `${selectedProject.name} | Admin` : 'Admin Portal'),
     [selectedProject],
@@ -986,11 +999,11 @@ useEffect(() => {
               border: 'none',
               borderRadius: 999,
               padding: '10px 16px',
-              background: verifyingLocally ? 'rgba(108,92,231,0.6)' : palette.accent,
+              background: verifyingLocally ? 'rgba(37,99,235,0.6)' : palette.accent,
               color: '#fff',
               fontWeight: 600,
               cursor: verifyingLocally ? 'wait' : 'pointer',
-              boxShadow: '0 12px 25px rgba(108,92,231,0.35)',
+              boxShadow: '0 12px 25px rgba(37,99,235,0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1074,7 +1087,7 @@ useEffect(() => {
               padding: '4px 10px',
               fontSize: 12,
               cursor: 'pointer',
-              boxShadow: manageProjectsMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
+              boxShadow: manageProjectsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
             }}
           >
             {manageProjectsMode ? 'Done' : 'Manage'}
@@ -1114,10 +1127,17 @@ useEffect(() => {
           const hovered = hoveredProjectId === project.id;
           const isEditing = project.id === editingProjectId;
           const baseBackground = active
-            ? 'linear-gradient(135deg,#6c5ce7,#7f6bff)'
-            : hovered || isEditing
-            ? '#f5f2ff'
-            : '#fff';
+            ? 'linear-gradient(135deg,#f8fbff,#eef3ff)'
+            : '#ffffff';
+          const statusLabel = project.status ? project.status.replace(/-/g, ' ') : 'active';
+          const statusColor =
+            project.status === 'active'
+              ? '#22c55e'
+              : project.status === 'funding'
+              ? '#f97316'
+              : project.status === 'completed'
+              ? '#94a3b8'
+              : '#94a3b8';
           return (
             <div
               key={`project-${project.id ?? idx}`}
@@ -1128,18 +1148,17 @@ useEffect(() => {
               onMouseEnter={() => setHoveredProjectId(project.id)}
               onMouseLeave={() => setHoveredProjectId((prev) => (prev === project.id ? null : prev))}
               style={{
-                textAlign: 'left',
-                padding: '12px 14px',
-                borderRadius: 14,
-                border: `1px solid ${active || hovered || isEditing ? palette.accent : palette.border}`,
+                padding: '18px 20px',
+                borderRadius: 20,
+                border: `2px solid ${active ? palette.accent : hovered || isEditing ? '#c7d2fe' : palette.border}`,
                 background: baseBackground,
-                color: active ? '#fff' : palette.text,
+                color: palette.text,
                 cursor: isEditing ? 'default' : 'pointer',
                 fontWeight: active ? 600 : 500,
                 boxShadow: active
-                  ? '0 12px 24px rgba(108,92,231,0.25)'
+                  ? '0 20px 38px rgba(59,130,246,0.25)'
                   : hovered || isEditing
-                  ? '0 8px 18px rgba(15,23,42,0.12)'
+                  ? '0 12px 26px rgba(15,23,42,0.12)'
                   : '0 4px 12px rgba(15,23,42,0.05)',
                 transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
               }}
@@ -1198,7 +1217,7 @@ useEffect(() => {
                         boxShadow:
                           editingProjectSaving || !editingProjectName.trim()
                             ? 'none'
-                            : '0 8px 18px rgba(108,92,231,0.25)',
+                            : '0 8px 18px rgba(37,99,235,0.25)',
                       }}
                     >
                       {editingProjectSaving ? 'Saving…' : 'Save'}
@@ -1206,50 +1225,67 @@ useEffect(() => {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {manageProjectsMode && (
-                      <input
-                        type="checkbox"
-                        checked={selectedProjectIds.includes(project.id)}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={() => toggleProjectSelection(project.id)}
-                      />
-                    )}
-                    <div>
-                      <strong>{project.name}</strong>
-                      <p
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {manageProjectsMode && (
+                        <input
+                          type="checkbox"
+                          checked={selectedProjectIds.includes(project.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => toggleProjectSelection(project.id)}
+                          style={{ width: 18, height: 18 }}
+                        />
+                      )}
+                      <div>
+                        <strong style={{ display: 'block', fontSize: 15 }}>{project.name}</strong>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 12,
+                            color: active ? palette.accent : palette.accentMuted,
+                          }}
+                        >
+                          Project #{project.id}
+                        </p>
+                      </div>
+                    </div>
+                    {!manageProjectsMode && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          beginProjectEdit(project);
+                        }}
                         style={{
-                          margin: 0,
+                          border: `1px solid ${palette.border}`,
+                          borderRadius: 999,
+                          padding: '4px 12px',
                           fontSize: 12,
-                          color: active ? 'rgba(255,255,255,0.8)' : palette.accentMuted,
+                          background: '#fff',
+                          color: palette.text,
+                          cursor: 'pointer',
                         }}
                       >
-                        #{project.id}
-                      </p>
-                    </div>
+                        Edit
+                      </button>
+                    )}
                   </div>
-                  {!manageProjectsMode && (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        beginProjectEdit(project);
-                      }}
-                      style={{
-                        border: `1px solid ${palette.border}`,
-                        borderRadius: 999,
-                        padding: '4px 10px',
-                        fontSize: 12,
-                        background: '#fff',
-                        color: palette.text,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Edit
-                    </button>
-                  )}
-                </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: '#f3f4f6' }}>
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              background: statusColor,
+                            }}
+                          />
+                          <span style={{ fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', color: '#475569' }}>{statusLabel}</span>
+                        </div>
+                      </div>
+                    </div>
               )}
             </div>
           );
@@ -1297,11 +1333,11 @@ useEffect(() => {
                       borderRadius: 999,
                       border: 'none',
                       padding: '10px 14px',
-                      background: creatingProject ? 'rgba(108,92,231,0.3)' : palette.accent,
+                      background: creatingProject ? 'rgba(37,99,235,0.3)' : palette.accent,
                       color: '#fff',
                       fontWeight: 600,
                       cursor: creatingProject ? 'not-allowed' : 'pointer',
-                      boxShadow: creatingProject ? 'none' : '0 12px 24px rgba(108,92,231,0.25)',
+                      boxShadow: creatingProject ? 'none' : '0 12px 24px rgba(37,99,235,0.25)',
                     }}
                   >
                     {creatingProject ? 'Adding…' : 'Add'}
@@ -1334,12 +1370,20 @@ useEffect(() => {
   const layoutClasses = ['admin-layout'];
   if (isMobile) layoutClasses.push('mobile');
   if (isMobile && projectDrawerOpen) layoutClasses.push('show-projects');
-  if (isMobile && investorDrawerOpen) layoutClasses.push('show-investors');
   const layoutClassName = layoutClasses.join(' ');
-  const drawerActive = isMobile && (projectDrawerOpen || investorDrawerOpen);
 
   return (
-    <div className={layoutClassName} style={{ minHeight: '100vh', display: 'flex', background: palette.bg, color: palette.text }}>
+    <div
+      className={layoutClassName}
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        background: palette.bg,
+        color: palette.text,
+        padding: isMobile ? 0 : 24,
+        gap: isMobile ? 0 : 24,
+      }}
+    >
       <style jsx global>{`
         .admin-document-link {
           text-decoration: none;
@@ -1355,7 +1399,6 @@ useEffect(() => {
             type="button"
             onClick={() => {
               setProjectDrawerOpen(true);
-              setInvestorDrawerOpen(false);
             }}
           >
             Projects
@@ -1364,29 +1407,21 @@ useEffect(() => {
             <p>Project</p>
             <strong>{selectedProject?.name || 'Select a project'}</strong>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setInvestorDrawerOpen(true);
-              setProjectDrawerOpen(false);
-            }}
-            disabled={!selectedProjectId}
-          >
-            Investors
-          </button>
+          <div style={{ width: 60 }} />
         </div>
       )}
       <aside
         className="admin-sidebar"
         style={{
-          width: 260,
+          width: isMobile ? '100%' : 300,
           padding: 24,
-          borderRight: `1px solid ${palette.border}`,
+          borderRight: `1px solid ${isMobile ? 'transparent' : palette.border}`,
           background: '#fff',
           display: 'flex',
           flexDirection: 'column',
           gap: 16,
-          boxShadow: '0 10px 30px rgba(17, 24, 39, 0.05)',
+          boxShadow: isMobile ? 'none' : '0 10px 30px rgba(17, 24, 39, 0.05)',
+          borderRadius: isMobile ? 0 : 20,
         }}
       >
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>{projectSidebarContent}</div>
@@ -1407,90 +1442,133 @@ useEffect(() => {
           Sign out
         </button>
       </aside>
-      <main className="admin-main" style={{ flex: 1, display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24, padding: 32 }}>
+      <main
+        className="admin-main"
+        style={{
+          flex: 1,
+          padding: isMobile ? 16 : 40,
+          overflowY: 'auto',
+          background: '#f8fafc',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: isMobile ? 20 : 32,
+        }}
+      >
         <section
           style={{
-            borderRadius: 24,
-            background: palette.panel,
-            padding: 24,
-            boxShadow: '0 20px 40px rgba(15,23,42,0.08)',
             display: 'flex',
-            flexDirection: 'column',
             gap: 16,
+            overflowX: 'auto',
+            paddingBottom: 4,
           }}
         >
-          <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Project</p>
-              <h3 style={{ margin: 0 }}>{selectedProject?.name || 'Select a project'}</h3>
+          {docStats.map((stat) => (
+            <div
+              key={stat.label}
+              style={{
+                background: '#fff',
+                borderRadius: 20,
+                border: `1px solid ${palette.border}`,
+                padding: 20,
+                boxShadow: shadows.subtle,
+                minWidth: isMobile ? 180 : 0,
+                flex: isMobile ? '0 0 auto' : '1 1 0',
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>{stat.label}</p>
+              <strong style={{ fontSize: 28, marginTop: 8, display: 'block' }}>{stat.value}</strong>
             </div>
-            {loading && <span style={{ fontSize: 12 }}>Loading…</span>}
-          </header>
-          {error && <div style={{ color: '#fca5a5' }}>{error}</div>}
-          <div
+          ))}
+        </section>
+          <section
             style={{
+              borderRadius: 28,
+              background: '#fff',
+              border: `1px solid ${palette.border}`,
+              boxShadow: shadows.card,
+              padding: 28,
               display: 'flex',
+              flexDirection: 'column',
               gap: 18,
-              borderBottom: '1px solid rgba(148,163,184,0.35)',
-              paddingBottom: 4,
             }}
           >
-            {(
-              [
-                { id: 'documents', label: 'Documents', icon: '📄' },
-                { id: 'share', label: 'Share', icon: '🔐' },
-              ] as Array<{ id: 'documents' | 'share'; label: string; icon: string }>
-            ).map((tab) => {
-              const active = centerTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setCenterTab(tab.id)}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: active ? palette.accent : palette.textStrong,
-                    opacity: active ? 1 : 0.7,
-                    fontSize: 14,
-                    fontWeight: active ? 600 : 500,
-                    padding: '6px 0',
-                    borderBottom: active ? `3px solid ${palette.accent}` : '3px solid transparent',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <span aria-hidden="true">{tab.icon}</span>
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-          {centerTab === 'documents' && selectedProject && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Workflow</p>
+                <h3 style={{ margin: 0, fontSize: 20 }}>Documents & Tokens</h3>
+              </div>
               <div
                 style={{
                   display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: isMobile ? 'stretch' : 'center',
-                  justifyContent: 'flex-start',
-                  gap: 12,
-                  marginTop: 12,
+                  gap: 8,
+                  borderRadius: 999,
+                  background: '#f1f5f9',
+                  padding: 4,
+                  flexWrap: isMobile ? 'nowrap' : 'wrap',
+                  overflowX: isMobile ? 'auto' : 'visible',
+                  width: isMobile ? '100%' : 'auto',
                 }}
               >
-                <button
-                  type="button"
-                  onClick={goToRequestSign}
+                {(
+                  [
+                    { id: 'documents', label: 'Documents', icon: '📄' },
+                    { id: 'investors', label: 'Investors', icon: '👥' },
+                    { id: 'share', label: 'Share', icon: '🔐' },
+                  ] as Array<{ id: 'documents' | 'share' | 'investors'; label: string; icon: string }>
+                ).map((tab) => {
+                  const active = centerTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      data-testid={`tab-${tab.id}`}
+                      onClick={() => setCenterTab(tab.id)}
+                      style={{
+                        border: 'none',
+                        borderRadius: 999,
+                        padding: '8px 18px',
+                        fontSize: 13,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: active ? palette.accent : 'transparent',
+                        color: active ? '#fff' : palette.textStrong,
+                        cursor: 'pointer',
+                        fontWeight: active ? 600 : 500,
+                        flex: isMobile ? '0 0 auto' : undefined,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span aria-hidden="true">{tab.icon}</span>
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </header>
+            {error && <div style={{ color: '#fca5a5' }}>{error}</div>}
+            {centerTab === 'documents' && selectedProject && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={goToRequestSign}
                   disabled={!canRequestSignatures}
                   style={usePrimaryButtonStyle(canRequestSignatures, requestButtonHovered)}
-                  onMouseEnter={() => canRequestSignatures && setRequestButtonHovered(true)}
-                  onMouseLeave={() => canRequestSignatures && setRequestButtonHovered(false)}
-                  title={
-                    canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
-                  }
-                >
+                    onMouseEnter={() => canRequestSignatures && setRequestButtonHovered(true)}
+                    onMouseLeave={() => canRequestSignatures && setRequestButtonHovered(false)}
+                    title={
+                      canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
+                    }
+                  >
                   <span
                     aria-hidden="true"
                     style={{
@@ -1528,7 +1606,7 @@ useEffect(() => {
                       fontSize: 12,
                       cursor: hasDocuments ? 'pointer' : 'not-allowed',
                       opacity: hasDocuments ? 1 : 0.5,
-                      boxShadow: manageDocumentsMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
+                      boxShadow: manageDocumentsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
                     }}
                   >
                     {manageDocumentsMode ? 'Done' : 'Manage'}
@@ -1545,9 +1623,9 @@ useEffect(() => {
                         revokingEnvelopes
                       }
                       style={{
-                        border: '1px solid rgba(248,113,113,0.8)',
-                        color: '#fca5a5',
-                        background: 'transparent',
+                        border: '1px solid #dc2626',
+                        color: '#fff',
+                        background: '#dc2626',
                         borderRadius: 999,
                         padding: '6px 12px',
                         fontSize: 13,
@@ -1565,6 +1643,13 @@ useEffect(() => {
                           revokingEnvelopes
                             ? 0.5
                             : 1,
+                        boxShadow:
+                          !hasDocuments ||
+                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
+                          actionLoading ||
+                          revokingEnvelopes
+                            ? 'none'
+                            : '0 10px 18px rgba(220,38,38,0.25)',
                       }}
                     >
                       {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete'}
@@ -1615,7 +1700,7 @@ useEffect(() => {
                                 ? '#f5f2ff'
                                 : '#fff',
                               boxShadow: envelopeSelected
-                                ? '0 12px 28px rgba(108,92,231,0.25)'
+                                ? '0 12px 28px rgba(37,99,235,0.25)'
                                 : envelopeHovered
                                 ? '0 12px 28px rgba(15,23,42,0.14)'
                                 : '0 10px 24px rgba(15,23,42,0.08)',
@@ -1785,7 +1870,7 @@ useEffect(() => {
                             padding: 16,
                             background: cardBackground,
                             boxShadow: cardSelected
-                              ? '0 12px 28px rgba(108,92,231,0.25)'
+                              ? '0 12px 28px rgba(37,99,235,0.25)'
                               : cardHovered
                               ? '0 12px 28px rgba(15,23,42,0.14)'
                               : '0 10px 24px rgba(15,23,42,0.08)',
@@ -1966,7 +2051,7 @@ useEffect(() => {
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 12,
-                      boxShadow: '0 15px 30px rgba(15,23,42,0.08)',
+                      boxShadow: shadows.subtle,
                     }}
                   >
                     <div>
@@ -2133,330 +2218,261 @@ useEffect(() => {
               )}
             </div>
           )}
-        </section>
-        <section
-          className="investor-panel"
-          style={{
-            borderRadius: 24,
-            background: palette.panel,
-            padding: 24,
-            boxShadow: '0 20px 40px rgba(15,23,42,0.08)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 14,
-            minWidth: 320,
-          }}
-        >
-          <header>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Investors</p>
-              <h3 style={{ margin: 0 }}>{investors.length} contacts</h3>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-              <button
-                type="button"
-                onClick={toggleInvestorsManage}
-                disabled={!selectedProjectId}
-                data-testid="investor-manage-toggle"
-                style={{
-                  border: `1px solid ${palette.border}`,
-                  background: manageInvestorsMode ? palette.accent : '#fff',
-                  color: !selectedProjectId ? palette.accentMuted : manageInvestorsMode ? '#fff' : palette.text,
-                  borderRadius: 999,
-                  padding: '4px 10px',
-                  fontSize: 12,
-                  cursor: selectedProjectId ? 'pointer' : 'not-allowed',
-                  opacity: selectedProjectId ? 1 : 0.5,
-                  boxShadow: manageInvestorsMode ? '0 8px 18px rgba(108,92,231,0.25)' : 'none',
-                }}
-                title={selectedProjectId ? undefined : 'Select a project first'}
-              >
-                {manageInvestorsMode ? 'Done' : 'Manage'}
-              </button>
-              {manageInvestorsMode && selectedProjectId && (
-                <button
-                  type="button"
-                  onClick={deleteSelectedInvestors}
-                  disabled={!selectedInvestorIds.length || deletingInvestors}
-                  data-testid="investor-remove-button"
-                  style={{
-                    border: '1px solid #dc2626',
-                    color: '#fff',
-                    background: deletingInvestors ? 'rgba(220,38,38,0.6)' : '#dc2626',
-                    borderRadius: 999,
-                    padding: '6px 12px',
-                    fontSize: 12,
-                    cursor: !selectedInvestorIds.length || deletingInvestors ? 'not-allowed' : 'pointer',
-                    opacity: !selectedInvestorIds.length && !deletingInvestors ? 0.5 : 1,
-                  }}
-                >
-                  {deletingInvestors ? 'Deleting…' : 'Delete'}
-                </button>
-              )}
-            </div>
-          </header>
-          {isMobile && (
-            <div className="drawer-mobile-close">
-              <button type="button" onClick={() => setInvestorDrawerOpen(false)}>
-                Close ✕
-              </button>
-            </div>
-          )}
-          <div style={{ overflowY: 'auto', maxHeight: '70vh', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {investors.length === 0 && <p style={{ color: palette.accentMuted }}>No investors linked.</p>}
-            {investors.map((investor, idx) => {
-              const invId = investor.id ?? idx;
-              const selected = manageInvestorsMode && investor.id ? selectedInvestorIds.includes(investor.id) : false;
-              const hovered = hoveredInvestorId === invId;
-              const editing = Boolean(investor.id && editingInvestorId === investor.id);
-              const cardBackground = selected
-                ? '#eef2ff'
-                : editing
-                ? '#f5f3ff'
-                : hovered
-                ? '#f8fafc'
-                : '#fff';
-              const cardBorder = selected || editing ? palette.accent : palette.border;
-              const boxShadow = selected || hovered || editing ? '0 8px 18px rgba(15,23,42,0.12)' : '0 4px 10px rgba(15,23,42,0.05)';
-              const unitsLabel =
-                typeof investor.units_invested === 'number'
-                  ? `${investor.units_invested.toLocaleString()} units`
-                  : 'Units n/a';
-              return (
-                <div
-                  key={`investor-${invId}`}
-                  onMouseEnter={() => setHoveredInvestorId(invId)}
-                  onMouseLeave={() => setHoveredInvestorId((prev) => (prev === invId ? null : prev))}
-                  style={{
-                    borderRadius: 12,
-                    background: cardBackground,
-                    border: `1px solid ${cardBorder}`,
-                    padding: 12,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: editing ? 'stretch' : 'center',
-                    gap: 12,
-                    boxShadow,
-                    transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
-                  }}
-                >
-                  {editing ? (
-                    <>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <input
-                          type="text"
-                          value={editingInvestorName}
-                          onChange={(event) => setEditingInvestorName(event.target.value)}
-                          placeholder="Investor name"
-                          style={{
-                            padding: 8,
-                            borderRadius: 8,
-                            border: `1px solid ${palette.border}`,
-                          }}
-                        />
-                        <input
-                          type="email"
-                          value={editingInvestorEmail}
-                          onChange={(event) => setEditingInvestorEmail(event.target.value)}
-                          placeholder="Investor email"
-                          style={{
-                            padding: 8,
-                            borderRadius: 8,
-                            border: `1px solid ${palette.border}`,
-                          }}
-                        />
-                        <input
-                          type="number"
-                          min="0"
-                          value={editingInvestorUnits}
-                          onChange={(event) => setEditingInvestorUnits(event.target.value)}
-                          placeholder="Units invested"
-                          style={{
-                            padding: 8,
-                            borderRadius: 8,
-                            border: `1px solid ${palette.border}`,
-                          }}
-                        />
+          {centerTab === 'investors' && (
+            <div className="investor-panel" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <header>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Investors</p>
+                    <h3 style={{ margin: 0 }}>{investors.length} contacts</h3>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={toggleInvestorsManage}
+                      disabled={!selectedProjectId}
+                      data-testid="investor-manage-toggle"
+                      style={{
+                        border: `1px solid ${palette.border}`,
+                        background: manageInvestorsMode ? palette.accent : '#fff',
+                        color: !selectedProjectId ? palette.accentMuted : manageInvestorsMode ? '#fff' : palette.text,
+                        borderRadius: 999,
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        cursor: selectedProjectId ? 'pointer' : 'not-allowed',
+                        opacity: selectedProjectId ? 1 : 0.5,
+                        boxShadow: manageInvestorsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
+                      }}
+                    >
+                      {manageInvestorsMode ? 'Done' : 'Manage'}
+                    </button>
+                    {manageInvestorsMode && selectedProjectId && (
+                      <button
+                        type="button"
+                        onClick={deleteSelectedInvestors}
+                        disabled={!selectedInvestorIds.length || deletingInvestors}
+                        data-testid="investor-remove-button"
+                        style={{
+                          border: '1px solid #dc2626',
+                          color: '#fff',
+                          background: deletingInvestors ? 'rgba(220,38,38,0.6)' : '#dc2626',
+                          borderRadius: 999,
+                          padding: '6px 12px',
+                          fontSize: 12,
+                          cursor: !selectedInvestorIds.length || deletingInvestors ? 'not-allowed' : 'pointer',
+                          opacity: !selectedInvestorIds.length && !deletingInvestors ? 0.5 : 1,
+                        }}
+                      >
+                        {deletingInvestors ? 'Deleting…' : 'Delete'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p style={{ margin: '8px 0 0', fontSize: 13, color: palette.accentMuted }}>
+                  {selectedProjectId ? 'These investors are linked to this project.' : 'Select a project to manage investors.'}
+                </p>
+              </header>
+              {!selectedProjectId ? (
+                <p style={{ color: palette.accentMuted }}>Choose a project to manage investors.</p>
+              ) : investors.length === 0 ? (
+                <p style={{ color: palette.accentMuted }}>No investors linked.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {investors.map((investor) => {
+                    const selected = selectedInvestorIds.includes(investor.id);
+                    const editing = editingInvestorId === investor.id;
+                    const cardBorder = selected || editing ? palette.accent : palette.border;
+                    return (
+                      <div
+                        key={investor.id}
+                        style={{
+                          borderRadius: 16,
+                          border: `1px solid ${cardBorder}`,
+                          padding: 16,
+                          background: '#fff',
+                          boxShadow: selected ? '0 12px 28px rgba(37,99,235,0.2)' : '0 4px 12px rgba(15,23,42,0.05)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                          <div style={{ flex: 1 }}>
+                            <strong style={{ display: 'block', fontSize: 15 }}>{investor.name}</strong>
+                            <p style={{ margin: '4px 0', fontSize: 13, color: palette.accentMuted }}>{investor.email}</p>
+                            <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                              {typeof investor.units_invested === 'number'
+                                ? `${investor.units_invested.toLocaleString()} units`
+                                : investor.role}
+                            </span>
+                          </div>
+                          {manageInvestorsMode && (
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleInvestorSelection(investor.id)}
+                              style={{ width: 18, height: 18 }}
+                            />
+                          )}
+                        </div>
+                        {editing ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                            <input
+                              type="text"
+                              value={editingInvestorName}
+                              onChange={(event) => setEditingInvestorName(event.target.value)}
+                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                            />
+                            <input
+                              type="email"
+                              value={editingInvestorEmail}
+                              onChange={(event) => setEditingInvestorEmail(event.target.value)}
+                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              value={editingInvestorUnits}
+                              onChange={(event) => setEditingInvestorUnits(event.target.value)}
+                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                            />
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                              <button type="button" onClick={cancelInvestorEdit} style={{ border: 'none', background: 'transparent', color: palette.accentMuted, cursor: 'pointer' }}>
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={saveInvestorEdit}
+                                disabled={editingInvestorSaving}
+                                style={{
+                                  border: 'none',
+                                  background: palette.accent,
+                                  color: '#fff',
+                                  borderRadius: 999,
+                                  padding: '6px 14px',
+                                  cursor: editingInvestorSaving ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                {editingInvestorSaving ? 'Saving…' : 'Save'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <button
+                              type="button"
+                              onClick={() => beginInvestorEdit(investor)}
+                              style={{
+                                border: `1px solid ${palette.border}`,
+                                borderRadius: 999,
+                                padding: '4px 10px',
+                                fontSize: 12,
+                                background: '#fff',
+                                color: palette.text,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    );
+                  })}
+                </div>
+              )}
+              {manageInvestorsMode && selectedProjectId && (
+                <div style={{ borderTop: `1px solid ${palette.border}`, marginTop: 8, paddingTop: 12 }}>
+                  {!showInvestorForm ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowInvestorForm(true)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: palette.accent,
+                        textAlign: 'left',
+                        padding: 0,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      + Add investor
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <input
+                        type="text"
+                        placeholder="Name"
+                        value={newInvestorName}
+                        onChange={(event) => setNewInvestorName(event.target.value)}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          border: `1px solid ${palette.border}`,
+                        }}
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        value={newInvestorEmail}
+                        onChange={(event) => setNewInvestorEmail(event.target.value)}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          border: `1px solid ${palette.border}`,
+                        }}
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Units (e.g. 10000)"
+                        value={newInvestorUnits}
+                        onChange={(event) => setNewInvestorUnits(event.target.value)}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          border: `1px solid ${palette.border}`,
+                        }}
+                      />
+                      <div style={{ display: 'flex', gap: 8 }}>
                         <button
                           type="button"
-                          onClick={cancelInvestorEdit}
-                          disabled={editingInvestorSaving}
+                          onClick={createInvestor}
+                          disabled={creatingInvestor}
                           style={{
-                            border: `1px solid ${palette.border}`,
-                            background: '#fff',
-                            color: palette.text,
+                            flex: 1,
+                            border: 'none',
                             borderRadius: 999,
-                            padding: '6px 14px',
+                            padding: '10px 14px',
+                            background: creatingInvestor ? 'rgba(37,99,235,0.3)' : palette.accent,
+                            color: '#fff',
+                            fontWeight: 600,
+                            cursor: creatingInvestor ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {creatingInvestor ? 'Adding…' : 'Add'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetInvestorForm}
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            color: palette.accentMuted,
+                            cursor: 'pointer',
                             fontSize: 12,
-                            cursor: editingInvestorSaving ? 'not-allowed' : 'pointer',
                           }}
                         >
                           Cancel
                         </button>
-                        <button
-                          type="button"
-                          onClick={saveInvestorEdit}
-                          disabled={editingInvestorSaving}
-                          style={{
-                            border: 'none',
-                            background: palette.accent,
-                            color: '#fff',
-                            borderRadius: 999,
-                            padding: '6px 14px',
-                            fontSize: 12,
-                            cursor: editingInvestorSaving ? 'not-allowed' : 'pointer',
-                            boxShadow: editingInvestorSaving ? 'none' : '0 8px 18px rgba(108,92,231,0.25)',
-                          }}
-                        >
-                          {editingInvestorSaving ? 'Saving…' : 'Save'}
-                        </button>
                       </div>
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        {manageInvestorsMode && investor.id && (
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleInvestorSelection(investor.id!)}
-                          />
-                        )}
-                        <div>
-                          <strong>{investor.name}</strong>
-                          <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{investor.email}</p>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                        <span style={{ fontSize: 12, color: palette.accentMuted }}>{unitsLabel}</span>
-                        {!manageInvestorsMode && investor.id && (
-                          <button
-                            type="button"
-                            onClick={() => beginInvestorEdit(investor)}
-                            style={{
-                              border: `1px solid ${palette.border}`,
-                              borderRadius: 999,
-                              padding: '4px 10px',
-                              fontSize: 12,
-                              background: '#fff',
-                              color: palette.text,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Edit
-                          </button>
-                        )}
-                      </div>
-                    </>
+                    </div>
                   )}
-                </div>
-              );
-            })}
-          </div>
-          {manageInvestorsMode && selectedProjectId && (
-            <div style={{ borderTop: `1px solid ${palette.border}`, marginTop: 12, paddingTop: 12 }}>
-              {!showInvestorForm ? (
-                <button
-                  type="button"
-                  onClick={() => setShowInvestorForm(true)}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: palette.accent,
-                    textAlign: 'left',
-                    padding: 0,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  + Add investor
-                </button>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    value={newInvestorName}
-                    onChange={(event) => setNewInvestorName(event.target.value)}
-                    style={{
-                      padding: 10,
-                      borderRadius: 8,
-                      border: `1px solid ${palette.border}`,
-                    }}
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={newInvestorEmail}
-                    onChange={(event) => setNewInvestorEmail(event.target.value)}
-                    style={{
-                      padding: 10,
-                      borderRadius: 8,
-                      border: `1px solid ${palette.border}`,
-                    }}
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Units (e.g. 10000)"
-                    value={newInvestorUnits}
-                    onChange={(event) => setNewInvestorUnits(event.target.value)}
-                    style={{
-                      padding: 10,
-                      borderRadius: 8,
-                      border: `1px solid ${palette.border}`,
-                    }}
-                  />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={createInvestor}
-                      disabled={creatingInvestor}
-                      style={{
-                        flex: 1,
-                        border: 'none',
-                        borderRadius: 999,
-                        padding: '10px 14px',
-                        background: creatingInvestor ? 'rgba(108,92,231,0.3)' : palette.accent,
-                        color: '#fff',
-                        fontWeight: 600,
-                        cursor: creatingInvestor ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      {creatingInvestor ? 'Adding…' : 'Add'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={resetInvestorForm}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: palette.accentMuted,
-                        cursor: 'pointer',
-                        fontSize: 12,
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
           )}
         </section>
       </main>
-      {drawerActive && <div className="drawer-overlay" onClick={closeDrawers} />}
       <style jsx>{`
-        .admin-layout {
-          gap: 0;
-        }
-        .admin-main-grid {
-          display: grid;
-          grid-template-columns: 1.4fr 1fr;
-          gap: 24px;
-        }
         .project-scroll {
           display: flex;
           flex-direction: column;
@@ -2464,33 +2480,18 @@ useEffect(() => {
           overflow-y: auto;
           max-height: calc(100vh - 220px);
         }
-        .drawer-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(15, 23, 42, 0.45);
-          z-index: 30;
-        }
         .admin-mobile-header {
           display: none;
         }
         .drawer-mobile-close {
           display: none;
         }
-        @media (max-width: 1200px) {
-          .admin-main-grid {
-            grid-template-columns: 1fr;
-          }
-        }
         .admin-layout.mobile {
           flex-direction: column;
           position: relative;
         }
         .admin-layout.mobile .admin-main {
-          display: block !important;
           padding: 16px !important;
-        }
-        .admin-layout.mobile .admin-main > section {
-          margin-bottom: 24px;
         }
         .admin-layout.mobile .admin-mobile-header {
           display: flex;
@@ -2513,11 +2514,6 @@ useEffect(() => {
           background: ${palette.accent};
           color: #fff;
           cursor: pointer;
-        }
-        .admin-mobile-header button:disabled {
-          background: rgba(148, 163, 184, 0.4);
-          color: rgba(255, 255, 255, 0.7);
-          cursor: not-allowed;
         }
         .admin-mobile-header .admin-mobile-heading p {
           margin: 0;
@@ -2547,25 +2543,6 @@ useEffect(() => {
           transform: translateX(0);
         }
         .admin-layout.mobile:not(.show-projects) .admin-sidebar {
-          pointer-events: none;
-        }
-        .admin-layout.mobile .investor-panel {
-          display: block;
-          position: fixed;
-          top: 0;
-          right: 0;
-          height: 100%;
-          width: min(360px, 85vw);
-          transform: translateX(100%);
-          transition: transform 0.3s ease;
-          z-index: 40;
-          box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
-          background: ${palette.panel};
-        }
-        .admin-layout.mobile.show-investors .investor-panel {
-          transform: translateX(0);
-        }
-        .admin-layout.mobile:not(.show-investors) .investor-panel {
           pointer-events: none;
         }
         .admin-layout.mobile .drawer-mobile-close {

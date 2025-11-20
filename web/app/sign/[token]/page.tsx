@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, CSSProperties } from 'react';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
 import { useParams } from 'next/navigation';
+import { theme } from '../../../lib/theme';
 
 type PageRender = {
   pageIndex: number;
@@ -31,6 +32,18 @@ const FONT_STACKS: Record<string, string> = {
   script: `'Lucida Handwriting', 'Brush Script MT', cursive`,
 };
 const resolveFontStack = (id?: string) => FONT_STACKS[id ?? DEFAULT_FONT] || FONT_STACKS[DEFAULT_FONT];
+
+const palette = {
+  pageBackground: theme.colors.page,
+  card: theme.colors.panel,
+  border: theme.colors.border,
+  accent: theme.colors.accent,
+  accentMuted: theme.colors.textMuted,
+  text: theme.colors.text,
+  chip: theme.colors.chip || '#eef2ff',
+  overlay: theme.colors.overlay,
+};
+const shadows = theme.shadows;
 
 export default function SignPage() {
   if (typeof window !== 'undefined') {
@@ -258,48 +271,68 @@ export default function SignPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <header
+    <div
+      style={{
+        minHeight: '100vh',
+        background: palette.pageBackground,
+        color: palette.text,
+      }}
+    >
+      <div
         style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 20,
-          background: '#fff',
-          borderBottom: '1px solid #e5e7eb',
-          padding: '12px 20px',
+          maxWidth: 1400,
+          margin: '0 auto',
+          padding: '32px 24px 120px',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: 'column',
+          gap: 24,
         }}
       >
-        <div>
-          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Document</p>
-          <strong style={{ fontSize: 18 }}>{documentLabel}</strong>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Signer</p>
-          <strong style={{ fontSize: 16 }}>{data.signer?.name}</strong>
-          <div style={{ fontSize: 12, color: '#6b7280' }}>{data.signer?.email}</div>
-        </div>
-      </header>
-      {mainContent}
+        <header
+          style={{
+            position: 'sticky',
+            top: 24,
+            zIndex: 20,
+            background: palette.card,
+            border: `1px solid ${palette.border}`,
+            borderRadius: 28,
+            padding: '20px 32px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 25px 60px rgba(15,23,42,0.12)',
+            backdropFilter: 'blur(10px)',
+          }}
+        >
+          <div>
+            <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Document</p>
+            <strong style={{ fontSize: 20 }}>{documentLabel}</strong>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Signer</p>
+            <strong style={{ fontSize: 18 }}>{data.signer?.name}</strong>
+            <div style={{ fontSize: 13, color: palette.accentMuted }}>{data.signer?.email}</div>
+          </div>
+        </header>
+        {mainContent}
+      </div>
       <style jsx>{`
         .sign-content {
           flex: 1;
-          padding: 24px;
+          padding: 0;
         }
         .sign-columns {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) 320px;
-          gap: 24px;
+          grid-template-columns: minmax(0, 1fr) 340px;
+          gap: 28px;
           align-items: flex-start;
         }
         .sign-doc-section {
-          max-height: calc(100vh - 160px);
-          min-height: calc(100vh - 160px);
+          max-height: calc(100vh - 220px);
+          min-height: calc(100vh - 220px);
           overflow-y: auto;
           padding-right: 8px;
-          padding-bottom: 32px;
+          padding-bottom: 24px;
         }
         .sign-sidebar {
           position: sticky;
@@ -307,32 +340,34 @@ export default function SignPage() {
           display: flex;
           flex-direction: column;
           gap: 12px;
+          min-width: 0;
         }
         .sign-sidebar.completion {
           position: static;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
+          border: 1px solid ${palette.border};
+          border-radius: 20px;
           padding: 24px 28px;
-          background: #fff;
+          background: ${palette.card};
           display: flex;
           flex-direction: column;
           gap: 16px;
         }
         .sign-sidebar-card {
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
+          border: 1px solid ${palette.border};
+          border-radius: 20px;
           padding: 24px 28px;
-          background: #fff;
+          background: ${palette.card};
           display: flex;
           flex-direction: column;
           gap: 24px;
+          box-shadow: ${shadows.card};
         }
         .sign-sidebar-action {
           padding-top: 4px;
         }
         .status-message {
           margin-top: 8px;
-          color: #2563eb;
+          color: ${palette.accent};
         }
         .sign-content.completion {
           height: calc(100vh - 78px);
@@ -359,39 +394,44 @@ export default function SignPage() {
           gap: 16px;
           align-items: center;
           padding: 24px 28px;
-          border: 1px solid #e5e7eb;
-          border-radius: 20px;
-          background: #ffffff;
-          box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+          border: 1px solid ${palette.border};
+          border-radius: 24px;
+          background: ${palette.card};
+          box-shadow: ${shadows.card};
         }
         .completion-panel .label {
           margin: 0;
           font-size: 12px;
-          color: #6b7280;
+          color: ${palette.accentMuted};
           letter-spacing: 0.2em;
           text-transform: uppercase;
         }
         .completion-panel .status-title {
           font-size: 22px;
           margin: 4px 0 0;
-          color: #0f172a;
+          color: ${palette.text};
         }
         .completion-panel .message {
           margin: 0;
           font-size: 14px;
-          color: #0f172a;
+          color: ${palette.text};
           line-height: 1.5;
           max-width: 440px;
         }
         .completion-viewer {
           flex: 1;
           min-height: 0;
-          border: 1px solid #e5e7eb;
+          border: 1px solid ${palette.border};
           border-radius: 24px;
-          background: #fff;
+          background: ${palette.card};
           padding: 28px;
-          box-shadow: 0 20px 60px rgba(12, 19, 43, 0.08);
+          box-shadow: ${shadows.modal};
           overflow-y: auto;
+        }
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
         }
         @media (max-width: 1080px) {
           .sign-columns {
@@ -430,14 +470,29 @@ function Consent({ token, consented, onToggle }: { token: string; consented: boo
     onToggle(true);
   };
   return (
-    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+    <label
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 12,
+        cursor: 'pointer',
+        color: palette.text,
+      }}
+    >
       <input
         type="checkbox"
         checked={consented}
         onChange={onChange}
-        style={{ width: 20, height: 20, marginTop: 2 }}
+        style={{
+          width: 20,
+          height: 20,
+          marginTop: 2,
+          accentColor: palette.accent,
+        }}
       />
-      <span style={{ fontSize: 14, lineHeight: 1.4 }}>I agree to use electronic records & signatures</span>
+      <span style={{ fontSize: 14, lineHeight: 1.5, color: palette.accentMuted }}>
+        I agree to use electronic records & signatures
+      </span>
     </label>
   );
 }
@@ -504,41 +559,42 @@ function Complete({
     setSending(false);
   };
   return (
-      <button
-        onClick={onComplete}
-        disabled={disabled || sending}
-        style={{
-          background: '#2563eb',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 8,
-          padding: '14px 36px',
-          fontSize: 16,
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 10,
-          cursor: disabled || sending ? 'not-allowed' : 'pointer',
-          opacity: disabled || sending ? 0.6 : 1,
-          width: '100%',
-        }}
-      >
-        {sending && (
-          <span
-            style={{
-              width: 18,
-              height: 18,
-              borderRadius: '50%',
-              border: '2px solid rgba(255,255,255,0.4)',
-              borderTopColor: '#fff',
-              display: 'inline-block',
-              animation: 'spin 0.9s linear infinite',
-            }}
-          />
-        )}
-        {sending ? 'Finishing…' : 'Finish and Sign'}
-      </button>
+    <button
+      onClick={onComplete}
+      disabled={disabled || sending}
+      style={{
+        background: palette.accent,
+        color: '#fff',
+        border: 'none',
+        borderRadius: 16,
+        padding: '16px 34px',
+        fontSize: 16,
+        fontWeight: 600,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        cursor: disabled || sending ? 'not-allowed' : 'pointer',
+        opacity: disabled || sending ? 0.55 : 1,
+        width: '100%',
+        boxShadow: shadows.pill,
+      }}
+    >
+      {sending && (
+        <span
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            border: '2px solid rgba(255,255,255,0.4)',
+            borderTopColor: '#fff',
+            display: 'inline-block',
+            animation: 'spin 0.9s linear infinite',
+          }}
+        />
+      )}
+      {sending ? 'Finishing…' : 'Finish and Sign'}
+    </button>
   );
 }
 
@@ -575,7 +631,16 @@ function PdfSigningSurface({
         return (
           <div
             key={page.pageIndex}
-            style={{ position: 'relative', width: page.width, margin: '0 auto', boxShadow: '0 10px 25px rgba(15,23,42,0.1)' }}
+            style={{
+              position: 'relative',
+              width: page.width,
+              margin: '0 auto',
+              boxShadow: shadows.card,
+              borderRadius: 18,
+              overflow: 'hidden',
+              background: '#fff',
+              border: `1px solid ${palette.border}`,
+            }}
           >
             <img src={page.dataUrl} alt={`Page ${page.pageIndex + 1}`} style={{ width: '100%', display: 'block' }} />
             {renderOverlays &&
@@ -635,7 +700,7 @@ function FieldOverlay({
             ...baseStyle,
             display: 'flex',
             alignItems: 'center',
-            border: '1px solid #cbd5f5',
+            border: `1px solid ${palette.border}`,
             borderRadius: 4,
             background: 'rgba(255,255,255,0.9)',
             justifyContent: 'flex-start',
@@ -662,7 +727,7 @@ function FieldOverlay({
             height: '100%',
             padding: 6,
             background: 'rgba(255,255,255,0.9)',
-            border: '1px solid #94a3b8',
+            border: `1px solid ${palette.border}`,
             borderRadius: 4,
             fontSize: 14,
             fontFamily,
@@ -680,7 +745,7 @@ function FieldOverlay({
             ...baseStyle,
             display: 'flex',
             alignItems: 'center',
-            border: '1px solid #cbd5f5',
+            border: `1px solid ${palette.border}`,
             borderRadius: 4,
             background: 'rgba(255,255,255,0.9)',
             justifyContent: 'flex-start',
@@ -707,7 +772,7 @@ function FieldOverlay({
             height: '100%',
             padding: 6,
             background: 'rgba(255,255,255,0.9)',
-            border: '1px solid #94a3b8',
+            border: `1px solid ${palette.border}`,
             borderRadius: 4,
             boxSizing: 'border-box',
           }}
@@ -885,7 +950,7 @@ function SignatureFieldCanvas({
       style={{
         ...style,
         boxSizing: 'border-box',
-        border: '2px dashed #2563eb',
+        border: `2px dashed ${palette.accent}`,
         borderRadius: 6,
         background: 'rgba(255,255,255,0.9)',
         overflow: 'visible',

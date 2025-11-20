@@ -131,7 +131,7 @@ const palette = {
   cardSurface: theme.colors.panel,
   accent: theme.colors.accent,
   accentMuted: theme.colors.textMuted,
-  textSubtle: theme.colors.textMuted,
+  textSubtle: theme.colors.textSubtle || theme.colors.textMuted,
   textStrong: theme.colors.text,
   chip: theme.colors.accentSoft,
 };
@@ -1072,21 +1072,25 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         minHeight: '100vh',
         background: palette.pageBackground,
         color: palette.textStrong,
+        padding: '32px 24px 120px',
+        gap: 24,
+        boxSizing: 'border-box',
       }}
     >
       <header
         style={{
           position: 'sticky',
-          top: 0,
+          top: 16,
           zIndex: 40,
           background: palette.headerBackground,
-          borderBottom: palette.headerBorder,
-          padding: '16px 28px',
+          border: palette.headerBorder,
+          borderRadius: 28,
+          padding: '20px 32px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: 16,
-          boxShadow: '0 12px 30px rgba(15,23,42,0.08)',
+          gap: 20,
+          boxShadow: '0 25px 60px rgba(15,23,42,0.12)',
           backdropFilter: 'blur(10px)',
         }}
       >
@@ -1124,21 +1128,29 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
             type="button"
             onClick={logout}
             style={{
-              border: '1px solid rgba(148,163,184,0.5)',
-              background: 'transparent',
-              color: '#e2e8f0',
+              border: `1px solid ${palette.accent}`,
+              background: '#fff',
+              color: palette.accent,
               borderRadius: 999,
               padding: '6px 12px',
               fontSize: 12,
               cursor: 'pointer',
+              fontWeight: 600,
             }}
           >
             Sign out
           </button>
         </div>
       </header>
-      <div style={{ flex: 1, padding: 32, paddingBottom: 160 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) 380px', gap: 28, alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, width: '100%', maxWidth: 1400, margin: '0 auto' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 2fr) 380px',
+            gap: 32,
+            alignItems: 'flex-start',
+          }}
+        >
           <section
             style={{
               maxHeight: 'calc(100vh - 160px)',
@@ -1161,10 +1173,10 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
             style={{
               marginTop: 24,
               padding: 32,
-              border: `2px dashed ${palette.accent}`,
+              border: `2px dashed rgba(37,99,235,0.35)`,
               borderRadius: 20,
               textAlign: 'center',
-              background: '#fff',
+              background: palette.cardSurface,
               boxShadow: theme.shadows.card,
             }}
           >
@@ -1202,9 +1214,10 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   key={page.pageIndex}
                   style={{
                     margin: '0 auto',
-                    background: '#fff',
+                    background: palette.cardSurface,
                     borderRadius: 18,
-                    boxShadow: '0 30px 70px rgba(15,23,42,0.18)',
+                    boxShadow: '0 35px 80px rgba(15,23,42,0.15)',
+                    border: palette.cardBorder,
                     padding: 24,
                   }}
                   onClick={() => setSelectedFieldId(null)}
@@ -1410,7 +1423,16 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         )}
       </section>
 
-      <section style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <section
+        style={{
+          position: 'sticky',
+          top: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 24,
+          minWidth: isMobile ? 'auto' : 360,
+        }}
+      >
         <div
           style={{
             border: palette.cardBorder,

@@ -1,4 +1,5 @@
 
+import './globals.css';
 import { theme } from '../lib/theme';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +14,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body
         style={{
-          fontFamily: 'Inter, ui-sans-serif, system-ui',
           margin: 0,
           minHeight: '100vh',
           background: theme.colors.page,

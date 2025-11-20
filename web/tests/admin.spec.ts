@@ -93,6 +93,10 @@ const waitForDashboard = async (page: Page) => {
   await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
 };
 
+const openInvestorsTab = async (page: Page) => {
+  await page.getByTestId('tab-investors').click();
+};
+
 test.describe('Admin portal', () => {
   test('rejects invalid admin token', async ({ page }) => {
     await page.route('**/api/projects', async (route) => {
@@ -139,6 +143,7 @@ test.describe('Admin portal', () => {
     await completeLogin(page);
     await waitForDashboard(page);
 
+    await openInvestorsTab(page);
     const investorPanel = page.locator('.investor-panel');
     await expect(investorPanel.getByText('Alpha Holder')).toBeVisible();
 
@@ -148,9 +153,10 @@ test.describe('Admin portal', () => {
 
     await page.getByRole('button', { name: /Beta Build/i }).click();
 
+    await expect(shareHeading).toHaveCount(0);
+    await openInvestorsTab(page);
     await expect(investorPanel.getByText('Beta Holder')).toBeVisible();
     await expect(investorPanel.getByText('Alpha Holder')).toHaveCount(0);
-    await expect(shareHeading).toHaveCount(0);
   });
 
   test('manage investors mode allows bulk removal', async ({ page }) => {
@@ -166,6 +172,7 @@ test.describe('Admin portal', () => {
     await completeLogin(page);
     await waitForDashboard(page);
 
+    await openInvestorsTab(page);
     const investorPanel = page.locator('.investor-panel');
     await investorPanel.getByTestId('investor-manage-toggle').click();
     const removeButton = investorPanel.getByTestId('investor-remove-button');

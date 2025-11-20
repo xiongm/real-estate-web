@@ -1628,13 +1628,13 @@ useEffect(() => {
         style={{
           width: isMobile ? '100%' : 300,
           padding: 24,
-          borderRight: `1px solid ${isMobile ? 'transparent' : palette.border}`,
-          background: '#fff',
+          borderRight: 'none',
+          background: '#ffffff',
           display: 'flex',
           flexDirection: 'column',
           gap: 16,
-          boxShadow: isMobile ? 'none' : '0 10px 30px rgba(17, 24, 39, 0.05)',
-          borderRadius: isMobile ? 0 : 20,
+          boxShadow: 'none',
+          borderRadius: 0,
         }}
       >
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>{projectSidebarContent}</div>
@@ -1713,33 +1713,26 @@ useEffect(() => {
         </section>
           <section
             style={{
-              borderRadius: 28,
-              background: '#fff',
-              border: `1px solid ${palette.border}`,
-              boxShadow: shadows.card,
-              padding: 28,
+              borderRadius: 0,
+              background: '#f8fafc',
+              border: 'none',
+              boxShadow: 'none',
+              padding: 8,
               display: 'flex',
               flexDirection: 'column',
               gap: 18,
             }}
           >
-            <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
-              <div>
-                <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Workflow</p>
-                <h3 style={{ margin: 0, fontSize: 20 }}>Signatures & Tokens</h3>
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 8,
-                  borderRadius: 999,
-                  background: '#f1f5f9',
-                  padding: 4,
-                  flexWrap: isMobile ? 'nowrap' : 'wrap',
-                  overflowX: isMobile ? 'auto' : 'visible',
-                  width: isMobile ? '100%' : 'auto',
-                }}
-              >
+            <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 12, alignItems: 'center' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    flexWrap: isMobile ? 'nowrap' : 'wrap',
+                    overflowX: isMobile ? 'auto' : 'visible',
+                    width: isMobile ? '100%' : 'auto',
+                  }}
+                >
                 {(
                   [
                     { id: 'documents', label: 'Documents', icon: '📁' },

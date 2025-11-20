@@ -1723,7 +1723,17 @@ useEffect(() => {
               gap: 18,
             }}
           >
-            <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 12, alignItems: 'center' }}>
+            <header
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'flex-start',
+                gap: 12,
+                alignItems: 'center',
+                paddingBottom: 12,
+                borderBottom: `1px solid ${palette.border}`,
+              }}
+            >
                 <div
                   style={{
                     display: 'flex',

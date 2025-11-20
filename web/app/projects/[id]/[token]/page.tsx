@@ -42,6 +42,7 @@ export default function ProjectViewerPage() {
   const [summary, setSummary] = useState<ProjectSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const projectId = useMemo(() => Number(params?.id), [params]);
   const token = params?.token || '';
@@ -72,6 +73,16 @@ export default function ProjectViewerPage() {
       });
     return () => abort.abort();
   }, [projectId, token]);
+
+  useEffect(() => {
+    const updateViewport = () => {
+      if (typeof window === 'undefined') return;
+      setIsMobile(window.innerWidth < 768);
+    };
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
 
   const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
 
@@ -124,8 +135,14 @@ export default function ProjectViewerPage() {
           {!loading && !token && <p style={{ color: palette.accentMuted }}>Missing project access token.</p>}
           {!loading && error && <p style={{ color: '#fca5a5' }}>{error}</p>}
           {!loading && summary && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 28 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: 28,
+              }}
+            >
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 24 }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                     <h3 style={{ margin: 0 }}>Signed Documents</h3>
@@ -212,7 +229,7 @@ export default function ProjectViewerPage() {
                   )}
                 </div>
               </div>
-              <div>
+              <div style={{ flex: isMobile ? '1 1 auto' : '0 0 360px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <h3 style={{ margin: 0 }}>Investor Contacts</h3>
                   <span style={{ fontSize: 12, color: palette.accentMuted }}>
@@ -234,6 +251,9 @@ export default function ProjectViewerPage() {
                           border: `1px solid ${palette.border}`,
                           padding: 14,
                           background: 'rgba(15,23,42,0.65)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
                         }}
                       >
                         <strong style={{ fontSize: 15 }}>{inv.name}</strong>
@@ -241,6 +261,30 @@ export default function ProjectViewerPage() {
                         <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
                           {inv.units_invested?.toLocaleString()} units
                         </p>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                            gap: 8,
+                          }}
+                        >
+                          <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
+                            <strong style={{ display: 'block', color: '#f8fafc' }}>Mailing</strong>
+                            {inv.mailing_address || '—'}
+                          </div>
+                          <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
+                            <strong style={{ display: 'block', color: '#f8fafc' }}>Bank</strong>
+                            {inv.bank_name || '—'}
+                          </div>
+                          <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
+                            <strong style={{ display: 'block', color: '#f8fafc' }}>Account #</strong>
+                            {inv.bank_account_number || '—'}
+                          </div>
+                          <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
+                            <strong style={{ display: 'block', color: '#f8fafc' }}>Routing #</strong>
+                            {inv.bank_routing_number || '—'}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

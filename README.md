@@ -101,6 +101,21 @@ Need an inspector? `npm run test:e2e:ui` opens the Playwright runner so you can 
 
 > **Investor download test:** `tests/investor-download.spec.ts` creates a real project/file via the API to verify Unicode file downloads. Make sure the backend stack is running (`docker compose up -d db minio redis api`) and that Playwright can authenticate with the admin token (`ADMIN_ACCESS_TOKEN` in `.env`, or override with `PLAYWRIGHT_ADMIN_TOKEN`). If your API isn’t on `http://localhost:8000`, set `PLAYWRIGHT_API_BASE`.
 
+## Release workflow
+1. **Prep on your working branch (e.g., `figma-revamp`):**
+   - `git pull` and confirm `git status` is clean.
+   - Create/sync a release branch (optional but handy for hotfixes): `git checkout -b release/vX.Y.Z` (or `git checkout release/vX.Y.Z && git merge figma-revamp` if it already exists).
+   - Run validations (`docker compose run --rm api-tests`, `cd web && npm run test:e2e`).
+2. **Tag the release:** `git tag -a vX.Y.Z -m "Release vX.Y.Z"` while on the commit you want to ship.
+3. **Push everything:** `git push origin release/vX.Y.Z` (if you created/updated the branch) and `git push origin vX.Y.Z`.
+4. **Create the GitHub release** using that tag (notes + binaries if needed).
+5. **Deploy on the release host:**
+   - `ssh` in, then `git fetch origin` and either `git checkout vX.Y.Z` (tag) or `git checkout release/vX.Y.Z && git pull`.
+   - Update `.env` if any secrets/URLs changed.
+   - Restart the stack so the containers read the new code/env: `docker compose up -d --build`.
+
+The hero banner uses an Unsplash URL directly—no extra assets or figma files need to be copied to the server for a release.
+
 ## Python stamper
 We use `reportlab` to paint visible content (text/checkbox/signature PNG) onto a PDF page overlay, then `pypdf` to merge with the original. Certificate page is generated via `reportlab` and appended.
 

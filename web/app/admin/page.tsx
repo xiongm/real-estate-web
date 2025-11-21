@@ -1810,7 +1810,16 @@ useEffect(() => {
               }}
             >
               <div style={{ flex: '1 1 320px' }}>
-                <h1 style={{ margin: '0 0 8px', fontSize: isMobile ? 28 : 38, fontWeight: 700 }}>
+                <h1
+                  style={{
+                    margin: '0 0 8px',
+                    fontSize: isMobile ? 28 : 40,
+                    fontWeight: 700,
+                    color: '#fff',
+                    textShadow: '0 6px 20px rgba(2,6,23,0.65)',
+                    letterSpacing: '-0.5px',
+                  }}
+                >
                   {selectedProject?.name || 'Select a project'}
                 </h1>
                 <p style={{ margin: 0, color: 'rgba(255,255,255,0.82)', maxWidth: 520 }}>

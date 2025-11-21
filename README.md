@@ -99,6 +99,8 @@ npm run test:e2e
 
 Need an inspector? `npm run test:e2e:ui` opens the Playwright runner so you can step through scenarios locally. Set `PLAYWRIGHT_BASE_URL` if you prefer to hit an already running web server instead of letting the test suite start `npm run dev`.
 
+> **Investor download test:** `tests/investor-download.spec.ts` creates a real project/file via the API to verify Unicode file downloads. Make sure the backend stack is running (`docker compose up -d db minio redis api`) and that Playwright can authenticate with the admin token (`ADMIN_ACCESS_TOKEN` in `.env`, or override with `PLAYWRIGHT_ADMIN_TOKEN`). If your API isn’t on `http://localhost:8000`, set `PLAYWRIGHT_API_BASE`.
+
 ## Python stamper
 We use `reportlab` to paint visible content (text/checkbox/signature PNG) onto a PDF page overlay, then `pypdf` to merge with the original. Certificate page is generated via `reportlab` and appended.
 

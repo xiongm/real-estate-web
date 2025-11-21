@@ -1,6 +1,7 @@
 
 import os
 import secrets
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Response, status
 from sqlmodel import Session, select
 from minio.error import S3Error
@@ -50,6 +51,13 @@ def _serialize_project_file(doc: ProjectFile):
     }
 
 router = APIRouter()
+
+def _content_disposition(filename: str) -> str:
+    safe_ascii = filename.encode("ascii", errors="ignore").decode("ascii").strip().replace('"', "")
+    if not safe_ascii:
+        safe_ascii = "download"
+    encoded = quote(filename)
+    return f"attachment; filename=\"{safe_ascii}\"; filename*=UTF-8''{encoded}"
 
 @router.post("")
 def create_project(
@@ -153,7 +161,7 @@ def download_document_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": _content_disposition(filename)},
     )
 
 @router.get("/{project_id}/files")
@@ -224,7 +232,7 @@ def download_project_file(
     return Response(
         content=file_bytes,
         media_type=project_file.content_type or "application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
+        headers={"Content-Disposition": _content_disposition(download_name)},
     )
 
 @router.delete("/{project_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -347,7 +355,7 @@ def download_final_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": _content_disposition(filename)},
     )
 
 @router.delete("/{project_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

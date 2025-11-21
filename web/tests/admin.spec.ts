@@ -314,6 +314,49 @@ test.describe('Admin portal', () => {
     await expect(page.getByTestId('signatures-list-section')).toHaveCount(0);
   });
 
+  test('view signees expands signed packet details', async ({ page }) => {
+    await mockAdminData(page, {
+      finalsByProject: {
+        201: [
+          {
+            envelope_id: 501,
+            document_id: 99,
+            document_name: 'Signed Packet One',
+            completed_at: '2025-06-01T12:00:00Z',
+            sha256_final: 'abc123',
+          },
+        ],
+      },
+      envelopesByProject: {
+        201: [
+          {
+            id: 501,
+            subject: 'Completed Packet',
+            status: 'completed',
+            created_at: '2025-05-01T10:00:00Z',
+            total_signers: 2,
+            completed_signers: 2,
+            document: { id: 99, filename: 'Signed Packet One' },
+            signers: [
+              { id: 1, name: 'Signer One', email: 'one@example.com', status: 'completed', role: 'Investor', routing_order: 1 },
+              { id: 2, name: 'Signer Two', email: 'two@example.com', status: 'completed', role: 'Investor', routing_order: 2 },
+            ],
+          },
+        ],
+      },
+    });
+
+    await completeLogin(page);
+    await waitForDashboard(page);
+    await page.getByTestId('tab-signatures').click();
+
+    const viewButton = page.getByRole('button', { name: /view signees/i }).first();
+    await viewButton.click();
+
+    await expect(page.getByText('Signer One')).toBeVisible();
+    await expect(page.getByText('Signer Two')).toBeVisible();
+  });
+
   test('request sign only creates envelope after final submit', async ({ page }) => {
     const investors = {
       201: [

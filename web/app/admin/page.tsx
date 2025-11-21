@@ -660,11 +660,14 @@ useEffect(() => {
     [investors],
   );
   const totalDocumentsCount = documentEntries.length + projectFiles.length;
+
   const docStats = useMemo(
     () => [
       {
         label: 'Investors',
         value: investors.length.toString(),
+        iconBg: '#dbeafe',
+        iconColor: '#1d4ed8',
         icon: (
           <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="1.7" fill="none">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -677,6 +680,8 @@ useEffect(() => {
       {
         label: 'Shares committed',
         value: `$${totalInvestorUnits.toLocaleString('en-US')}`,
+        iconBg: '#f3e8ff',
+        iconColor: '#7e22ce',
         icon: (
           <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="1.7" fill="none">
             <path d="M12 1v22" />
@@ -687,6 +692,8 @@ useEffect(() => {
       {
         label: 'Documents',
         value: totalDocumentsCount.toString(),
+        iconBg: '#ecfccb',
+        iconColor: '#65a30d',
         icon: (
           <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="1.7" fill="none">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
@@ -697,6 +704,8 @@ useEffect(() => {
       {
         label: 'Awaiting signatures',
         value: outstandingEnvelopes.length.toString(),
+        iconBg: '#fee2e2',
+        iconColor: '#dc2626',
         icon: (
           <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="1.7" fill="none">
             <path d="M21 2l-6 6" />
@@ -772,6 +781,34 @@ useEffect(() => {
       return false;
     } finally {
       setRevokingEnvelopes(false);
+    }
+  };
+
+  const toggleFinalExpansion = (id: number) => {
+    setExpandedFinals((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleEnvelopeExpansion = (id: number) => {
+    setExpandedEnvelopes((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleCardDownload = async (href?: string) => {
+    if (!href) return;
+    try {
+      const response = await fetch(href);
+      if (!response.ok) throw new Error('download failed');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = href.split('/').pop() || 'document.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('Download failed');
     }
   };
 
@@ -1060,6 +1097,14 @@ useEffect(() => {
     }
   };
 
+  const removeProjectLocally = (projectId: number) => {
+    setProjects((prev) => prev.filter((proj) => proj.id !== projectId));
+    setSelectedProjectIds((prev) => prev.filter((id) => id !== projectId));
+    if (selectedProjectId === projectId) {
+      selectProject(null);
+    }
+  };
+
   const toggleProjectManage = () => {
     setManageProjectsMode((prev) => {
       if (prev) {
@@ -1075,6 +1120,30 @@ useEffect(() => {
     setSelectedProjectIds((prev) => (prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]));
   };
 
+  const performProjectDelete = async (projectId: number) => {
+    const resp = await fetch(`${baseApi}/api/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: { 'X-Access-Token': adminToken ?? '' },
+    });
+    if (!resp.ok) throw new Error(`Failed to delete project (${resp.status})`);
+    removeProjectLocally(projectId);
+  };
+
+  const deleteProjectDirect = async (projectId: number) => {
+    const confirmRemove = window.confirm(
+      'Deleting this project removes all documents, investors, envelopes, and signed packets. This cannot be undone. Continue?',
+    );
+    if (!confirmRemove) return;
+    setActionLoading(true);
+    try {
+      await performProjectDelete(projectId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete project');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const deleteSelectedProjects = async () => {
     if (!selectedProjectIds.length) return;
     const confirmRemove = window.confirm(
@@ -1084,18 +1153,10 @@ useEffect(() => {
     setActionLoading(true);
     try {
       for (const projectId of selectedProjectIds) {
-        const resp = await fetch(`${baseApi}/api/projects/${projectId}`, {
-          method: 'DELETE',
-          headers: { 'X-Access-Token': adminToken ?? '' },
-        });
-        if (!resp.ok) throw new Error(`Failed to delete project (${resp.status})`);
-        if (projectId === selectedProjectId) {
-          selectProject(null);
-        }
+        await performProjectDelete(projectId);
       }
       setSelectedProjectIds([]);
       setManageProjectsMode(false);
-      await loadProjects();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete projects');
     } finally {
@@ -1124,6 +1185,16 @@ useEffect(() => {
       alert('Token copied to clipboard.');
     } catch {
       alert('Unable to copy token automatically.');
+    }
+  };
+
+  const copyMagicLink = async (link?: string | null) => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      alert('Magic link copied to clipboard.');
+    } catch {
+      alert('Unable to copy magic link automatically.');
     }
   };
 
@@ -1286,71 +1357,85 @@ useEffect(() => {
 
   const projectSidebarContent = (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <h2 style={{ margin: 0, fontSize: 20, color: palette.text }}>Projects</h2>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={toggleProjectManage}
-            style={{
-              border: `1px solid ${palette.border}`,
-              background: manageProjectsMode ? palette.accent : '#fff',
-              color: manageProjectsMode ? '#fff' : palette.text,
-              borderRadius: 999,
-              padding: '4px 10px',
-              fontSize: 12,
-              cursor: 'pointer',
-              boxShadow: manageProjectsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
-            }}
-          >
-            {manageProjectsMode ? 'Done' : 'Manage'}
-          </button>
-          {manageProjectsMode && (
+      <div style={{ padding: 24, borderBottom: `1px solid ${palette.border}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20, color: palette.text }}>Projects</h2>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: palette.accentMuted }}>
+              {projects.length ? `${projects.length} active project${projects.length > 1 ? 's' : ''}` : 'No projects yet'}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {manageProjectsMode && (
+              <button
+                type="button"
+                onClick={deleteSelectedProjects}
+                disabled={!selectedProjectIds.length || actionLoading}
+                style={{
+                  borderRadius: 999,
+                  border: '1px solid #dc2626',
+                  background: '#dc2626',
+                  color: '#fff',
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  cursor: !selectedProjectIds.length || actionLoading ? 'not-allowed' : 'pointer',
+                  opacity: !selectedProjectIds.length || actionLoading ? 0.5 : 1,
+                  boxShadow: !selectedProjectIds.length || actionLoading ? 'none' : '0 10px 20px rgba(220,38,38,0.2)',
+                }}
+              >
+                Delete
+              </button>
+            )}
             <button
               type="button"
-              onClick={deleteSelectedProjects}
-              disabled={!selectedProjectIds.length || actionLoading}
+              onClick={toggleProjectManage}
               style={{
-                border: '1px solid #dc2626',
-                color: '#fff',
-                background: '#dc2626',
                 borderRadius: 999,
-                padding: '4px 10px',
+                border: `1px solid ${palette.border}`,
+                background: manageProjectsMode ? palette.accent : '#fff',
+                color: manageProjectsMode ? '#fff' : palette.text,
+                padding: '6px 14px',
                 fontSize: 12,
-                cursor: !selectedProjectIds.length || actionLoading ? 'not-allowed' : 'pointer',
-                opacity: !selectedProjectIds.length || actionLoading ? 0.5 : 1,
-                boxShadow: !selectedProjectIds.length || actionLoading ? 'none' : '0 10px 18px rgba(220,38,38,0.25)',
+                fontWeight: 600,
+                cursor: 'pointer',
               }}
             >
-              Delete
+              {manageProjectsMode ? 'Done' : 'Manage'}
             </button>
-          )}
+          </div>
         </div>
+        {isMobile && (
+          <div className="drawer-mobile-close">
+            <button type="button" onClick={() => setProjectDrawerOpen(false)}>
+              Close ✕
+            </button>
+          </div>
+        )}
       </div>
-      {isMobile && (
-        <div className="drawer-mobile-close">
-          <button type="button" onClick={() => setProjectDrawerOpen(false)}>
-            Close ✕
-          </button>
-        </div>
-      )}
-      <div className="project-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
+      <div className="project-scroll" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {projects.map((project, idx) => {
           const active = project.id === selectedProjectId;
           const hovered = hoveredProjectId === project.id;
           const isEditing = project.id === editingProjectId;
-          const baseBackground = active
-            ? 'linear-gradient(135deg,#f8fbff,#eef3ff)'
-            : '#ffffff';
+          const selectedIndicator =
+            selectedProjectIds.includes(project.id) || project.id === selectedProjectId ? '#3b82f6' : palette.border;
           const statusLabel = project.status ? project.status.replace(/-/g, ' ') : 'active';
-          const statusColor =
+          const statusDot =
             project.status === 'active'
               ? '#22c55e'
               : project.status === 'funding'
               ? '#f97316'
               : project.status === 'completed'
               ? '#94a3b8'
-              : '#94a3b8';
+              : '#a5b4fc';
+          const investorsLabel =
+            selectedProjectId === project.id ? `${investors.length} investor${investors.length === 1 ? '' : 's'}` : 'Investors';
+          const badgeLabel =
+            selectedProjectId === project.id
+              ? hasOutstandingEnvelopes
+                ? 'Pending docs'
+                : 'All signed'
+              : statusLabel;
           return (
             <div
               key={`project-${project.id ?? idx}`}
@@ -1361,23 +1446,21 @@ useEffect(() => {
               onMouseEnter={() => setHoveredProjectId(project.id)}
               onMouseLeave={() => setHoveredProjectId((prev) => (prev === project.id ? null : prev))}
               style={{
-                padding: '18px 20px',
+                border: `2px solid ${active ? '#3b82f6' : hovered || isEditing ? '#c7d2fe' : palette.border}`,
                 borderRadius: 20,
-                border: `2px solid ${active ? palette.accent : hovered || isEditing ? '#c7d2fe' : palette.border}`,
-                background: baseBackground,
-                color: palette.text,
-                cursor: isEditing ? 'default' : 'pointer',
-                fontWeight: active ? 600 : 500,
+                padding: 20,
+                background: active ? '#eff6ff' : '#fff',
                 boxShadow: active
-                  ? '0 20px 38px rgba(59,130,246,0.25)'
-                  : hovered || isEditing
-                  ? '0 12px 26px rgba(15,23,42,0.12)'
-                  : '0 4px 12px rgba(15,23,42,0.05)',
-                transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                  ? '0 25px 45px rgba(59,130,246,0.25)'
+                  : hovered
+                  ? '0 20px 38px rgba(15,23,42,0.1)'
+                  : '0 6px 18px rgba(15,23,42,0.05)',
+                cursor: isEditing ? 'default' : 'pointer',
+                transition: 'border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
               }}
             >
               {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <input
                     type="text"
                     value={editingProjectName}
@@ -1395,42 +1478,27 @@ useEffect(() => {
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                     <button
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        cancelProjectEdit();
-                      }}
-                      disabled={editingProjectSaving}
+                      onClick={cancelProjectEdit}
                       style={{
-                        border: `1px solid ${palette.border}`,
-                        background: '#fff',
-                        color: palette.text,
-                        borderRadius: 999,
-                        padding: '6px 14px',
-                        fontSize: 12,
-                        cursor: editingProjectSaving ? 'not-allowed' : 'pointer',
+                        border: 'none',
+                        background: 'transparent',
+                        color: palette.accentMuted,
+                        cursor: 'pointer',
                       }}
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        saveProjectEdit();
-                      }}
-                      disabled={editingProjectSaving || !editingProjectName.trim()}
+                      onClick={saveProjectEdit}
+                      disabled={editingProjectSaving}
                       style={{
                         border: 'none',
                         background: palette.accent,
                         color: '#fff',
                         borderRadius: 999,
                         padding: '6px 14px',
-                        fontSize: 12,
-                        cursor: editingProjectSaving || !editingProjectName.trim() ? 'not-allowed' : 'pointer',
-                        boxShadow:
-                          editingProjectSaving || !editingProjectName.trim()
-                            ? 'none'
-                            : '0 8px 18px rgba(37,99,235,0.25)',
+                        cursor: editingProjectSaving ? 'not-allowed' : 'pointer',
                       }}
                     >
                       {editingProjectSaving ? 'Saving…' : 'Save'}
@@ -1438,73 +1506,153 @@ useEffect(() => {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      {manageProjectsMode && (
-                        <input
-                          type="checkbox"
-                          checked={selectedProjectIds.includes(project.id)}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={() => toggleProjectSelection(project.id)}
-                          style={{ width: 18, height: 18 }}
-                        />
-                      )}
-                      <div>
-                        <strong style={{ display: 'block', fontSize: 15 }}>{project.name}</strong>
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: 12,
-                            color: active ? palette.accent : palette.accentMuted,
-                          }}
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <div
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 16,
+                          background: active ? '#dbeafe' : '#f8fafc',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#1f2937',
+                        }}
+                      >
+                        <svg
+                          aria-hidden="true"
+                          width={20}
+                          height={20}
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          fill="none"
                         >
-                          Project #{project.id}
+                          <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+                          <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+                          <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+                          <path d="M10 6h4" />
+                          <path d="M10 10h4" />
+                          <path d="M10 14h4" />
+                          <path d="M10 18h4" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 600 }}>{project.name || `Project ${idx + 1}`}</p>
+                        <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted, textTransform: 'capitalize' }}>
+                          {statusLabel}
                         </p>
                       </div>
                     </div>
-                    {!manageProjectsMode && (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        background: statusDot,
+                        alignSelf: 'flex-start',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16 }}>
+                    <span style={{ fontSize: 13, color: palette.accentMuted }}>{investorsLabel}</span>
+                    <span
+                      style={{
+                        borderRadius: 999,
+                        padding: '3px 10px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: active ? '#fef3c7' : '#f1f5f9',
+                        color: active ? '#92400e' : '#475569',
+                      }}
+                    >
+                      {badgeLabel}
+                    </span>
+                  </div>
+                  {manageProjectsMode && (
+                    <div style={{ display: 'flex', alignItems: 'center', marginTop: 14, gap: 8, justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleProjectSelection(project.id);
+                          }}
+                          style={{
+                            border: `1px solid ${selectedIndicator}`,
+                            borderRadius: 999,
+                            padding: '4px 12px',
+                            fontSize: 12,
+                            background: selectedProjectIds.includes(project.id) ? '#dbeafe' : '#fff',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {selectedProjectIds.includes(project.id) ? 'Selected' : 'Select'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            beginProjectEdit(project);
+                          }}
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            color: palette.accent,
+                            fontSize: 12,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          beginProjectEdit(project);
+                          deleteProjectDirect(project.id);
                         }}
+                        disabled={actionLoading}
                         style={{
-                          border: `1px solid ${palette.border}`,
+                          border: 'none',
                           borderRadius: 999,
                           padding: '4px 12px',
                           fontSize: 12,
-                          background: '#fff',
-                          color: palette.text,
-                          cursor: 'pointer',
+                          background: '#dc2626',
+                          color: '#fff',
+                          cursor: actionLoading ? 'not-allowed' : 'pointer',
+                          opacity: actionLoading ? 0.6 : 1,
+                          boxShadow: actionLoading ? 'none' : '0 6px 14px rgba(220,38,38,0.25)',
                         }}
                       >
-                        Edit
+                        Delete
                       </button>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: '#f3f4f6' }}>
-                          <span
-                            aria-hidden="true"
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              background: statusColor,
-                            }}
-                          />
-                          <span style={{ fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', color: '#475569' }}>{statusLabel}</span>
-                        </div>
-                      </div>
                     </div>
+                  )}
+                </>
               )}
             </div>
           );
         })}
+        {!projects.length && (
+          <div
+            style={{
+              padding: 24,
+              borderRadius: 16,
+              border: `1px dashed ${palette.border}`,
+              textAlign: 'center',
+              color: palette.accentMuted,
+              background: '#f8fafc',
+            }}
+          >
+            No projects yet.
+          </div>
+        )}
         {manageProjectsMode && (
-          <div style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 12, marginTop: 4 }}>
+          <div style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 16 }}>
             {!showProjectForm ? (
               <button
                 type="button"
@@ -1513,8 +1661,6 @@ useEffect(() => {
                   border: 'none',
                   background: 'transparent',
                   color: palette.accent,
-                  textAlign: 'left',
-                  padding: 0,
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -1522,21 +1668,19 @@ useEffect(() => {
                 + Create project
               </button>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <input
                   type="text"
                   value={newProjectName}
                   onChange={(event) => setNewProjectName(event.target.value)}
                   placeholder="Project name"
                   style={{
-                    padding: 10,
+                    padding: 12,
                     borderRadius: 10,
                     border: `1px solid ${palette.border}`,
-                    background: '#fff',
-                    color: palette.text,
                   }}
                 />
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 10 }}>
                   <button
                     type="button"
                     onClick={createProject}
@@ -1550,7 +1694,6 @@ useEffect(() => {
                       color: '#fff',
                       fontWeight: 600,
                       cursor: creatingProject ? 'not-allowed' : 'pointer',
-                      boxShadow: creatingProject ? 'none' : '0 12px 24px rgba(37,99,235,0.25)',
                     }}
                   >
                     {creatingProject ? 'Adding…' : 'Add'}
@@ -1566,7 +1709,6 @@ useEffect(() => {
                       background: 'transparent',
                       color: palette.accentMuted,
                       cursor: 'pointer',
-                      fontSize: 12,
                     }}
                   >
                     Cancel
@@ -1584,6 +1726,150 @@ useEffect(() => {
   if (isMobile) layoutClasses.push('mobile');
   if (isMobile && projectDrawerOpen) layoutClasses.push('show-projects');
   const layoutClassName = layoutClasses.join(' ');
+  const heroSection = (
+    <section
+      style={{
+        position: 'relative',
+        width: '100%',
+        minHeight: isMobile ? 176 : 272,
+        backgroundColor: '#0f172a',
+        color: '#fff',
+        overflow: 'hidden',
+        margin: 0,
+        padding: 0,
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage:
+            'linear-gradient(130deg,rgba(2,6,23,0.65),rgba(2,6,23,0.15)), url(https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1600)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          opacity: selectedProject ? 0.85 : 0.45,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg,rgba(3,7,18,0) 0%,rgba(3,7,18,0.85) 100%)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'flex-end',
+        }}
+      >
+        <div style={{ width: '100%', padding: isMobile ? '20px 16px' : '32px 56px' }}>
+          <div
+            style={{
+              maxWidth: 1200,
+              margin: '0 auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 999,
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {selectedProject?.status?.replace(/-/g, ' ') || 'Project'}
+              </span>
+              <span
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.1)',
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                }}
+              >
+                {selectedProjectId ? `#${selectedProjectId}` : 'Unassigned'}
+              </span>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                gap: 24,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ flex: '1 1 320px' }}>
+                <h1 style={{ margin: '0 0 8px', fontSize: isMobile ? 28 : 38, fontWeight: 700 }}>
+                  {selectedProject?.name || 'Select a project'}
+                </h1>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.82)', maxWidth: 520 }}>
+                  {selectedProject
+                    ? 'Monitor performance, manage documents, and share the portal with investors.'
+                    : 'Choose a project to start managing signatures, files, and investors.'}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, color: 'rgba(255,255,255,0.85)' }}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
+                    style={{ color: '#fff' }}
+                  >
+                    <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  <span style={{ fontWeight: 500 }}>
+                    {selectedProject ? `${investors.length} active investors` : 'Waiting for project selection'}
+                  </span>
+                </div>
+              </div>
+              <div style={{ minWidth: 260, textAlign: isMobile ? 'left' : 'right' }}>
+                <p style={{ margin: 0, fontSize: 12, letterSpacing: 1, color: 'rgba(255,255,255,0.72)' }}>Investor portal</p>
+                {shareLink ? (
+                  <>
+                    <a
+                      href={shareLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        color: '#fff',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        gap: 6,
+                        alignItems: 'center',
+                        marginTop: 10,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Open viewer ↗
+                    </a>
+                    <p style={{ margin: '8px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.72)', wordBreak: 'break-all' }}>{shareLink}</p>
+                  </>
+                ) : (
+                  <p style={{ marginTop: 8, fontSize: 13, color: 'rgba(255,255,255,0.65)' }}>
+                    Select a project to copy and share its investor dashboard link.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 
   return (
     <div
@@ -1593,8 +1879,8 @@ useEffect(() => {
         display: 'flex',
         background: palette.bg,
         color: palette.text,
-        padding: isMobile ? 0 : 24,
-        gap: isMobile ? 0 : 24,
+        padding: 0,
+        gap: 0,
       }}
     >
       <style jsx global>{`
@@ -1626,9 +1912,9 @@ useEffect(() => {
       <aside
         className="admin-sidebar"
         style={{
-          width: isMobile ? '100%' : 300,
-          padding: 24,
-          borderRight: 'none',
+          width: isMobile ? '100%' : 320,
+          padding: isMobile ? 16 : 24,
+          borderRight: isMobile ? 'none' : '1px solid #e2e8f0',
           background: '#ffffff',
           display: 'flex',
           flexDirection: 'column',
@@ -1659,90 +1945,106 @@ useEffect(() => {
         className="admin-main"
         style={{
           flex: 1,
-          padding: isMobile ? 16 : 40,
+          padding: 0,
           overflowY: 'auto',
           background: '#f8fafc',
           display: 'flex',
           flexDirection: 'column',
-          gap: isMobile ? 20 : 32,
+          gap: 0,
         }}
       >
-        <section
+        {heroSection}
+        <div
           style={{
-            display: 'flex',
-            gap: 16,
-            overflowX: 'auto',
-            paddingBottom: 4,
+            width: '100%',
+            padding: isMobile ? 12 : 24,
           }}
         >
-          {docStats.map((stat) => (
-            <div
-              key={stat.label}
-              style={{
-                background: '#fff',
-                borderRadius: 20,
-                border: `1px solid ${palette.border}`,
-                padding: 20,
-                boxShadow: shadows.subtle,
-                minWidth: isMobile ? 180 : 0,
-                flex: isMobile ? '0 0 auto' : '1 1 0',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div
-                  style={{
-                    width: 50,
-                    height: 50,
-                    borderRadius: 16,
-                    background: 'linear-gradient(135deg, #eef2ff, #e0e7ff)',
-                    color: '#4338ca',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {stat.icon}
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>{stat.label}</p>
-                  <strong style={{ fontSize: 28, marginTop: 4, display: 'block' }}>{stat.value}</strong>
-                </div>
-              </div>
-            </div>
-          ))}
-        </section>
-          <section
+          <div
             style={{
-              borderRadius: 0,
-              background: '#f8fafc',
-              border: 'none',
+              maxWidth: 1200,
+              margin: '0 auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: isMobile ? 20 : 32,
+            }}
+          >
+          <div
+            style={{
+              borderRadius: isMobile ? 18 : 32,
+              background: 'inherit',
+              border: '1px solid transparent',
               boxShadow: 'none',
-              padding: 8,
               display: 'flex',
               flexDirection: 'column',
               gap: 18,
+              padding: isMobile ? 8 : 12,
             }}
           >
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? 'repeat(auto-fit, minmax(160px, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+                gap: 10,
+                marginBottom: isMobile ? 4 : 8,
+              }}
+            >
+              {docStats.map((stat) => (
+                <div
+                  key={stat.label}
+                  style={{
+                    background: '#fff',
+                    borderRadius: 16,
+                    border: '1px solid #e2e8f0',
+                    padding: isMobile ? 14 : 18,
+                    boxShadow: '0 12px 20px rgba(15,23,42,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 16,
+                      background: stat.iconBg,
+                      color: stat.iconColor,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {stat.icon}
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>{stat.label}</p>
+                    <strong style={{ fontSize: 28, marginTop: 4, display: 'block' }}>{stat.value}</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
             <header
               style={{
                 display: 'flex',
-                flexWrap: 'wrap',
                 justifyContent: 'flex-start',
-                gap: 12,
                 alignItems: 'center',
-                paddingBottom: 12,
-                borderBottom: `1px solid ${palette.border}`,
+                paddingBottom: 16,
+                borderBottom: '1px solid #e2e8f0',
               }}
             >
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 8,
-                    flexWrap: isMobile ? 'nowrap' : 'wrap',
-                    overflowX: isMobile ? 'auto' : 'visible',
-                    width: isMobile ? '100%' : 'auto',
-                  }}
-                >
+              <div
+                style={{
+                  display: 'inline-flex',
+                  gap: 4,
+                  padding: 4,
+                  borderRadius: 999,
+                  background: '#e0e7ff',
+                  border: '1px solid #c7d2fe',
+                  width: isMobile ? '100%' : 'auto',
+                  overflowX: isMobile ? 'auto' : 'visible',
+                }}
+              >
                 {(
                   [
                     { id: 'documents', label: 'Documents', icon: '📁' },
@@ -1759,19 +2061,20 @@ useEffect(() => {
                       data-testid={`tab-${tab.id}`}
                       onClick={() => setCenterTab(tab.id)}
                       style={{
-                        border: 'none',
                         borderRadius: 999,
+                        border: '1px solid transparent',
                         padding: '8px 18px',
                         fontSize: 13,
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 6,
-                        background: active ? palette.accent : 'transparent',
-                        color: active ? '#fff' : palette.textStrong,
+                        background: active ? '#fff' : 'transparent',
+                        color: active ? palette.text : palette.accentMuted,
                         cursor: 'pointer',
                         fontWeight: active ? 600 : 500,
                         flex: isMobile ? '0 0 auto' : undefined,
                         whiteSpace: 'nowrap',
+                        boxShadow: active ? '0 12px 24px rgba(15,23,42,0.12)' : 'none',
                       }}
                     >
                       <span aria-hidden="true">{tab.icon}</span>
@@ -1783,479 +2086,462 @@ useEffect(() => {
             </header>
             {error && <div style={{ color: '#fca5a5' }}>{error}</div>}
             {centerTab === 'signatures' && selectedProject && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <div
                   style={{
                     display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
                     justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
                     gap: 12,
                   }}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                      gap: 12,
-                      width: isMobile ? '100%' : 'auto',
-                    }}
-                  >
+                  <div>
+                    <h3 style={{ margin: 0 }}>Signatures & Packets</h3>
+                    <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>Monitor outgoing envelopes and completed packets.</p>
+                  </div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={goToRequestSign}
+                      disabled={!canRequestSignatures}
+                      style={usePrimaryButtonStyle(canRequestSignatures, requestButtonHovered)}
+                      onMouseEnter={() => canRequestSignatures && setRequestButtonHovered(true)}
+                      onMouseLeave={() => canRequestSignatures && setRequestButtonHovered(false)}
+                      title={
+                        canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
+                      }
+                    >
+                      <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width={16}
+                          height={16}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" x2="12" y1="3" y2="15" />
+                        </svg>
+                        Request signatures
+                      </span>
+                    </button>
                     <button
+                      data-testid="signatures-manage-toggle"
                       type="button"
                       onClick={toggleDocumentsManage}
-                      data-testid="signatures-manage-toggle"
-                    disabled={!hasSignaturesAvailable}
+                      disabled={!hasSignaturesAvailable}
                       style={{
+                        borderRadius: 999,
                         border: `1px solid ${palette.border}`,
+                        padding: '6px 14px',
                         background: manageDocumentsMode ? palette.accent : '#fff',
                         color: manageDocumentsMode ? '#fff' : palette.text,
-                        borderRadius: 999,
-                        padding: '4px 12px',
-                        fontSize: 12,
-                      cursor: hasSignaturesAvailable ? 'pointer' : 'not-allowed',
-                      opacity: hasSignaturesAvailable ? 1 : 0.5,
-                        boxShadow: manageDocumentsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
+                        fontWeight: 600,
+                        cursor: hasSignaturesAvailable ? 'pointer' : 'not-allowed',
+                        opacity: hasSignaturesAvailable ? 1 : 0.6,
                       }}
                     >
                       {manageDocumentsMode ? 'Done' : 'Manage'}
                     </button>
                     {manageDocumentsMode && (
                       <button
+                        data-testid="signatures-delete-selected"
                         type="button"
                         onClick={deleteSelectedDocuments}
-                        data-testid="signatures-delete-selected"
-                      disabled={
-                        !hasSignaturesAvailable ||
-                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
-                          actionLoading ||
-                          revokingEnvelopes
+                        disabled={
+                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) || actionLoading || revokingEnvelopes
                         }
                         style={{
-                          border: '1px solid #dc2626',
-                          color: '#fff',
-                          background: '#dc2626',
                           borderRadius: 999,
-                          padding: '6px 12px',
-                          fontSize: 13,
-                        cursor:
-                          !hasSignaturesAvailable ||
-                            (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
-                            actionLoading ||
-                            revokingEnvelopes
-                              ? 'not-allowed'
-                              : 'pointer',
-                        opacity:
-                          !hasSignaturesAvailable ||
-                            (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
-                            actionLoading ||
-                            revokingEnvelopes
-                              ? 0.5
-                              : 1,
-                        boxShadow:
-                          !hasSignaturesAvailable ||
-                            (!selectedFinalIds.length && !selectedEnvelopeIds.length) ||
-                            actionLoading ||
-                            revokingEnvelopes
-                              ? 'none'
-                              : '0 10px 18px rgba(220,38,38,0.25)',
+                          border: '1px solid #dc2626',
+                          padding: '6px 14px',
+                          background: '#dc2626',
+                          color: '#fff',
+                          fontWeight: 600,
+                          cursor:
+                            !selectedFinalIds.length && !selectedEnvelopeIds.length ? 'not-allowed' : 'pointer',
+                          opacity: !selectedFinalIds.length && !selectedEnvelopeIds.length ? 0.5 : 1,
                         }}
                       >
-                        {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete'}
+                        {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete selected'}
                       </button>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={goToRequestSign}
-                    disabled={!canRequestSignatures}
-                    style={usePrimaryButtonStyle(canRequestSignatures, requestButtonHovered)}
-                    onMouseEnter={() => canRequestSignatures && setRequestButtonHovered(true)}
-                    onMouseLeave={() => canRequestSignatures && setRequestButtonHovered(false)}
-                    title={
-                      canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
-                    }
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 20,
-                        lineHeight: 1,
-                      }}
-                    >
-                      ✍️
-                    </span>
-                    <span style={{ fontSize: 14, fontWeight: 700 }}>Request signatures</span>
-                  </button>
                 </div>
-
-              {hasSignaturesAvailable && (
-                <div data-testid="signatures-list-section" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {documentEntries.map((entry, idx) => {
-                      if (entry.kind === 'awaiting') {
-                        const env = entry.env;
-                        const expanded = expandedEnvelopes[env.id] ?? false;
-                        const hasSigners = env.total_signers > 0;
-                        const progressLabel = hasSigners
-                          ? `${env.completed_signers}/${env.total_signers} signed`
-                          : 'Incomplete setup';
-                        const buttonLabel = expanded ? 'Hide signees' : progressLabel;
-                        const documentUrl =
-                          selectedProjectId && env.document?.id
-                            ? `${baseApi}/api/projects/${selectedProjectId}/documents/${env.document.id}/pdf${tokenParam}`
-                            : null;
-                        const fileLabel = env.document?.filename || 'Untitled PDF';
-                        const envelopeHovered = hoveredEnvelopeId === env.id;
-                        const envelopeSelected = selectedEnvelopeIds.includes(env.id);
-                        return (
-                          <div
-                            key={`env-${env.id}`}
-                            data-document-kind="awaiting"
-                            onMouseEnter={() => setHoveredEnvelopeId(env.id)}
-                            onMouseLeave={() =>
-                              setHoveredEnvelopeId((prev) => (prev === env.id ? null : prev))
+                {!hasSignaturesAvailable ? (
+                  <div
+                    style={{
+                      padding: 28,
+                      border: '1px dashed rgba(148,163,184,0.45)',
+                      borderRadius: 16,
+                      textAlign: 'center',
+                      color: palette.accentMuted,
+                      background: '#fff',
+                    }}
+                  >
+                    Upload a PDF and add investors to start sending signature requests.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {documentEntries.map((entry) => {
+                          const isAwaiting = entry.kind === 'awaiting';
+                          const final = entry.kind === 'signed' ? entry.final : null;
+                          const envelopeRecord = isAwaiting
+                            ? entry.env
+                            : envelopeMap[final!.envelope_id] ??
+                              ({
+                                id: final?.envelope_id ?? 0,
+                                subject: final?.document_name ?? 'Signed packet',
+                                status: 'completed',
+                                created_at: final?.completed_at ?? '',
+                                document: final
+                                  ? { id: final.document_id ?? null, filename: final.document_name ?? null }
+                                  : undefined,
+                                total_signers: 0,
+                                completed_signers: 0,
+                                signers: [],
+                              } as EnvelopeSummary);
+                          if (!envelopeRecord) return null;
+                          const envelopeId = envelopeRecord.id;
+                          const finalId = final?.envelope_id ?? envelopeId;
+                          const expanded = isAwaiting
+                            ? expandedEnvelopes[envelopeId] ?? false
+                            : expandedFinals[finalId] ?? false;
+                          const hovered = isAwaiting
+                            ? hoveredEnvelopeId === envelopeId
+                            : hoveredFinalId === finalId;
+                          const selected = isAwaiting
+                            ? selectedEnvelopeIds.includes(envelopeId)
+                            : selectedFinalIds.includes(finalId);
+                          const signerList = envelopeRecord.signers || [];
+                          const signerAvatars = signerList.slice(0, 10);
+                          const extraSigners = Math.max(0, signerList.length - signerAvatars.length);
+                          const totalSigners = envelopeRecord.total_signers || signerList.length || 0;
+                          const completedSigners =
+                            envelopeRecord.completed_signers ??
+                            signerList.filter((signer) => signer.status === 'completed').length;
+                          const progressLabel =
+                            totalSigners > 0 ? `${Math.min(completedSigners, totalSigners)}/${totalSigners} signed` : 'Incomplete setup';
+                          const buttonLabel = expanded ? 'Hide signees' : progressLabel;
+                          const chipLabel = isAwaiting
+                            ? totalSigners > 0
+                              ? 'Awaiting'
+                              : 'Needs setup'
+                            : 'Completed';
+                          const chipStyle =
+                            isAwaiting && totalSigners === 0
+                              ? { ...awaitingChipStyle, background: '#fef3c7', color: '#92400e' }
+                              : isAwaiting
+                                ? awaitingChipStyle
+                                : completedChipStyle;
+                          const timelineLabel = isAwaiting
+                            ? formatSentLabel(envelopeRecord.created_at)
+                            : `Completed ${formatLocalDateTime(final?.completed_at) ?? 'time unavailable'}`;
+                          const documentLabel = isAwaiting
+                            ? envelopeRecord.document?.filename || 'Untitled PDF'
+                            : final?.document_name || envelopeRecord.document?.filename || 'Signed packet';
+                          const docNameForExt =
+                            isAwaiting && envelopeRecord.document?.filename
+                              ? envelopeRecord.document.filename
+                              : final?.document_name || envelopeRecord.document?.filename || documentLabel;
+                          const fileExtLabel = docNameForExt
+                            ? (docNameForExt.split('.').pop() ?? '').toUpperCase() || 'PDF'
+                            : 'PDF';
+                          const documentUrl = isAwaiting
+                            ? selectedProjectId && envelopeRecord.document?.id
+                              ? `${baseApi}/api/projects/${selectedProjectId}/documents/${envelopeRecord.document.id}/pdf${tokenParam}`
+                              : null
+                            : `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${finalId}/pdf${tokenParam}`;
+                          const showCheckbox = isAwaiting ? manageEnvelopesMode : manageSignedMode;
+                          const showRevoke = isAwaiting && manageEnvelopesMode;
+                          const key = isAwaiting ? `env-${envelopeId}` : `final-${finalId}`;
+                          const handleMouseEnter = () => {
+                            if (isAwaiting) {
+                              setHoveredEnvelopeId(envelopeId);
+                            } else {
+                              setHoveredFinalId(finalId);
                             }
-                            style={{
-                              border:
-                                envelopeSelected || envelopeHovered
-                                  ? `1px solid ${palette.accent}`
-                                  : `1px solid ${palette.border}`,
-                              borderRadius: 18,
-                              padding: 16,
-                              background: envelopeSelected
-                                ? envelopeHovered
-                                  ? '#e4ddff'
-                                  : '#ede9ff'
-                                : envelopeHovered
-                                ? '#f5f2ff'
-                                : '#fff',
-                              boxShadow: envelopeSelected
-                                ? '0 12px 28px rgba(37,99,235,0.25)'
-                                : envelopeHovered
-                                ? '0 12px 28px rgba(15,23,42,0.14)'
-                                : '0 10px 24px rgba(15,23,42,0.08)',
-                              transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
-                            }}
-                          >
+                          };
+                          const handleMouseLeave = () => {
+                            if (isAwaiting) {
+                              setHoveredEnvelopeId((prev) => (prev === envelopeId ? null : prev));
+                            } else {
+                              setHoveredFinalId((prev) => (prev === finalId ? null : prev));
+                            }
+                          };
+                          const toggleSelection = () => {
+                            if (isAwaiting) {
+                              toggleEnvelopeSelection(envelopeId);
+                            } else {
+                              toggleFinalSelection(finalId);
+                            }
+                          };
+                          const toggleExpansion = () => {
+                            if (isAwaiting) {
+                              toggleEnvelopeExpansion(envelopeId);
+                            } else {
+                              toggleFinalExpansion(finalId);
+                            }
+                          };
+                          const getSignerColor = (status?: string) => {
+                            if (status === 'completed') return '#22c55e';
+                            if (status === 'declined' || status === 'voided') return '#dc2626';
+                            return '#94a3b8';
+                          };
+
+                          return (
                             <div
+                              key={key}
+                              data-document-kind={isAwaiting ? 'awaiting' : 'signed'}
+                              onMouseEnter={handleMouseEnter}
+                              onMouseLeave={handleMouseLeave}
                               style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start',
-                                gap: 16,
-                                flexWrap: 'wrap',
+                                border: selected || hovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                                borderRadius: 14,
+                                padding: 16,
+                                background: '#fff',
+                                boxShadow:
+                                  selected || hovered
+                                    ? '0 10px 22px rgba(37,99,235,0.12)'
+                                    : '0 6px 16px rgba(15,23,42,0.08)',
+                                transition: 'border 0.2s ease, box-shadow 0.2s ease',
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 200 }}>
-                                {manageEnvelopesMode && (
-                                  <input
-                                    type="checkbox"
-                                    checked={envelopeSelected}
-                                    onChange={() => toggleEnvelopeSelection(env.id)}
-                                    onClick={(event) => event.stopPropagation()}
-                                  />
-                                )}
-                                <div>
-                                  {documentUrl ? (
-                                    <a
-                                      href={documentUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      style={documentLinkStyle}
-                                      className="admin-document-link"
-                                    >
-                                      <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
-                                    </a>
-                                  ) : (
-                                    <strong style={{ fontSize: 16 }}>{fileLabel}</strong>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'flex-start',
+                                  gap: 12,
+                                  flexWrap: 'wrap',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 260px' }}>
+                                  {showCheckbox && (
+                                    <input
+                                      type="checkbox"
+                                      checked={selected}
+                                      onChange={toggleSelection}
+                                      onClick={(event) => event.stopPropagation()}
+                                    />
                                   )}
-                                  <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
-                                    {formatSentLabel(env.created_at)}
-                                  </p>
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                                <span style={awaitingChipStyle}>Awaiting</span>
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setExpandedEnvelopes((prev) => ({
-                                      ...prev,
-                                      [env.id]: !expanded,
-                                    }));
-                                  }}
-                                  style={{
-                                    border: `1px solid ${palette.border}`,
-                                    borderRadius: 999,
-                                    padding: '4px 12px',
-                                    background: '#fff',
-                                    cursor: 'pointer',
-                                    fontSize: 12,
-                                  }}
-                                >
-                                  {buttonLabel}
-                                </button>
-                              </div>
-                            </div>
-                            {expanded && (
-                              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {env.signers.map((signer) => {
-                                  const completed = signer.status === 'completed';
-                                  const completionLabel =
-                                    completed && signer.completed_at
-                                      ? formatLocalDateTime(signer.completed_at) || 'time unavailable'
-                                      : null;
-                                  const signerKey = `outstanding-signer-${env.id}-${signer.id}`;
-                                  const signerHovered = hoveredSignerKey === signerKey;
-                                  return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
                                     <div
-                                      key={signerKey}
-                                      onMouseEnter={() => setHoveredSignerKey(signerKey)}
-                                      onMouseLeave={() =>
-                                        setHoveredSignerKey((prev) => (prev === signerKey ? null : prev))
-                                      }
                                       style={{
-                                        padding: 12,
+                                        width: 48,
+                                        height: 48,
                                         borderRadius: 12,
-                                        border: signerHovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                                        background: '#f1f5f9',
                                         display: 'flex',
-                                        justifyContent: 'space-between',
                                         alignItems: 'center',
-                                        background: signerHovered ? '#f5f2ff' : '#fff',
-                                        boxShadow: signerHovered ? '0 8px 18px rgba(15,23,42,0.12)' : 'none',
-                                        transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                                        justifyContent: 'center',
                                       }}
                                     >
-                                      <div>
-                                        <strong>{signer.name}</strong>
-                                        <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
-                                        {completionLabel && (
-                                          <span style={{ fontSize: 11, color: palette.accentMuted }}>Completed {completionLabel}</span>
-                                        )}
-                                      </div>
-                                      <span
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="24"
+                                        height="24"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        style={{ color: '#dc2626' }}
+                                      >
+                                        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                                        <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                                        <path d="M10 9H8" />
+                                        <path d="M16 13H8" />
+                                        <path d="M16 17H8" />
+                                      </svg>
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                      {documentUrl ? (
+                                        <a
+                                          href={documentUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          style={documentLinkStyle}
+                                          className="admin-document-link"
+                                        >
+                                          <strong style={{ fontSize: 16 }}>{documentLabel}</strong>
+                                        </a>
+                                      ) : (
+                                        <strong style={{ fontSize: 16 }}>{documentLabel}</strong>
+                                      )}
+                                      <div
                                         style={{
-                                          borderRadius: 999,
-                                          padding: '4px 10px',
-                                          fontSize: 12,
-                                          color: completed ? '#065f46' : '#92400e',
-                                          background: completed ? '#dcfce7' : '#fffbeb',
-                                          border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 8,
+                                          flexWrap: 'wrap',
+                                          color: palette.accentMuted,
+                                          marginTop: 4,
                                         }}
                                       >
-                                        {completed ? 'Signed' : 'Pending'}
-                                      </span>
-                                      {signer.magic_link && (
-                                        <button
-                                          type="button"
-                                          onClick={() => navigator.clipboard.writeText(signer.magic_link)}
+                                        <span
                                           style={{
-                                            border: `1px solid ${palette.border}`,
+                                            padding: '2px 8px',
                                             borderRadius: 999,
-                                            padding: '4px 10px',
-                                            fontSize: 12,
-                                            cursor: 'pointer',
-                                            background: '#fff',
-                                            marginLeft: 8,
+                                            background: '#fee2e2',
+                                            color: '#b91c1c',
+                                            fontSize: 11,
+                                            fontWeight: 600,
                                           }}
                                         >
-                                          Copy link
-                                        </button>
-                                      )}
+                                          {fileExtLabel}
+                                        </span>
+                                        <span>•</span>
+                                        <span style={{ fontSize: 12 }}>{timelineLabel}</span>
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+                                        <span style={chipStyle}>{chipLabel}</span>
+                                        {signerList.length > 0 && (
+                                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            {signerAvatars.map((signer, idx) => (
+                                              <div
+                                                key={`${key}-avatar-${signer.id}`}
+                                                title={`${signer.name || signer.email || 'Signer'} - ${signer.status || 'pending'}`}
+                                                style={{
+                                                  width: 28,
+                                                  height: 28,
+                                                  borderRadius: '50%',
+                                                  border: '2px solid #fff',
+                                                  background: getSignerColor(signer.status),
+                                                  color: '#fff',
+                                                  fontWeight: 700,
+                                                  fontSize: 12,
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  marginLeft: idx === 0 ? 0 : -8,
+                                                  textTransform: 'uppercase',
+                                                  boxShadow: '0 6px 14px rgba(15,23,42,0.18)',
+                                                }}
+                                              >
+                                                {(signer.name || signer.email || '?').trim().charAt(0) || '?'}
+                                              </div>
+                                            ))}
+                                            {extraSigners > 0 && (
+                                              <div
+                                                title={`${extraSigners} more signer${extraSigners > 1 ? 's' : ''}`}
+                                                style={{
+                                                  width: 28,
+                                                  height: 28,
+                                                  borderRadius: '50%',
+                                                  border: '2px solid #fff',
+                                                  background: '#1e293b',
+                                                  color: '#fff',
+                                                  fontWeight: 700,
+                                                  fontSize: 11,
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  marginLeft: signerAvatars.length ? -8 : 0,
+                                                  boxShadow: '0 6px 14px rgba(15,23,42,0.18)',
+                                                }}
+                                              >
+                                                +{extraSigners}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                        {totalSigners > 0 && (
+                                          <span style={{ fontSize: 12, color: palette.accentMuted }}>{progressLabel}</span>
+                                        )}
+                                      </div>
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-
-                      const item = entry.final;
-                      const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${item.envelope_id}/pdf${tokenParam}`;
-                      const finalEnvelope = envelopeMap[item.envelope_id];
-                      const signerList = finalEnvelope?.signers ?? [];
-                      const expanded = expandedFinals[item.envelope_id] ?? false;
-                      const hasSigners = signerList.length > 0;
-                      const completedAtLabel = formatLocalDateTime(item.completed_at) ?? 'time unavailable';
-                      const cardSelected = selectedFinalIds.includes(item.envelope_id);
-                      const cardHovered = hoveredFinalId === item.envelope_id;
-                      const cardBackground = cardSelected
-                        ? cardHovered
-                          ? '#e4ddff'
-                          : '#ede9ff'
-                        : cardHovered
-                        ? '#f5f2ff'
-                        : '#fff';
-                      return (
-                        <div
-                          key={`final-${selectedProjectId}-${item.envelope_id ?? `idx-${idx}`}-${item.sha256_final ?? 'na'}`}
-                          data-document-kind="signed"
-                          onMouseEnter={() => setHoveredFinalId(item.envelope_id)}
-                          onMouseLeave={() => setHoveredFinalId((prev) => (prev === item.envelope_id ? null : prev))}
-                          style={{
-                            border: cardSelected ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
-                            borderRadius: 18,
-                            padding: 16,
-                            background: cardBackground,
-                            boxShadow: cardSelected
-                              ? '0 12px 28px rgba(37,99,235,0.25)'
-                              : cardHovered
-                              ? '0 12px 28px rgba(15,23,42,0.14)'
-                              : '0 10px 24px rgba(15,23,42,0.08)',
-                            transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'flex-start',
-                              gap: 16,
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 200 }}>
-                              {manageSignedMode && (
-                                <input
-                                  type="checkbox"
-                                  checked={cardSelected}
-                                  onChange={() => toggleFinalSelection(item.envelope_id)}
-                                  onClick={(event) => event.stopPropagation()}
-                                />
-                              )}
-                              <div>
-                                <a
-                                  href={downloadUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={documentLinkStyle}
-                                  className="admin-document-link"
-                                >
-                                  <strong style={{ fontSize: 16 }}>{item.document_name}</strong>
-                                </a>
-                                <p style={{ margin: '4px 0 0', fontSize: 12, color: palette.accentMuted }}>
-                                  Completed {completedAtLabel}
-                                </p>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                              <span style={completedChipStyle}>Completed</span>
-                              {hasSigners && (
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setExpandedFinals((prev) => ({
-                                      ...prev,
-                                      [item.envelope_id]: !expanded,
-                                    }));
-                                  }}
-                                  style={{
-                                    border: `1px solid ${palette.border}`,
-                                    borderRadius: 999,
-                                    padding: '4px 12px',
-                                    background: '#fff',
-                                    cursor: 'pointer',
-                                    fontSize: 12,
-                                  }}
-                                >
-                                  {expanded ? 'Hide signees' : 'Signees'}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          {expanded && hasSigners && (
-                            <div
-                              style={{
-                                marginTop: 16,
-                                marginLeft: manageSignedMode ? 32 : 0,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: 8,
-                              }}
-                            >
-                              {signerList.map((signer) => {
-                                const completed = signer.status === 'completed';
-                                const completionLabel =
-                                  completed && signer.completed_at
-                                    ? formatLocalDateTime(signer.completed_at) || 'time unavailable'
-                                    : null;
-                                const signerKey = `final-signer-${item.envelope_id}-${signer.id}`;
-                                const signerHovered = hoveredSignerKey === signerKey;
-                                return (
-                                  <div
-                                    key={signerKey}
-                                    onMouseEnter={() => setHoveredSignerKey(signerKey)}
-                                    onMouseLeave={() =>
-                                      setHoveredSignerKey((prev) => (prev === signerKey ? null : prev))
-                                    }
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                  <button
+                                    type="button"
+                                    onClick={toggleExpansion}
+                                    aria-label={expanded ? 'Hide signees' : 'View signees'}
                                     style={{
-                                      padding: 12,
-                                      borderRadius: 12,
-                                      border: signerHovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center',
-                                      background: signerHovered ? '#f5f2ff' : '#fff',
-                                      boxShadow: signerHovered ? '0 8px 18px rgba(15,23,42,0.12)' : 'none',
-                                      transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                                      borderRadius: 999,
+                                      border: '1px solid rgba(148,163,184,0.6)',
+                                      padding: '6px 12px',
+                                      background: '#fff',
+                                      cursor: 'pointer',
+                                      fontSize: 13,
                                     }}
                                   >
-                                    <div>
-                                      <strong>{signer.name}</strong>
-                                      <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>{signer.email}</p>
-                                      {completionLabel && (
-                                        <span style={{ fontSize: 11, color: palette.accentMuted }}>Completed {completionLabel}</span>
-                                      )}
-                                    </div>
-                                    <span
-                                      style={{
-                                        borderRadius: 999,
-                                        padding: '4px 10px',
-                                        fontSize: 12,
-                                        color: completed ? '#065f46' : '#92400e',
-                                        background: completed ? '#dcfce7' : '#fffbeb',
-                                        border: completed ? '1px solid #bbf7d0' : '1px solid #fde68a',
-                                      }}
-                                    >
-                                      {completed ? 'Signed' : 'Pending'}
-                                    </span>
+                                    {buttonLabel}
+                                  </button>
+                                </div>
+                              </div>
+                              {expanded && signerList.length > 0 && (
+                                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${palette.border}` }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {signerList.map((signer) => {
+                                      const completed = signer.status === 'completed';
+                                      return (
+                                        <div
+                                          key={`${key}-signer-${signer.id}`}
+                                          style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            gap: 16,
+                                            flexWrap: 'wrap',
+                                            fontSize: 13,
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <strong style={{ fontSize: 13 }}>{signer.name || 'Unnamed signer'}</strong>
+                                            <span style={{ color: palette.accentMuted }}>{signer.email || 'Email unavailable'}</span>
+                                          </div>
+                                          <div style={{ textAlign: 'right', minWidth: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                            <span style={{ color: completed ? '#15803d' : '#9ca3af', fontWeight: 600 }}>
+                                              {completed ? 'Signed' : signer.status || 'Pending'}
+                                            </span>
+                                            {signer.completed_at && (
+                                              <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
+                                                {formatLocalDateTime(signer.completed_at)}
+                                              </p>
+                                            )}
+                                            {signer.magic_link && (
+                                              <button
+                                                type="button"
+                                                onClick={() => copyMagicLink(signer.magic_link)}
+                                                style={{
+                                                  border: `1px solid ${palette.border}`,
+                                                  borderRadius: 999,
+                                                  padding: '4px 10px',
+                                                  background: '#fff',
+                                                  color: palette.accent,
+                                                  fontSize: 12,
+                                                  cursor: 'pointer',
+                                                }}
+                                              >
+                                                Copy link
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              })}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {!hasSignaturesAvailable && (
-                <div
-                  style={{
-                    border: `1px dashed ${palette.border}`,
-                    borderRadius: 16,
-                    padding: 24,
-                    textAlign: 'center',
-                    color: palette.accentMuted,
-                    background: '#f8fafc',
-                  }}
-                >
-                  <p style={{ margin: 0, fontSize: 13 }}>
-                    Upload a PDF and add investors to start sending signature requests.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
           {centerTab === 'signatures' && !selectedProject && (
             <div
               style={{
@@ -2269,65 +2555,55 @@ useEffect(() => {
               Select a project on the left to review its uploaded PDFs and signed packets.
             </div>
           )}
-          {centerTab === 'documents' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {!selectedProjectId ? (
-                <div
-                  style={{
-                    padding: 32,
-                    border: '1px dashed rgba(148,163,184,0.4)',
-                    borderRadius: 16,
-                    textAlign: 'center',
-                    color: palette.accentMuted,
-                  }}
-                >
-                  Select a project to upload documents.
-                </div>
-              ) : (
-                <>
+            {centerTab === 'documents' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {!selectedProjectId ? (
                   <div
                     style={{
-                      border: `1px solid ${palette.border}`,
+                      padding: isMobile ? 24 : 36,
+                      border: '1px dashed rgba(148,163,184,0.45)',
                       borderRadius: 20,
-                      padding: 20,
+                      textAlign: 'center',
+                      color: palette.accentMuted,
                       background: '#fff',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 12,
-                      boxShadow: shadows.subtle,
                     }}
                   >
+                    Select a project to upload documents.
+                  </div>
+                ) : (
+                  <>
                     <div
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        gap: 12,
                         flexWrap: 'wrap',
+                        gap: 16,
+                        padding: '8px 4px',
                       }}
                     >
                       <div>
-                        <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Documents</p>
-                        <h4 style={{ margin: '4px 0 0' }}>Share project files with your team</h4>
+                        <h3 style={{ margin: 0 }}>Project Documents</h3>
+                        <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>All files and documents related to this project.</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setShowDocumentUpload((prev) => !prev)}
                         style={{
+                          borderRadius: 10,
                           border: 'none',
-                          borderRadius: 999,
-                          padding: '8px 16px',
+                          padding: '10px 18px',
                           background: palette.accent,
                           color: '#fff',
                           fontWeight: 600,
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: 8,
+                          gap: 6,
                         }}
                       >
                         <svg
-                          aria-hidden="true"
+                          xmlns="http://www.w3.org/2000/svg"
                           width={18}
                           height={18}
                           viewBox="0 0 24 24"
@@ -2337,48 +2613,77 @@ useEffect(() => {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         >
-                          <path d="M12 16V4" />
-                          <path d="M6 10l6-6 6 6" />
-                          <rect x="4" y="16" width="16" height="4" rx="1" />
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" x2="12" y1="3" y2="15" />
                         </svg>
-                        {showDocumentUpload ? 'Close' : 'Upload document'}
+                        {showDocumentUpload ? 'Close upload' : 'Upload documents'}
                       </button>
                     </div>
                     {showDocumentUpload && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div
+                        style={{
+                          border: '1px dashed rgba(148,163,184,0.45)',
+                          borderRadius: 16,
+                          padding: 16,
+                          background: '#f8fafc',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 12,
+                        }}
+                      >
                         <input
                           type="text"
                           placeholder="Document name"
                           value={projectFileUploadName}
                           onChange={(event) => setProjectFileUploadName(event.target.value)}
-                          style={{
-                            padding: 10,
-                            borderRadius: 10,
-                            border: `1px solid ${palette.border}`,
-                          }}
+                          style={{ padding: 12, borderRadius: 10, border: `1px solid ${palette.border}` }}
                         />
+                        <label
+                          htmlFor="project-file-upload"
+                          style={{
+                            border: '2px dashed rgba(148,163,184,0.6)',
+                            borderRadius: 12,
+                            padding: '18px 12px',
+                            textAlign: 'center',
+                            color: palette.accentMuted,
+                            cursor: 'pointer',
+                            background: '#fff',
+                          }}
+                        >
+                          Drag & drop files here or click to browse
+                        </label>
                         <input
+                          id="project-file-upload"
                           type="file"
                           accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,application/pdf,application/msword,application/vnd.ms-powerpoint,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                           onChange={handleProjectFileSelection}
-                          style={{ padding: 6 }}
+                          style={{ display: 'none' }}
                         />
                         {projectFileUploadFile && (
-                          <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
-                            Selected: {projectFileUploadFile.name} ({Math.round(projectFileUploadFile.size / 1024)} KB)
-                          </p>
+                          <p style={{ margin: 0, fontSize: 13 }}>Selected: {projectFileUploadFile.name}</p>
                         )}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowDocumentUpload(false);
+                              setProjectFileUploadFile(null);
+                              setProjectFileUploadName('');
+                            }}
+                            style={{ border: 'none', background: 'transparent', color: palette.accentMuted, cursor: 'pointer' }}
+                          >
+                            Cancel
+                          </button>
                           <button
                             type="button"
                             onClick={uploadProjectFile}
                             disabled={!projectFileUploadFile || projectFileUploading}
                             style={{
+                              borderRadius: 10,
                               border: 'none',
-                              borderRadius: 999,
-                              padding: '8px 18px',
-                              background:
-                                !projectFileUploadFile || projectFileUploading ? 'rgba(37,99,235,0.3)' : palette.accent,
+                              padding: '10px 18px',
+                              background: !projectFileUploadFile || projectFileUploading ? 'rgba(37,99,235,0.35)' : palette.accent,
                               color: '#fff',
                               fontWeight: 600,
                               cursor: !projectFileUploadFile || projectFileUploading ? 'not-allowed' : 'pointer',
@@ -2389,70 +2694,105 @@ useEffect(() => {
                         </div>
                       </div>
                     )}
-                  </div>
-                  <div>
-                    <p style={{ margin: '0 0 8px', fontSize: 13, color: palette.accentMuted }}>Uploaded documents</p>
-                    {projectFilesLoading ? (
-                      <p style={{ color: palette.accentMuted }}>Loading documents…</p>
-                    ) : hasProjectFiles ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {projectFiles.map((file) => {
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {projectFilesLoading ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+                          <div className="admin-loading-spinner" />
+                        </div>
+                      ) : hasProjectFiles ? (
+                        projectFiles.map((file) => {
                           const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/files/${file.id}/download${tokenParam}`;
                           const deleting = projectFileDeletingId === file.id;
                           const hovered = hoveredProjectFileId === file.id;
+                          const ext = (file.display_name || file.stored_filename || '').split('.').pop()?.toUpperCase() || 'FILE';
                           return (
                             <div
                               key={file.id}
                               style={{
-                                borderRadius: 16,
                                 border: hovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                                borderRadius: 16,
                                 padding: 16,
-                                background: hovered ? '#f5f2ff' : '#fff',
                                 display: 'flex',
-                                justifyContent: 'space-between',
+                                alignItems: 'center',
                                 gap: 16,
                                 flexWrap: 'wrap',
-                                boxShadow: hovered ? '0 12px 28px rgba(37,99,235,0.18)' : '0 4px 12px rgba(15,23,42,0.05)',
-                                transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                                background: '#fff',
+                                transition: 'border 0.2s ease, background 0.2s ease',
                               }}
                               onMouseEnter={() => setHoveredProjectFileId(file.id)}
-                              onMouseLeave={() =>
-                                setHoveredProjectFileId((prev) => (prev === file.id ? null : prev))
-                              }
+                              onMouseLeave={() => setHoveredProjectFileId((prev) => (prev === file.id ? null : prev))}
                             >
-                              <div style={{ flex: 1, minWidth: 200 }}>
-                                <a
-                                  href={downloadUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="admin-document-link"
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 220px' }}>
+                                <div
                                   style={{
-                                    fontSize: 15,
-                                    fontWeight: 600,
-                                    color: palette.accent,
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 12,
+                                    background: '#f1f5f9',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                   }}
                                 >
-                                  {file.display_name}
-                                </a>
-                                <p style={{ margin: '4px 0', fontSize: 12, color: palette.accentMuted }}>
-                                  Original: {file.stored_filename}
-                                </p>
-                                <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
-                                  Uploaded {formatLocalDateTime(file.uploaded_at) ?? 'time unavailable'}
-                                </p>
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    style={{ color: '#dc2626' }}
+                                  >
+                                    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                                    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                                    <path d="M10 9H8" />
+                                    <path d="M16 13H8" />
+                                    <path d="M16 17H8" />
+                                  </svg>
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <a
+                                    href={downloadUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="admin-document-link"
+                                    style={{ margin: 0, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                  >
+                                    {file.display_name}
+                                  </a>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: palette.accentMuted }}>
+                                    <span
+                                      style={{
+                                        padding: '2px 8px',
+                                        borderRadius: 999,
+                                        background: '#fee2e2',
+                                        color: '#b91c1c',
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {ext}
+                                    </span>
+                                    <span>•</span>
+                                    <span>Uploaded {formatLocalDateTime(file.uploaded_at) ?? 'time unavailable'}</span>
+                                  </div>
+                                </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <div style={{ display: 'flex', gap: 10 }}>
                                 <button
                                   type="button"
                                   onClick={() => deleteProjectFile(file.id)}
                                   disabled={deleting}
                                   style={{
-                                    border: '1px solid #dc2626',
-                                    borderRadius: 999,
-                                    padding: '6px 12px',
-                                    fontSize: 12,
-                                    background: deleting ? 'rgba(220,38,38,0.2)' : '#fff',
+                                    borderRadius: 8,
+                                    border: '1px solid rgba(220,38,38,0.4)',
+                                    padding: '6px 14px',
+                                    background: deleting ? 'rgba(220,38,38,0.12)' : '#fff',
                                     color: '#dc2626',
+                                    fontSize: 13,
                                     cursor: deleting ? 'not-allowed' : 'pointer',
                                   }}
                                 >
@@ -2461,34 +2801,43 @@ useEffect(() => {
                               </div>
                             </div>
                           );
-                        })}
-                      </div>
-                    ) : (
-                      <p style={{ color: palette.accentMuted }}>No documents uploaded yet.</p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                        })
+                      ) : (
+                        <div
+                          style={{
+                            padding: 28,
+                            borderRadius: 16,
+                            border: '1px dashed rgba(148,163,184,0.6)',
+                            textAlign: 'center',
+                            color: palette.accentMuted,
+                          }}
+                        >
+                          No documents uploaded yet.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           {centerTab === 'share' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {selectedProject ? (
                 <>
                   <div>
                     <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Project</p>
-                    <h3 style={{ margin: '4px 0 0' }}>{selectedProject.name}</h3>
+                    <h3 style={{ margin: '4px 0 0', fontSize: 22 }}>{selectedProject.name}</h3>
                   </div>
                   <div
                     style={{
-                      borderRadius: 16,
+                      borderRadius: 24,
                       border: `1px solid ${palette.border}`,
-                      padding: 20,
+                      padding: 24,
                       background: '#ffffff',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: 12,
-                      boxShadow: shadows.subtle,
+                      gap: 16,
+                      boxShadow: '0 18px 32px rgba(15,23,42,0.08)',
                     }}
                   >
                     <div>
@@ -2548,14 +2897,14 @@ useEffect(() => {
                   </div>
                   <div
                     style={{
-                      borderRadius: 16,
+                      borderRadius: 24,
                       border: `1px solid ${palette.border}`,
-                      padding: 20,
+                      padding: 24,
                       background: '#ffffff',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: 12,
-                      boxShadow: '0 15px 30px rgba(15,23,42,0.08)',
+                      gap: 16,
+                      boxShadow: '0 18px 32px rgba(15,23,42,0.08)',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -2588,7 +2937,7 @@ useEffect(() => {
                       style={{
                         marginTop: 4,
                         padding: '12px 14px',
-                        borderRadius: 10,
+                        borderRadius: 14,
                         background: '#f4f5fb',
                         fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                         fontSize: 13,
@@ -2736,65 +3085,93 @@ useEffect(() => {
                     const editing = editingInvestorId === investor.id;
                     const hovered = hoveredInvestorId === investor.id;
                     const cardBorder = selected || editing || hovered ? palette.accent : palette.border;
+                    const highlightBg = hovered || selected ? '#edf2ff' : '#fff';
+                    const initialsSource = (investor.name || investor.email || '?').trim();
+                    const initials = initialsSource ? initialsSource[0]?.toUpperCase() ?? '?' : '?';
+                    const unitsValue =
+                      typeof investor.units_invested === 'number' ? investor.units_invested : null;
+                    const unitsLabel = unitsValue !== null ? `${unitsValue.toLocaleString()} units` : 'Units pending';
+                    const secondaryLabel =
+                      investor.role?.trim() ||
+                      (investor.mailing_address ? investor.mailing_address : 'Role not specified');
                     return (
                       <div
                         key={investor.id}
                         style={{
-                          borderRadius: 16,
+                          borderRadius: 18,
                           border: `1px solid ${cardBorder}`,
                           padding: 16,
-                          background: hovered || selected ? '#f5f2ff' : '#fff',
-                          boxShadow: selected || hovered ? '0 12px 28px rgba(37,99,235,0.2)' : '0 4px 12px rgba(15,23,42,0.05)',
+                          background: highlightBg,
+                          boxShadow: highlightBg !== '#fff' ? '0 10px 24px rgba(37,99,235,0.15)' : '0 8px 18px rgba(15,23,42,0.04)',
                           transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
                         }}
                         onMouseEnter={() => setHoveredInvestorId(investor.id)}
                         onMouseLeave={() => setHoveredInvestorId((prev) => (prev === investor.id ? null : prev))}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                          <div style={{ flex: 1 }}>
-                            <strong style={{ display: 'block', fontSize: 15 }}>{investor.name}</strong>
-                            <p style={{ margin: '4px 0', fontSize: 13, color: palette.accentMuted }}>{investor.email}</p>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 16,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 240px' }}>
+                            {manageInvestorsMode && (
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() => toggleInvestorSelection(investor.id)}
+                                style={{ width: 18, height: 18 }}
+                              />
+                            )}
                             <div
                               style={{
-                                display: 'grid',
-                                gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
-                                gap: 8,
-                                marginTop: 8,
+                                width: 48,
+                                height: 48,
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, #3b82f6, #a855f7)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#fff',
+                                fontWeight: 700,
+                                fontSize: 18,
+                                flexShrink: 0,
                               }}
                             >
-                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
-                                <strong style={{ display: 'block', color: palette.text }}>Investment</strong>
-                                {typeof investor.units_invested === 'number'
-                                  ? `${investor.units_invested.toLocaleString()} units`
-                                  : '—'}
-                              </div>
-                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
-                                <strong style={{ display: 'block', color: palette.text }}>Mailing</strong>
-                                {investor.mailing_address || '—'}
-                              </div>
-                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
-                                <strong style={{ display: 'block', color: palette.text }}>Bank</strong>
-                                {investor.bank_name || '—'}
-                              </div>
-                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
-                                <strong style={{ display: 'block', color: palette.text }}>Account #</strong>
-                                {investor.bank_account_number || '—'}
-                              </div>
-                              <div style={{ fontSize: 12, color: palette.accentMuted, lineHeight: 1.4 }}>
-                                <strong style={{ display: 'block', color: palette.text }}>Routing #</strong>
-                                {investor.bank_routing_number || '—'}
-                              </div>
+                              {initials}
+                            </div>
+                            <div>
+                              <p style={{ margin: 0, fontWeight: 600, fontSize: 15 }}>{investor.name || 'Unnamed investor'}</p>
+                              <p style={{ margin: '4px 0 0', color: palette.accentMuted, fontSize: 13 }}>
+                                {investor.email || 'Email unavailable'}
+                              </p>
                             </div>
                           </div>
-                          {manageInvestorsMode && (
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => toggleInvestorSelection(investor.id)}
-                              style={{ width: 18, height: 18 }}
-                            />
-                          )}
+                          <div style={{ textAlign: 'right', minWidth: isMobile ? 'auto' : 180 }}>
+                            <p style={{ margin: 0, fontWeight: 600 }}>{unitsLabel}</p>
+                            <p style={{ margin: '4px 0 0', color: palette.accentMuted, fontSize: 13 }}>{secondaryLabel}</p>
+                          </div>
                         </div>
+                        {!editing && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 12,
+                              flexWrap: 'wrap',
+                              marginTop: 10,
+                              fontSize: 12,
+                              color: palette.accentMuted,
+                            }}
+                          >
+                            {investor.mailing_address && <span>Mailing: {investor.mailing_address}</span>}
+                            {investor.bank_name && <span>Bank: {investor.bank_name}</span>}
+                            {investor.bank_account_number && <span>Acct #: {investor.bank_account_number}</span>}
+                            {investor.bank_routing_number && <span>Routing #: {investor.bank_routing_number}</span>}
+                          </div>
+                        )}
                         {editing ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
                             <input
@@ -3026,7 +3403,9 @@ useEffect(() => {
               )}
             </div>
           )}
-        </section>
+        </div>
+          </div>
+        </div>
       </main>
       <style jsx>{`
         .project-scroll {

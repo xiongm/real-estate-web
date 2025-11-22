@@ -468,8 +468,17 @@ export default function ProjectViewerPage() {
               )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 24, flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 320px' }}>
-                <h1 style={{ margin: '0 0 8px', fontSize: isMobile ? 28 : 40, fontWeight: 700, letterSpacing: '-0.5px' }}>
+              <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: isMobile ? 28 : 40,
+                    fontWeight: 700,
+                    letterSpacing: '-0.5px',
+                    color: '#fff',
+                    textShadow: '0 6px 20px rgba(2,6,23,0.65)',
+                  }}
+                >
                   {heroProject?.name || 'Project overview'}
                 </h1>
                 {heroProject?.description ? (

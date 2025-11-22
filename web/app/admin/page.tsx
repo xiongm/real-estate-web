@@ -234,6 +234,8 @@ const addressCache = useRef<Map<string, string[]>>(new Map());
   const [heroAddressLoading, setHeroAddressLoading] = useState(false);
   const heroBlurTimeout = useRef<NodeJS.Timeout | null>(null);
   const [heroMenuOpen, setHeroMenuOpen] = useState(false);
+  const [heroMenuHoveredItem, setHeroMenuHoveredItem] = useState<'delete' | 'logout' | null>(null);
+  const [heroMenuHovered, setHeroMenuHovered] = useState(false);
   const heroMenuRef = useRef<HTMLDivElement | null>(null);
   const heroMenuButtonRef = useRef<HTMLButtonElement | null>(null);
 const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors'>('documents');
@@ -1833,6 +1835,10 @@ useEffect(() => {
           }}
           type="button"
           onClick={() => setHeroMenuOpen((prev) => !prev)}
+          onMouseEnter={() => setHeroMenuHovered(true)}
+          onMouseLeave={() => setHeroMenuHovered(false)}
+          onFocus={() => setHeroMenuHovered(true)}
+          onBlur={() => setHeroMenuHovered(false)}
           aria-haspopup="menu"
           aria-expanded={heroMenuOpen}
           style={{
@@ -1840,14 +1846,20 @@ useEffect(() => {
             borderRadius: 999,
             width: isMobile ? 38 : 44,
             height: isMobile ? 38 : 44,
-            background: 'rgba(255,255,255,0.18)',
+            background:
+              heroMenuHovered || heroMenuOpen ? 'rgba(255,255,255,0.26)' : 'rgba(255,255,255,0.18)',
             color: '#fff',
             backdropFilter: 'blur(10px)',
-            boxShadow: '0 10px 30px rgba(2,6,23,0.25)',
+            boxShadow:
+              heroMenuHovered || heroMenuOpen
+                ? '0 12px 32px rgba(2,6,23,0.35), 0 0 0 1px rgba(255,255,255,0.38)'
+                : '0 10px 30px rgba(2,6,23,0.25)',
+            transform: heroMenuHovered ? 'translateY(-1px)' : 'none',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            transition: 'background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease',
           }}
         >
           <svg
@@ -1890,37 +1902,55 @@ useEffect(() => {
               type="button"
               onClick={handleHeroDeleteProject}
               disabled={!selectedProjectId || actionLoading}
-              style={{
-                border: 'none',
-                borderRadius: 10,
-                padding: '10px 12px',
-                background: selectedProjectId ? '#fee2e2' : 'rgba(255,255,255,0.08)',
-                color: selectedProjectId ? '#b91c1c' : 'rgba(255,255,255,0.5)',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: !selectedProjectId || actionLoading ? 'not-allowed' : 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              Delete project
-            </button>
-            <button
-              type="button"
-              onClick={handleHeroLogout}
-              style={{
-                border: 'none',
-                borderRadius: 10,
-                padding: '10px 12px',
-                background: 'rgba(255,255,255,0.1)',
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              Sign out
-            </button>
+              onMouseEnter={() => setHeroMenuHoveredItem('delete')}
+              onMouseLeave={() => setHeroMenuHoveredItem(null)}
+              onFocus={() => setHeroMenuHoveredItem('delete')}
+              onBlur={() => setHeroMenuHoveredItem(null)}
+            style={{
+              border: 'none',
+              borderRadius: 8,
+              padding: '10px 12px',
+              background:
+                !selectedProjectId || actionLoading
+                  ? 'rgba(255,255,255,0.08)'
+                  : heroMenuHoveredItem === 'delete'
+                    ? 'rgba(255,255,255,0.18)'
+                    : 'rgba(255,255,255,0.1)',
+              color: !selectedProjectId || actionLoading ? 'rgba(255,255,255,0.5)' : '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: !selectedProjectId || actionLoading ? 'not-allowed' : 'pointer',
+              textAlign: 'left',
+              boxShadow: 'none',
+              transition: 'background 0.15s ease',
+            }}
+          >
+            Delete project
+          </button>
+          <button
+            type="button"
+            onClick={handleHeroLogout}
+            onMouseEnter={() => setHeroMenuHoveredItem('logout')}
+            onMouseLeave={() => setHeroMenuHoveredItem(null)}
+            onFocus={() => setHeroMenuHoveredItem('logout')}
+            onBlur={() => setHeroMenuHoveredItem(null)}
+            style={{
+              border: 'none',
+              borderRadius: 8,
+              padding: '10px 12px',
+              background:
+                heroMenuHoveredItem === 'logout' ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.1)',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              textAlign: 'left',
+              boxShadow: 'none',
+              transition: 'background 0.15s ease',
+            }}
+          >
+            Sign out
+          </button>
           </div>
         )}
       </div>
@@ -2275,7 +2305,6 @@ useEffect(() => {
                     >
                       Open viewer ↗
                     </a>
-                    <p style={{ margin: '8px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.72)', wordBreak: 'break-all' }}>{shareLink}</p>
                   </>
                 ) : (
                   <p style={{ marginTop: 8, fontSize: 13, color: 'rgba(255,255,255,0.65)' }}>

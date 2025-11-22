@@ -75,6 +75,19 @@ Services:
   Update `.env` with the new user’s access/secret and restart API/web. Only delete/recreate the MinIO data volume if you intentionally want a clean slate.
 - **Reminder**: Editing `.env` alone is not enough; restart the affected containers so they pick up the new values.
 
+### Mapbox address autocomplete
+- To enable the inline project address autocomplete, create a Mapbox access token with the Geocoding API enabled and save it as `MAPBOX_ACCESS_TOKEN` in `.env`. The admin UI proxies autocomplete requests through `/api/places/mapbox/autocomplete`, so the token is never exposed to browsers.
+
+## Database schema updates
+This skeleton does not ship with a migration tool. When we add new columns we run simple `ALTER TABLE` statements manually (once per environment) before restarting the API. For the `address` and `description` fields introduced on projects, run:
+
+```sql
+ALTER TABLE project ADD COLUMN address TEXT;
+ALTER TABLE project ADD COLUMN description TEXT;
+```
+
+Apply these on your Postgres instance (e.g., `docker compose exec db psql -U <user> -d signing -c "<statement>"`) before starting the new release.
+
 ### Public URLs in emails
 - Set `WEB_BASE_URL` (or `NEXT_PUBLIC_WEB_BASE`) in `.env` to the externally reachable URL for the web app (e.g., your Cloudflare Tunnel hostname). The API uses this value when generating magic-link emails (`<base>/sign/<token>`). If it’s missing, links fall back to `http://localhost:3000`.
 

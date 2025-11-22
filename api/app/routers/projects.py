@@ -62,6 +62,8 @@ def _content_disposition(filename: str) -> str:
 @router.post("")
 def create_project(
     name: str,
+    address: str = "",
+    description: str = "",
     tenant_id: int = 1,
     session: Session = Depends(get_session),
     ctx=Depends(require_admin_access),
@@ -69,7 +71,13 @@ def create_project(
     existing = session.exec(select(Project).where(Project.name == name)).first()
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "project name already exists")
-    p = Project(name=name, tenant_id=tenant_id, access_token=secrets.token_urlsafe(32))
+    p = Project(
+        name=name,
+        tenant_id=tenant_id,
+        address=address or None,
+        description=description or None,
+        access_token=secrets.token_urlsafe(32),
+    )
     session.add(p)
     session.commit()
     session.refresh(p)
@@ -313,6 +321,8 @@ def project_summary(
             "id": project.id,
             "name": project.name,
             "status": project.status,
+            "address": project.address,
+            "description": project.description,
         },
         "documents": [_serialize_document(doc) for doc in documents],
         "signed_documents": [_serialize_final(row) for row in final_rows],

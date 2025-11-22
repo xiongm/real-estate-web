@@ -46,6 +46,7 @@ services:
       - WORKER_QUEUE=signing
       - ADMIN_ACCESS_TOKEN=${ADMIN_ACCESS_TOKEN}
       - WEB_BASE_URL=${WEB_BASE_URL}
+      - MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN}
     depends_on:
       - db
       - minio

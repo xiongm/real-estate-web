@@ -72,3 +72,5 @@ class ProjectInvestorUpdate(BaseModel):
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
+    address: Optional[str] = None
+    description: Optional[str] = None

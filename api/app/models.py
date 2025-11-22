@@ -22,6 +22,8 @@ class Project(SQLModel, table=True):
     name: str
     status: str = "active"
     access_token: Optional[str] = ORMField(default=None, index=True)
+    address: Optional[str] = None
+    description: Optional[str] = None
 
 class Document(SQLModel, table=True):
     id: Optional[int] = ORMField(default=None, primary_key=True)

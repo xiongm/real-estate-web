@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, FormEvent, CSSProperties, KeyboardEvent, ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, FormEvent, CSSProperties, KeyboardEvent, ChangeEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
 
@@ -9,6 +9,8 @@ type Project = {
   name: string;
   status: string;
   access_token?: string | null;
+  address?: string | null;
+  description?: string | null;
 };
 
 type FinalArtifact = {
@@ -201,6 +203,8 @@ const [showDocumentUpload, setShowDocumentUpload] = useState(false);
 const [hoveredProjectFileId, setHoveredProjectFileId] = useState<number | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
   const [editingProjectName, setEditingProjectName] = useState('');
+  const [editingProjectAddress, setEditingProjectAddress] = useState('');
+  const [editingProjectDescription, setEditingProjectDescription] = useState('');
   const [editingProjectSaving, setEditingProjectSaving] = useState(false);
   const [manageSignedMode, setManageSignedMode] = useState(false);
   const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
@@ -211,10 +215,18 @@ const [hoveredProjectFileId, setHoveredProjectFileId] = useState<number | null>(
   const [hoveredSignerKey, setHoveredSignerKey] = useState<string | null>(null);
   const [revokingEnvelopes, setRevokingEnvelopes] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectAddress, setNewProjectAddress] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [manageProjectsMode, setManageProjectsMode] = useState(false);
-  const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
+  const addressSuggestionTimeout = useRef<NodeJS.Timeout | null>(null);
+  const addressCache = useRef<Map<string, string[]>>(new Map());
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [editingAddressSuggestions, setEditingAddressSuggestions] = useState<string[]>([]);
+  const editingAddressTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [editingAddressLoading, setEditingAddressLoading] = useState(false);
 const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors'>('documents');
   const [deletingInvestors, setDeletingInvestors] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -241,6 +253,122 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
       closeDrawers();
     }
   }, [isMobile]);
+  useEffect(() => {
+    if (editingAddressTimeout.current) {
+      clearTimeout(editingAddressTimeout.current);
+      editingAddressTimeout.current = null;
+    }
+    if (!editingProjectId) {
+      setEditingAddressSuggestions([]);
+      setEditingAddressLoading(false);
+      return;
+    }
+    const trimmed = editingProjectAddress.trim();
+    if (!adminVerified || !adminToken || trimmed.length < 3) {
+      setEditingAddressSuggestions([]);
+      setEditingAddressLoading(false);
+      return;
+    }
+    const cached = addressCache.current.get(trimmed.toLowerCase());
+    if (cached) {
+      setEditingAddressSuggestions(cached);
+      setEditingAddressLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    editingAddressTimeout.current = setTimeout(async () => {
+      setEditingAddressLoading(true);
+      try {
+        const resp = await fetch(
+          `${baseApi}/api/places/mapbox/autocomplete?query=${encodeURIComponent(trimmed)}`,
+          {
+            headers: { 'X-Access-Token': adminToken },
+            signal: controller.signal,
+          },
+        );
+        if (!resp.ok) throw new Error('Failed to fetch address suggestions');
+        const data = await resp.json();
+        const suggestions =
+          Array.isArray(data?.suggestions)
+            ? data.suggestions
+                .map((item: { label?: string }) => item?.label)
+                .filter((label: string | undefined): label is string => Boolean(label))
+            : [];
+        addressCache.current.set(trimmed.toLowerCase(), suggestions);
+        setEditingAddressSuggestions(suggestions);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        setEditingAddressSuggestions([]);
+      } finally {
+        setEditingAddressLoading(false);
+      }
+    }, 120);
+    return () => {
+      if (editingAddressTimeout.current) {
+        clearTimeout(editingAddressTimeout.current);
+        editingAddressTimeout.current = null;
+      }
+      controller.abort();
+    };
+  }, [editingProjectAddress, editingProjectId, adminToken, adminVerified, baseApi]);
+  useEffect(() => {
+    if (addressSuggestionTimeout.current) {
+      clearTimeout(addressSuggestionTimeout.current);
+      addressSuggestionTimeout.current = null;
+    }
+    if (!showProjectForm) {
+      setAddressSuggestions([]);
+      setAddressLoading(false);
+      return;
+    }
+    const trimmed = newProjectAddress.trim();
+    if (!adminVerified || !adminToken || trimmed.length < 3) {
+      setAddressSuggestions([]);
+      setAddressLoading(false);
+      return;
+    }
+    const cached = addressCache.current.get(trimmed.toLowerCase());
+    if (cached) {
+      setAddressSuggestions(cached);
+      setAddressLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    addressSuggestionTimeout.current = setTimeout(async () => {
+      setAddressLoading(true);
+      try {
+        const resp = await fetch(
+          `${baseApi}/api/places/mapbox/autocomplete?query=${encodeURIComponent(trimmed)}`,
+          {
+            headers: { 'X-Access-Token': adminToken },
+            signal: controller.signal,
+          },
+        );
+        if (!resp.ok) throw new Error('Failed to fetch address suggestions');
+        const data = await resp.json();
+        const suggestions =
+          Array.isArray(data?.suggestions)
+            ? data.suggestions
+                .map((item: { label?: string }) => item?.label)
+                .filter((label: string | undefined): label is string => Boolean(label))
+            : [];
+        addressCache.current.set(trimmed.toLowerCase(), suggestions);
+        setAddressSuggestions(suggestions);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        setAddressSuggestions([]);
+      } finally {
+        setAddressLoading(false);
+      }
+    }, 120);
+    return () => {
+      if (addressSuggestionTimeout.current) {
+        clearTimeout(addressSuggestionTimeout.current);
+        addressSuggestionTimeout.current = null;
+      }
+      controller.abort();
+    };
+  }, [newProjectAddress, showProjectForm, adminToken, adminVerified, baseApi]);
   const rememberProjectSelection = (id: number | null) => {
     if (typeof window === 'undefined') return;
     if (id !== null && id !== undefined) {
@@ -273,13 +401,19 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
   const cancelProjectEdit = () => {
     setEditingProjectId(null);
     setEditingProjectName('');
+    setEditingProjectAddress('');
+    setEditingProjectDescription('');
     setEditingProjectSaving(false);
+    setEditingAddressSuggestions([]);
+    setEditingAddressLoading(false);
   };
 
   const beginProjectEdit = (project: Project) => {
     if (!project.id) return;
     setEditingProjectId(project.id);
     setEditingProjectName(project.name ?? '');
+    setEditingProjectAddress(project.address ?? '');
+    setEditingProjectDescription(project.description ?? '');
     setEditingProjectSaving(false);
   };
 
@@ -290,6 +424,8 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
       setError('Project name is required.');
       return;
     }
+    const trimmedAddress = editingProjectAddress.trim();
+    const trimmedDescription = editingProjectDescription.trim();
     setEditingProjectSaving(true);
     try {
       const resp = await fetch(`${baseApi}/api/projects/${editingProjectId}`, {
@@ -298,7 +434,11 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
           'Content-Type': 'application/json',
           'X-Access-Token': adminToken,
         },
-        body: JSON.stringify({ name: trimmedName }),
+        body: JSON.stringify({
+          name: trimmedName,
+          address: trimmedAddress,
+          description: trimmedDescription,
+        }),
       });
       if (!resp.ok) throw new Error(`Failed to update project (${resp.status})`);
       const updated = await resp.json();
@@ -308,6 +448,8 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
       setError(err instanceof Error ? err.message : 'Failed to update project');
     } finally {
       setEditingProjectSaving(false);
+      setEditingAddressSuggestions([]);
+      setEditingAddressLoading(false);
     }
   };
 
@@ -1081,13 +1223,19 @@ useEffect(() => {
     setCreatingProject(true);
     setError(null);
     try {
-      const resp = await fetch(`${baseApi}/api/projects?name=${encodeURIComponent(name)}`, {
+      const params = new URLSearchParams();
+      params.set('name', name);
+      params.set('address', newProjectAddress.trim());
+      params.set('description', newProjectDescription.trim());
+      const resp = await fetch(`${baseApi}/api/projects?${params.toString()}`, {
         method: 'POST',
         headers: { 'X-Access-Token': adminToken },
       });
       if (!resp.ok) throw new Error(`Failed to create project (${resp.status})`);
       const project = await resp.json();
       setNewProjectName('');
+      setNewProjectAddress('');
+      setNewProjectDescription('');
       setShowProjectForm(false);
       await loadProjects(project.id);
     } catch (err) {
@@ -1099,7 +1247,6 @@ useEffect(() => {
 
   const removeProjectLocally = (projectId: number) => {
     setProjects((prev) => prev.filter((proj) => proj.id !== projectId));
-    setSelectedProjectIds((prev) => prev.filter((id) => id !== projectId));
     if (selectedProjectId === projectId) {
       selectProject(null);
     }
@@ -1108,16 +1255,10 @@ useEffect(() => {
   const toggleProjectManage = () => {
     setManageProjectsMode((prev) => {
       if (prev) {
-        setSelectedProjectIds([]);
-      } else {
         cancelProjectEdit();
       }
       return !prev;
     });
-  };
-
-  const toggleProjectSelection = (id: number) => {
-    setSelectedProjectIds((prev) => (prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]));
   };
 
   const performProjectDelete = async (projectId: number) => {
@@ -1139,26 +1280,6 @@ useEffect(() => {
       await performProjectDelete(projectId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete project');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const deleteSelectedProjects = async () => {
-    if (!selectedProjectIds.length) return;
-    const confirmRemove = window.confirm(
-      `Deleting ${selectedProjectIds.length} project(s) will remove all related documents, investors, and envelopes. This cannot be undone. Continue?`,
-    );
-    if (!confirmRemove) return;
-    setActionLoading(true);
-    try {
-      for (const projectId of selectedProjectIds) {
-        await performProjectDelete(projectId);
-      }
-      setSelectedProjectIds([]);
-      setManageProjectsMode(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete projects');
     } finally {
       setActionLoading(false);
     }
@@ -1365,44 +1486,22 @@ useEffect(() => {
               {projects.length ? `${projects.length} active project${projects.length > 1 ? 's' : ''}` : 'No projects yet'}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {manageProjectsMode && (
-              <button
-                type="button"
-                onClick={deleteSelectedProjects}
-                disabled={!selectedProjectIds.length || actionLoading}
-                style={{
-                  borderRadius: 999,
-                  border: '1px solid #dc2626',
-                  background: '#dc2626',
-                  color: '#fff',
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  cursor: !selectedProjectIds.length || actionLoading ? 'not-allowed' : 'pointer',
-                  opacity: !selectedProjectIds.length || actionLoading ? 0.5 : 1,
-                  boxShadow: !selectedProjectIds.length || actionLoading ? 'none' : '0 10px 20px rgba(220,38,38,0.2)',
-                }}
-              >
-                Delete
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={toggleProjectManage}
-              style={{
-                borderRadius: 999,
-                border: `1px solid ${palette.border}`,
-                background: manageProjectsMode ? palette.accent : '#fff',
-                color: manageProjectsMode ? '#fff' : palette.text,
-                padding: '6px 14px',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              {manageProjectsMode ? 'Done' : 'Manage'}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={toggleProjectManage}
+            style={{
+              borderRadius: 999,
+              border: `1px solid ${palette.border}`,
+              background: manageProjectsMode ? palette.accent : '#fff',
+              color: manageProjectsMode ? '#fff' : palette.text,
+              padding: '6px 14px',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {manageProjectsMode ? 'Done' : 'Manage'}
+          </button>
         </div>
         {isMobile && (
           <div className="drawer-mobile-close">
@@ -1417,8 +1516,6 @@ useEffect(() => {
           const active = project.id === selectedProjectId;
           const hovered = hoveredProjectId === project.id;
           const isEditing = project.id === editingProjectId;
-          const selectedIndicator =
-            selectedProjectIds.includes(project.id) || project.id === selectedProjectId ? '#3b82f6' : palette.border;
           const statusLabel = project.status ? project.status.replace(/-/g, ' ') : 'active';
           const statusDot =
             project.status === 'active'
@@ -1473,6 +1570,93 @@ useEffect(() => {
                       border: `1px solid ${palette.border}`,
                       background: '#fff',
                       color: palette.text,
+                    }}
+                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={editingProjectAddress}
+                      onChange={(event) => setEditingProjectAddress(event.target.value)}
+                      placeholder="Project address"
+                      disabled={editingProjectSaving}
+                      style={{
+                        padding: 10,
+                        borderRadius: 10,
+                        border: `1px solid ${palette.border}`,
+                        background: '#fff',
+                        color: palette.text,
+                        width: '100%',
+                      }}
+                    />
+                    {editingAddressLoading && (
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute',
+                          right: 12,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          fontSize: 12,
+                          color: palette.accentMuted,
+                        }}
+                      >
+                        Loading…
+                      </span>
+                    )}
+                    {editingAddressSuggestions.length > 0 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          background: '#fff',
+                          border: `1px solid ${palette.border}`,
+                          borderRadius: 12,
+                          marginTop: 4,
+                          maxHeight: 180,
+                          overflowY: 'auto',
+                          boxShadow: '0 18px 30px rgba(15,23,42,0.1)',
+                          zIndex: 3,
+                        }}
+                      >
+                        {editingAddressSuggestions.map((suggestion) => (
+                          <button
+                            type="button"
+                            key={`${suggestion}-${editingProjectId}`}
+                            onClick={() => {
+                              setEditingProjectAddress(suggestion);
+                              setEditingAddressSuggestions([]);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              padding: '10px 12px',
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              fontSize: 13,
+                            }}
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <textarea
+                    placeholder="Project description"
+                    value={editingProjectDescription}
+                    onChange={(event) => setEditingProjectDescription(event.target.value)}
+                    rows={3}
+                    disabled={editingProjectSaving}
+                    style={{
+                      padding: 10,
+                      borderRadius: 10,
+                      border: `1px solid ${palette.border}`,
+                      background: '#fff',
+                      color: palette.text,
+                      resize: 'vertical',
                     }}
                   />
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -1573,42 +1757,23 @@ useEffect(() => {
                     </span>
                   </div>
                   {manageProjectsMode && (
-                    <div style={{ display: 'flex', alignItems: 'center', marginTop: 14, gap: 8, justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            toggleProjectSelection(project.id);
-                          }}
-                          style={{
-                            border: `1px solid ${selectedIndicator}`,
-                            borderRadius: 999,
-                            padding: '4px 12px',
-                            fontSize: 12,
-                            background: selectedProjectIds.includes(project.id) ? '#dbeafe' : '#fff',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {selectedProjectIds.includes(project.id) ? 'Selected' : 'Select'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            beginProjectEdit(project);
-                          }}
-                          style={{
-                            border: 'none',
-                            background: 'transparent',
-                            color: palette.accent,
-                            fontSize: 12,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Edit
-                        </button>
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', marginTop: 14, gap: 8, justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          beginProjectEdit(project);
+                        }}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: palette.accent,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Edit
+                      </button>
                       <button
                         type="button"
                         onClick={(event) => {
@@ -1651,72 +1816,209 @@ useEffect(() => {
             No projects yet.
           </div>
         )}
-        {manageProjectsMode && (
-          <div style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 16 }}>
-            {!showProjectForm ? (
+      </div>
+      <div
+        style={{
+          padding: 20,
+          borderTop: `1px solid ${palette.border}`,
+          marginTop: 'auto',
+        }}
+      >
+        {!showProjectForm ? (
+          <button
+            type="button"
+            onClick={() => {
+              setShowProjectForm(true);
+              setNewProjectName('');
+              setNewProjectAddress('');
+              setNewProjectDescription('');
+            }}
+            style={{
+              width: '100%',
+              borderRadius: 12,
+              border: `1px solid ${palette.border}`,
+              padding: '10px 14px',
+              background: '#fff',
+              color: palette.text,
+              fontWeight: 600,
+              fontSize: 13,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              cursor: 'pointer',
+              transition: 'background 0.15s ease, color 0.15s ease',
+            }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.background = palette.accentSoft;
+              event.currentTarget.style.color = palette.accent;
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.background = '#fff';
+              event.currentTarget.style.color = palette.text;
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+            New Project
+          </button>
+        ) : (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              createProject();
+            }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              background: '#fff',
+              borderRadius: 16,
+              padding: 16,
+              border: `1px solid ${palette.border}`,
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600 }}>Project name</label>
+              <input
+                type="text"
+                autoFocus
+                value={newProjectName}
+                onChange={(event) => setNewProjectName(event.target.value)}
+                placeholder="e.g. Houston Tower"
+                style={{ padding: 10, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                disabled={creatingProject}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600 }}>Address</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={newProjectAddress}
+                  onChange={(event) => setNewProjectAddress(event.target.value)}
+                  placeholder="Street, City"
+                  style={{ padding: 10, borderRadius: 10, border: `1px solid ${palette.border}`, width: '100%' }}
+                  disabled={creatingProject}
+                />
+                {addressLoading && (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      fontSize: 12,
+                      color: palette.accentMuted,
+                    }}
+                  >
+                    Loading…
+                  </span>
+                )}
+                {addressSuggestions.length > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: '#fff',
+                      border: `1px solid ${palette.border}`,
+                      borderRadius: 12,
+                      marginTop: 4,
+                      maxHeight: 180,
+                      overflowY: 'auto',
+                      boxShadow: '0 18px 30px rgba(15,23,42,0.1)',
+                      zIndex: 2,
+                    }}
+                  >
+                    {addressSuggestions.map((suggestion) => (
+                      <button
+                        type="button"
+                        key={suggestion}
+                        onClick={() => {
+                          setNewProjectAddress(suggestion);
+                          setAddressSuggestions([]);
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '10px 12px',
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          fontSize: 13,
+                        }}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600 }}>Description</label>
+              <textarea
+                rows={3}
+                value={newProjectDescription}
+                onChange={(event) => setNewProjectDescription(event.target.value)}
+                placeholder="Give teammates context about this project"
+                style={{ padding: 10, borderRadius: 10, border: `1px solid ${palette.border}`, resize: 'vertical' }}
+                disabled={creatingProject}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
               <button
                 type="button"
-                onClick={() => setShowProjectForm(true)}
+                onClick={() => {
+                  setShowProjectForm(false);
+                  setNewProjectName('');
+                  setNewProjectAddress('');
+                  setNewProjectDescription('');
+                }}
                 style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: palette.accent,
-                  fontWeight: 600,
+                  flex: 1,
+                  borderRadius: 12,
+                  border: `1px solid ${palette.border}`,
+                  padding: '10px 14px',
+                  background: '#fff',
                   cursor: 'pointer',
                 }}
               >
-                + Create project
+                Cancel
               </button>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <input
-                  type="text"
-                  value={newProjectName}
-                  onChange={(event) => setNewProjectName(event.target.value)}
-                  placeholder="Project name"
-                  style={{
-                    padding: 12,
-                    borderRadius: 10,
-                    border: `1px solid ${palette.border}`,
-                  }}
-                />
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    type="button"
-                    onClick={createProject}
-                    disabled={creatingProject}
-                    style={{
-                      flex: 1,
-                      borderRadius: 999,
-                      border: 'none',
-                      padding: '10px 14px',
-                      background: creatingProject ? 'rgba(37,99,235,0.3)' : palette.accent,
-                      color: '#fff',
-                      fontWeight: 600,
-                      cursor: creatingProject ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {creatingProject ? 'Adding…' : 'Add'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowProjectForm(false);
-                      setNewProjectName('');
-                    }}
-                    style={{
-                      border: 'none',
-                      background: 'transparent',
-                      color: palette.accentMuted,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+              <button
+                type="submit"
+                disabled={creatingProject}
+                style={{
+                  flex: 1,
+                  borderRadius: 12,
+                  border: 'none',
+                  padding: '10px 14px',
+                  background: creatingProject ? 'rgba(37,99,235,0.35)' : palette.accent,
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: creatingProject ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {creatingProject ? 'Creating…' : 'Create project'}
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </>
@@ -1750,6 +2052,51 @@ useEffect(() => {
           opacity: selectedProject ? 0.85 : 0.45,
         }}
       />
+      <div
+        style={{
+          position: 'absolute',
+          top: isMobile ? 16 : 24,
+          right: isMobile ? 16 : 32,
+          zIndex: 2,
+        }}
+      >
+        <button
+          type="button"
+          onClick={logout}
+          style={{
+            border: 'none',
+            borderRadius: 999,
+            padding: isMobile ? '6px 12px' : '8px 16px',
+            fontSize: 13,
+            fontWeight: 600,
+            background: 'rgba(255,255,255,0.15)',
+            color: '#fff',
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0 10px 30px rgba(2,6,23,0.25)',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Sign out
+        </button>
+      </div>
       <div
         style={{
           position: 'absolute',
@@ -1822,27 +2169,62 @@ useEffect(() => {
                 >
                   {selectedProject?.name || 'Select a project'}
                 </h1>
-                <p style={{ margin: 0, color: 'rgba(255,255,255,0.82)', maxWidth: 520 }}>
-                  {selectedProject
-                    ? 'Monitor performance, manage documents, and share the portal with investors.'
-                    : 'Choose a project to start managing signatures, files, and investors.'}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, color: 'rgba(255,255,255,0.85)' }}>
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="18"
-                    height="18"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    fill="none"
-                    style={{ color: '#fff' }}
-                  >
-                    <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
-                  <span style={{ fontWeight: 500 }}>
-                    {selectedProject ? `${investors.length} active investors` : 'Waiting for project selection'}
-                  </span>
+                {selectedProject?.description ? (
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.85)', maxWidth: 560 }}>
+                    {selectedProject.description}
+                  </p>
+                ) : (
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.82)', maxWidth: 520 }}>
+                    {selectedProject
+                      ? 'Monitor performance, manage documents, and share the portal with investors.'
+                      : 'Choose a project to start managing signatures, files, and investors.'}
+                  </p>
+                )}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14, color: 'rgba(255,255,255,0.88)' }}>
+                  {selectedProject?.address ? (
+                    <>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedProject.address)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 28,
+                          height: 28,
+                          borderRadius: '999px',
+                          background: 'rgba(255,255,255,0.15)',
+                          color: '#fff',
+                        }}
+                        aria-label="Open in Google Maps"
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="1.5" fill="none">
+                          <path d="M12 21s-6-4.35-6-10a6 6 0 1 1 12 0c0 5.65-6 10-6 10z" />
+                          <circle cx="12" cy="11" r="2" />
+                        </svg>
+                      </a>
+                      <span style={{ fontWeight: 500 }}>{selectedProject.address}</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="18"
+                        height="18"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        fill="none"
+                        style={{ color: '#fff' }}
+                      >
+                        <path d="M12 21s-6-4.35-6-10a6 6 0 1 1 12 0c0 5.65-6 10-6 10z" />
+                        <circle cx="12" cy="11" r="2" />
+                      </svg>
+                      <span style={{ fontWeight: 500 }}>
+                        {selectedProject ? `${investors.length} active investors` : 'Waiting for project selection'}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               <div style={{ minWidth: 260, textAlign: isMobile ? 'left' : 'right' }}>
@@ -1933,22 +2315,6 @@ useEffect(() => {
         }}
       >
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>{projectSidebarContent}</div>
-        <button
-          type="button"
-          onClick={logout}
-          style={{
-            border: `1px solid ${palette.accent}`,
-            background: '#fff',
-            color: palette.accent,
-            borderRadius: 999,
-            padding: '6px 12px',
-            fontSize: 12,
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
-        >
-          Sign out
-        </button>
       </aside>
       <main
         className="admin-main"

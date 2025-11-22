@@ -149,7 +149,7 @@ test.describe('Admin portal', () => {
     await completeLogin(page, 'secret-token');
     await waitForDashboard(page);
 
-    await expect(page.getByRole('button', { name: /Alpha Fund/i })).toBeVisible();
+    await expect(page.locator('.project-scroll').getByRole('button', { name: /Alpha Fund/i })).toBeVisible();
 
     const stored = await page.evaluate(() => ({
       token: localStorage.getItem('adminAccessToken'),

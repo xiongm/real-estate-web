@@ -103,6 +103,18 @@ const documentLinkStyle: CSSProperties = {
   alignItems: 'center',
   gap: 6,
 };
+const primaryButtonStyle = (enabled: boolean): CSSProperties => ({
+  border: 'none',
+  borderRadius: 999,
+  padding: '8px 18px',
+  background: enabled ? palette.accent : '#e2e8f0',
+  color: enabled ? '#fff' : palette.accentMuted,
+  cursor: enabled ? 'pointer' : 'not-allowed',
+  fontSize: 14,
+  fontWeight: 600,
+  boxShadow: enabled ? shadows.subtle : 'none',
+  transition: 'background 0.2s ease, box-shadow 0.2s ease',
+});
 const usePrimaryButtonStyle = (
   enabled: boolean,
   hovered: boolean,
@@ -201,11 +213,6 @@ const [projectFileUploading, setProjectFileUploading] = useState(false);
 const [projectFileDeletingId, setProjectFileDeletingId] = useState<number | null>(null);
 const [showDocumentUpload, setShowDocumentUpload] = useState(false);
 const [hoveredProjectFileId, setHoveredProjectFileId] = useState<number | null>(null);
-  const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
-  const [editingProjectName, setEditingProjectName] = useState('');
-  const [editingProjectAddress, setEditingProjectAddress] = useState('');
-  const [editingProjectDescription, setEditingProjectDescription] = useState('');
-  const [editingProjectSaving, setEditingProjectSaving] = useState(false);
   const [manageSignedMode, setManageSignedMode] = useState(false);
   const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
   const [manageDocumentsMode, setManageDocumentsMode] = useState(false);
@@ -214,19 +221,21 @@ const [hoveredProjectFileId, setHoveredProjectFileId] = useState<number | null>(
   const [hoveredProjectId, setHoveredProjectId] = useState<number | null>(null);
   const [hoveredSignerKey, setHoveredSignerKey] = useState<string | null>(null);
   const [revokingEnvelopes, setRevokingEnvelopes] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectAddress, setNewProjectAddress] = useState('');
-  const [newProjectDescription, setNewProjectDescription] = useState('');
-  const [creatingProject, setCreatingProject] = useState(false);
-  const [showProjectForm, setShowProjectForm] = useState(false);
-  const [manageProjectsMode, setManageProjectsMode] = useState(false);
-  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
-  const addressSuggestionTimeout = useRef<NodeJS.Timeout | null>(null);
-  const addressCache = useRef<Map<string, string[]>>(new Map());
-  const [addressLoading, setAddressLoading] = useState(false);
-  const [editingAddressSuggestions, setEditingAddressSuggestions] = useState<string[]>([]);
-  const editingAddressTimeout = useRef<NodeJS.Timeout | null>(null);
-  const [editingAddressLoading, setEditingAddressLoading] = useState(false);
+const [newProjectName, setNewProjectName] = useState('');
+const [creatingProject, setCreatingProject] = useState(false);
+const [showProjectForm, setShowProjectForm] = useState(false);
+const addressCache = useRef<Map<string, string[]>>(new Map());
+  const [heroEditingField, setHeroEditingField] = useState<'name' | 'address' | 'description' | null>(null);
+  const [heroEditingValue, setHeroEditingValue] = useState('');
+  const [heroEditingSaving, setHeroEditingSaving] = useState(false);
+  const heroInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const [heroAddressSuggestions, setHeroAddressSuggestions] = useState<string[]>([]);
+  const heroAddressTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [heroAddressLoading, setHeroAddressLoading] = useState(false);
+  const heroBlurTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [heroMenuOpen, setHeroMenuOpen] = useState(false);
+  const heroMenuRef = useRef<HTMLDivElement | null>(null);
+  const heroMenuButtonRef = useRef<HTMLButtonElement | null>(null);
 const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors'>('documents');
   const [deletingInvestors, setDeletingInvestors] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -241,6 +250,27 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
   const searchParams = useSearchParams();
   const projectParamRaw = searchParams?.get('project') ?? null;
   const projectParamId = projectParamRaw && !Number.isNaN(Number(projectParamRaw)) ? Number(projectParamRaw) : undefined;
+  const clearHeroAddressTimeout = () => {
+    if (heroAddressTimeout.current) {
+      clearTimeout(heroAddressTimeout.current);
+      heroAddressTimeout.current = null;
+    }
+  };
+  const clearHeroBlurTimeout = () => {
+    if (heroBlurTimeout.current) {
+      clearTimeout(heroBlurTimeout.current);
+      heroBlurTimeout.current = null;
+    }
+  };
+  const cancelHeroEdit = useCallback(() => {
+    clearHeroAddressTimeout();
+    clearHeroBlurTimeout();
+    setHeroEditingField(null);
+    setHeroEditingValue('');
+    setHeroAddressSuggestions([]);
+    setHeroAddressLoading(false);
+    setHeroEditingSaving(false);
+  }, []);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const update = () => setIsMobile(window.innerWidth <= 900);
@@ -254,88 +284,33 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
     }
   }, [isMobile]);
   useEffect(() => {
-    if (editingAddressTimeout.current) {
-      clearTimeout(editingAddressTimeout.current);
-      editingAddressTimeout.current = null;
-    }
-    if (!editingProjectId) {
-      setEditingAddressSuggestions([]);
-      setEditingAddressLoading(false);
-      return;
-    }
-    const trimmed = editingProjectAddress.trim();
-    if (!adminVerified || !adminToken || trimmed.length < 3) {
-      setEditingAddressSuggestions([]);
-      setEditingAddressLoading(false);
-      return;
-    }
-    const cached = addressCache.current.get(trimmed.toLowerCase());
-    if (cached) {
-      setEditingAddressSuggestions(cached);
-      setEditingAddressLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    editingAddressTimeout.current = setTimeout(async () => {
-      setEditingAddressLoading(true);
-      try {
-        const resp = await fetch(
-          `${baseApi}/api/places/mapbox/autocomplete?query=${encodeURIComponent(trimmed)}`,
-          {
-            headers: { 'X-Access-Token': adminToken },
-            signal: controller.signal,
-          },
-        );
-        if (!resp.ok) throw new Error('Failed to fetch address suggestions');
-        const data = await resp.json();
-        const suggestions =
-          Array.isArray(data?.suggestions)
-            ? data.suggestions
-                .map((item: { label?: string }) => item?.label)
-                .filter((label: string | undefined): label is string => Boolean(label))
-            : [];
-        addressCache.current.set(trimmed.toLowerCase(), suggestions);
-        setEditingAddressSuggestions(suggestions);
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return;
-        setEditingAddressSuggestions([]);
-      } finally {
-        setEditingAddressLoading(false);
-      }
-    }, 120);
     return () => {
-      if (editingAddressTimeout.current) {
-        clearTimeout(editingAddressTimeout.current);
-        editingAddressTimeout.current = null;
-      }
-      controller.abort();
+      clearHeroAddressTimeout();
+      clearHeroBlurTimeout();
     };
-  }, [editingProjectAddress, editingProjectId, adminToken, adminVerified, baseApi]);
+  }, []);
   useEffect(() => {
-    if (addressSuggestionTimeout.current) {
-      clearTimeout(addressSuggestionTimeout.current);
-      addressSuggestionTimeout.current = null;
-    }
-    if (!showProjectForm) {
-      setAddressSuggestions([]);
-      setAddressLoading(false);
+    clearHeroAddressTimeout();
+    if (heroEditingField !== 'address') {
+      setHeroAddressSuggestions([]);
+      setHeroAddressLoading(false);
       return;
     }
-    const trimmed = newProjectAddress.trim();
+    const trimmed = heroEditingValue.trim();
     if (!adminVerified || !adminToken || trimmed.length < 3) {
-      setAddressSuggestions([]);
-      setAddressLoading(false);
+      setHeroAddressSuggestions([]);
+      setHeroAddressLoading(false);
       return;
     }
     const cached = addressCache.current.get(trimmed.toLowerCase());
     if (cached) {
-      setAddressSuggestions(cached);
-      setAddressLoading(false);
+      setHeroAddressSuggestions(cached);
+      setHeroAddressLoading(false);
       return;
     }
     const controller = new AbortController();
-    addressSuggestionTimeout.current = setTimeout(async () => {
-      setAddressLoading(true);
+    heroAddressTimeout.current = setTimeout(async () => {
+      setHeroAddressLoading(true);
       try {
         const resp = await fetch(
           `${baseApi}/api/places/mapbox/autocomplete?query=${encodeURIComponent(trimmed)}`,
@@ -353,22 +328,53 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
                 .filter((label: string | undefined): label is string => Boolean(label))
             : [];
         addressCache.current.set(trimmed.toLowerCase(), suggestions);
-        setAddressSuggestions(suggestions);
+        setHeroAddressSuggestions(suggestions);
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        setAddressSuggestions([]);
+        setHeroAddressSuggestions([]);
       } finally {
-        setAddressLoading(false);
+        setHeroAddressLoading(false);
       }
     }, 120);
     return () => {
-      if (addressSuggestionTimeout.current) {
-        clearTimeout(addressSuggestionTimeout.current);
-        addressSuggestionTimeout.current = null;
-      }
+      clearHeroAddressTimeout();
       controller.abort();
     };
-  }, [newProjectAddress, showProjectForm, adminToken, adminVerified, baseApi]);
+  }, [heroEditingField, heroEditingValue, adminToken, adminVerified, baseApi]);
+  useEffect(() => {
+    if (heroEditingField && heroInputRef.current) {
+      heroInputRef.current.focus();
+      requestAnimationFrame(() => {
+        heroInputRef.current?.select();
+      });
+    }
+  }, [heroEditingField]);
+  useEffect(() => {
+    cancelHeroEdit();
+  }, [selectedProjectId, cancelHeroEdit]);
+  useEffect(() => {
+    if (!heroMenuOpen) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setHeroMenuOpen(false);
+      }
+    };
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (heroMenuRef.current?.contains(target)) return;
+      if (heroMenuButtonRef.current?.contains(target)) return;
+      setHeroMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [heroMenuOpen]);
+  useEffect(() => {
+    setHeroMenuOpen(false);
+  }, [selectedProjectId]);
   const rememberProjectSelection = (id: number | null) => {
     if (typeof window === 'undefined') return;
     if (id !== null && id !== undefined) {
@@ -395,61 +401,6 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
     rememberProjectSelection(id);
     if (isMobile) {
       setProjectDrawerOpen(false);
-    }
-  };
-
-  const cancelProjectEdit = () => {
-    setEditingProjectId(null);
-    setEditingProjectName('');
-    setEditingProjectAddress('');
-    setEditingProjectDescription('');
-    setEditingProjectSaving(false);
-    setEditingAddressSuggestions([]);
-    setEditingAddressLoading(false);
-  };
-
-  const beginProjectEdit = (project: Project) => {
-    if (!project.id) return;
-    setEditingProjectId(project.id);
-    setEditingProjectName(project.name ?? '');
-    setEditingProjectAddress(project.address ?? '');
-    setEditingProjectDescription(project.description ?? '');
-    setEditingProjectSaving(false);
-  };
-
-  const saveProjectEdit = async () => {
-    if (!adminToken || !editingProjectId) return;
-    const trimmedName = editingProjectName.trim();
-    if (!trimmedName) {
-      setError('Project name is required.');
-      return;
-    }
-    const trimmedAddress = editingProjectAddress.trim();
-    const trimmedDescription = editingProjectDescription.trim();
-    setEditingProjectSaving(true);
-    try {
-      const resp = await fetch(`${baseApi}/api/projects/${editingProjectId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Access-Token': adminToken,
-        },
-        body: JSON.stringify({
-          name: trimmedName,
-          address: trimmedAddress,
-          description: trimmedDescription,
-        }),
-      });
-      if (!resp.ok) throw new Error(`Failed to update project (${resp.status})`);
-      const updated = await resp.json();
-      setProjects((prev) => prev.map((proj) => (proj.id === updated.id ? { ...proj, ...updated } : proj)));
-      cancelProjectEdit();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update project');
-    } finally {
-      setEditingProjectSaving(false);
-      setEditingAddressSuggestions([]);
-      setEditingAddressLoading(false);
     }
   };
 
@@ -530,7 +481,6 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
       const data = await resp.json();
       const sorted = Array.isArray(data) ? [...data].sort((a, b) => (a?.id ?? 0) - (b?.id ?? 0)) : [];
       setProjects(sorted);
-      cancelProjectEdit();
       const rawSaved = typeof window !== 'undefined' ? localStorage.getItem('adminSelectedProjectId') : null;
       const savedId = rawSaved ? Number(rawSaved) : null;
       const savedValid = typeof savedId === 'number' && Number.isFinite(savedId) && sorted.some((p) => p.id === savedId);
@@ -768,6 +718,107 @@ useEffect(() => {
     setHoveredProjectFileId(null);
     return project;
   }, [projects, selectedProjectId]);
+  const getHeroFieldValue = useCallback(
+    (field: 'name' | 'address' | 'description') => {
+      if (!selectedProject) return '';
+      if (field === 'name') return selectedProject.name ?? '';
+      if (field === 'address') return selectedProject.address ?? '';
+      return selectedProject.description ?? '';
+    },
+    [selectedProject],
+  );
+  const beginHeroEdit = useCallback(
+    (field: 'name' | 'address' | 'description') => {
+      if (!selectedProject || !selectedProjectId) return;
+      setHeroEditingField(field);
+      setHeroEditingValue(getHeroFieldValue(field));
+    },
+    [selectedProject, selectedProjectId, getHeroFieldValue],
+  );
+  const submitHeroEdit = useCallback(
+    async (overrideValue?: string) => {
+      if (!heroEditingField) return;
+      if (!selectedProjectId || !adminToken) {
+        cancelHeroEdit();
+        return;
+      }
+      const effectiveValue = typeof overrideValue === 'string' ? overrideValue : heroEditingValue;
+      const normalizedValue = heroEditingField === 'description' ? effectiveValue : effectiveValue.trim();
+      if (heroEditingField === 'name' && !normalizedValue) {
+        setError('Project name is required.');
+        return;
+      }
+      if (normalizedValue === getHeroFieldValue(heroEditingField)) {
+        cancelHeroEdit();
+        return;
+      }
+      setHeroEditingSaving(true);
+      try {
+        const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Access-Token': adminToken,
+          },
+          body: JSON.stringify({ [heroEditingField]: normalizedValue }),
+        });
+        if (!resp.ok) throw new Error('Failed to update project');
+        const updated = await resp.json();
+        setProjects((prev) => prev.map((proj) => (proj.id === updated.id ? { ...proj, ...updated } : proj)));
+        cancelHeroEdit();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to update project');
+      } finally {
+        setHeroEditingSaving(false);
+      }
+    },
+    [
+      heroEditingField,
+      heroEditingValue,
+      selectedProjectId,
+      adminToken,
+      getHeroFieldValue,
+      cancelHeroEdit,
+      baseApi,
+    ],
+  );
+  const handleHeroKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelHeroEdit();
+      return;
+    }
+    if (
+      event.key === 'Tab' &&
+      !event.shiftKey &&
+      heroEditingField === 'address' &&
+      heroAddressSuggestions.length > 0
+    ) {
+      event.preventDefault();
+      const suggestion = heroAddressSuggestions[0];
+      setHeroEditingValue(suggestion);
+      submitHeroEdit(suggestion);
+      return;
+    }
+    if (event.key === 'Enter') {
+      if (heroEditingField === 'description' && !event.metaKey && !event.ctrlKey) {
+        return;
+      }
+      event.preventDefault();
+      submitHeroEdit();
+    }
+  };
+  const handleHeroBlur = () => {
+    clearHeroBlurTimeout();
+    heroBlurTimeout.current = setTimeout(() => {
+      submitHeroEdit();
+    }, 80);
+  };
+  const heroDisplayValue = useCallback(
+    (field: 'name' | 'address' | 'description') => getHeroFieldValue(field),
+    [getHeroFieldValue],
+  );
+  const heroNameDisplayId = selectedProject ? `hero-name-display-${selectedProject.id}` : 'hero-name-display';
   const selectedProjectToken = selectedProject?.access_token ?? null;
   const outstandingEnvelopes = useMemo(() => envelopes.filter((env) => env.status !== 'completed'), [envelopes]);
   const envelopeMap = useMemo(() => {
@@ -1225,8 +1276,6 @@ useEffect(() => {
     try {
       const params = new URLSearchParams();
       params.set('name', name);
-      params.set('address', newProjectAddress.trim());
-      params.set('description', newProjectDescription.trim());
       const resp = await fetch(`${baseApi}/api/projects?${params.toString()}`, {
         method: 'POST',
         headers: { 'X-Access-Token': adminToken },
@@ -1234,8 +1283,6 @@ useEffect(() => {
       if (!resp.ok) throw new Error(`Failed to create project (${resp.status})`);
       const project = await resp.json();
       setNewProjectName('');
-      setNewProjectAddress('');
-      setNewProjectDescription('');
       setShowProjectForm(false);
       await loadProjects(project.id);
     } catch (err) {
@@ -1250,15 +1297,6 @@ useEffect(() => {
     if (selectedProjectId === projectId) {
       selectProject(null);
     }
-  };
-
-  const toggleProjectManage = () => {
-    setManageProjectsMode((prev) => {
-      if (prev) {
-        cancelProjectEdit();
-      }
-      return !prev;
-    });
   };
 
   const performProjectDelete = async (projectId: number) => {
@@ -1283,6 +1321,15 @@ useEffect(() => {
     } finally {
       setActionLoading(false);
     }
+  };
+  const handleHeroDeleteProject = () => {
+    if (!selectedProjectId) return;
+    setHeroMenuOpen(false);
+    deleteProjectDirect(selectedProjectId);
+  };
+  const handleHeroLogout = () => {
+    setHeroMenuOpen(false);
+    logout();
   };
 
   const regenerateProjectToken = async (projectId: number) => {
@@ -1479,29 +1526,11 @@ useEffect(() => {
   const projectSidebarContent = (
     <>
       <div style={{ padding: 24, borderBottom: `1px solid ${palette.border}` }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 20, color: palette.text }}>Projects</h2>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: palette.accentMuted }}>
-              {projects.length ? `${projects.length} active project${projects.length > 1 ? 's' : ''}` : 'No projects yet'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={toggleProjectManage}
-            style={{
-              borderRadius: 999,
-              border: `1px solid ${palette.border}`,
-              background: manageProjectsMode ? palette.accent : '#fff',
-              color: manageProjectsMode ? '#fff' : palette.text,
-              padding: '6px 14px',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {manageProjectsMode ? 'Done' : 'Manage'}
-          </button>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 20, color: palette.text }}>Projects</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: palette.accentMuted }}>
+            {projects.length ? `${projects.length} active project${projects.length > 1 ? 's' : ''}` : 'No projects yet'}
+          </p>
         </div>
         {isMobile && (
           <div className="drawer-mobile-close">
@@ -1515,7 +1544,6 @@ useEffect(() => {
         {projects.map((project, idx) => {
           const active = project.id === selectedProjectId;
           const hovered = hoveredProjectId === project.id;
-          const isEditing = project.id === editingProjectId;
           const statusLabel = project.status ? project.status.replace(/-/g, ' ') : 'active';
           const statusDot =
             project.status === 'active'
@@ -1536,14 +1564,14 @@ useEffect(() => {
           return (
             <div
               key={`project-${project.id ?? idx}`}
-              role={!isEditing ? 'button' : undefined}
-              tabIndex={!isEditing ? 0 : -1}
-              onClick={!isEditing ? () => selectProject(project.id) : undefined}
-              onKeyDown={!isEditing ? (event) => handleProjectKeyDown(event, project.id) : undefined}
+              role="button"
+              tabIndex={0}
+              onClick={() => selectProject(project.id)}
+              onKeyDown={(event) => handleProjectKeyDown(event, project.id)}
               onMouseEnter={() => setHoveredProjectId(project.id)}
               onMouseLeave={() => setHoveredProjectId((prev) => (prev === project.id ? null : prev))}
               style={{
-                border: `2px solid ${active ? '#3b82f6' : hovered || isEditing ? '#c7d2fe' : palette.border}`,
+                border: `2px solid ${active ? '#3b82f6' : hovered ? '#c7d2fe' : palette.border}`,
                 borderRadius: 20,
                 padding: 20,
                 background: active ? '#eff6ff' : '#fff',
@@ -1552,253 +1580,75 @@ useEffect(() => {
                   : hovered
                   ? '0 20px 38px rgba(15,23,42,0.1)'
                   : '0 6px 18px rgba(15,23,42,0.05)',
-                cursor: isEditing ? 'default' : 'pointer',
+                cursor: 'pointer',
                 transition: 'border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
               }}
             >
-              {isEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <input
-                    type="text"
-                    value={editingProjectName}
-                    onChange={(event) => setEditingProjectName(event.target.value)}
-                    placeholder="Project name"
-                    disabled={editingProjectSaving}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div
                     style={{
-                      padding: 10,
-                      borderRadius: 10,
-                      border: `1px solid ${palette.border}`,
-                      background: '#fff',
-                      color: palette.text,
+                      width: 48,
+                      height: 48,
+                      borderRadius: 16,
+                      background: active ? '#dbeafe' : '#f8fafc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#1f2937',
                     }}
-                  />
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      value={editingProjectAddress}
-                      onChange={(event) => setEditingProjectAddress(event.target.value)}
-                      placeholder="Project address"
-                      disabled={editingProjectSaving}
-                      style={{
-                        padding: 10,
-                        borderRadius: 10,
-                        border: `1px solid ${palette.border}`,
-                        background: '#fff',
-                        color: palette.text,
-                        width: '100%',
-                      }}
-                    />
-                    {editingAddressLoading && (
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          position: 'absolute',
-                          right: 12,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          fontSize: 12,
-                          color: palette.accentMuted,
-                        }}
-                      >
-                        Loading…
-                      </span>
-                    )}
-                    {editingAddressSuggestions.length > 0 && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          background: '#fff',
-                          border: `1px solid ${palette.border}`,
-                          borderRadius: 12,
-                          marginTop: 4,
-                          maxHeight: 180,
-                          overflowY: 'auto',
-                          boxShadow: '0 18px 30px rgba(15,23,42,0.1)',
-                          zIndex: 3,
-                        }}
-                      >
-                        {editingAddressSuggestions.map((suggestion) => (
-                          <button
-                            type="button"
-                            key={`${suggestion}-${editingProjectId}`}
-                            onClick={() => {
-                              setEditingProjectAddress(suggestion);
-                              setEditingAddressSuggestions([]);
-                            }}
-                            style={{
-                              width: '100%',
-                              textAlign: 'left',
-                              padding: '10px 12px',
-                              border: 'none',
-                              background: 'transparent',
-                              cursor: 'pointer',
-                              fontSize: 13,
-                            }}
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  >
+                    <svg
+                      aria-hidden="true"
+                      width={20}
+                      height={20}
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      fill="none"
+                    >
+                      <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+                      <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+                      <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+                      <path d="M10 6h4" />
+                      <path d="M10 10h4" />
+                      <path d="M10 14h4" />
+                      <path d="M10 18h4" />
+                    </svg>
                   </div>
-                  <textarea
-                    placeholder="Project description"
-                    value={editingProjectDescription}
-                    onChange={(event) => setEditingProjectDescription(event.target.value)}
-                    rows={3}
-                    disabled={editingProjectSaving}
-                    style={{
-                      padding: 10,
-                      borderRadius: 10,
-                      border: `1px solid ${palette.border}`,
-                      background: '#fff',
-                      color: palette.text,
-                      resize: 'vertical',
-                    }}
-                  />
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                    <button
-                      type="button"
-                      onClick={cancelProjectEdit}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: palette.accentMuted,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveProjectEdit}
-                      disabled={editingProjectSaving}
-                      style={{
-                        border: 'none',
-                        background: palette.accent,
-                        color: '#fff',
-                        borderRadius: 999,
-                        padding: '6px 14px',
-                        cursor: editingProjectSaving ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      {editingProjectSaving ? 'Saving…' : 'Save'}
-                    </button>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 600 }}>{project.name || `Project ${idx + 1}`}</p>
+                    <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted, textTransform: 'capitalize' }}>
+                      {statusLabel}
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <div
-                        style={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 16,
-                          background: active ? '#dbeafe' : '#f8fafc',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#1f2937',
-                        }}
-                      >
-                        <svg
-                          aria-hidden="true"
-                          width={20}
-                          height={20}
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          fill="none"
-                        >
-                          <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
-                          <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
-                          <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
-                          <path d="M10 6h4" />
-                          <path d="M10 10h4" />
-                          <path d="M10 14h4" />
-                          <path d="M10 18h4" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 600 }}>{project.name || `Project ${idx + 1}`}</p>
-                        <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted, textTransform: 'capitalize' }}>
-                          {statusLabel}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '50%',
-                        background: statusDot,
-                        alignSelf: 'flex-start',
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16 }}>
-                    <span style={{ fontSize: 13, color: palette.accentMuted }}>{investorsLabel}</span>
-                    <span
-                      style={{
-                        borderRadius: 999,
-                        padding: '3px 10px',
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: active ? '#fef3c7' : '#f1f5f9',
-                        color: active ? '#92400e' : '#475569',
-                      }}
-                    >
-                      {badgeLabel}
-                    </span>
-                  </div>
-                  {manageProjectsMode && (
-                    <div style={{ display: 'flex', alignItems: 'center', marginTop: 14, gap: 8, justifyContent: 'flex-end' }}>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          beginProjectEdit(project);
-                        }}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          color: palette.accent,
-                          fontSize: 12,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          deleteProjectDirect(project.id);
-                        }}
-                        disabled={actionLoading}
-                        style={{
-                          border: 'none',
-                          borderRadius: 999,
-                          padding: '4px 12px',
-                          fontSize: 12,
-                          background: '#dc2626',
-                          color: '#fff',
-                          cursor: actionLoading ? 'not-allowed' : 'pointer',
-                          opacity: actionLoading ? 0.6 : 1,
-                          boxShadow: actionLoading ? 'none' : '0 6px 14px rgba(220,38,38,0.25)',
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    background: statusDot,
+                    alignSelf: 'flex-start',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16 }}>
+                <span style={{ fontSize: 13, color: palette.accentMuted }}>{investorsLabel}</span>
+                <span
+                  style={{
+                    borderRadius: 999,
+                    padding: '3px 10px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: active ? '#fef3c7' : '#f1f5f9',
+                    color: active ? '#92400e' : '#475569',
+                  }}
+                >
+                  {badgeLabel}
+                </span>
+              </div>
             </div>
           );
         })}
@@ -1830,8 +1680,6 @@ useEffect(() => {
             onClick={() => {
               setShowProjectForm(true);
               setNewProjectName('');
-              setNewProjectAddress('');
-              setNewProjectDescription('');
             }}
             style={{
               width: '100%',
@@ -1902,93 +1750,12 @@ useEffect(() => {
                 disabled={creatingProject}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Address</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  value={newProjectAddress}
-                  onChange={(event) => setNewProjectAddress(event.target.value)}
-                  placeholder="Street, City"
-                  style={{ padding: 10, borderRadius: 10, border: `1px solid ${palette.border}`, width: '100%' }}
-                  disabled={creatingProject}
-                />
-                {addressLoading && (
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      position: 'absolute',
-                      right: 12,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      fontSize: 12,
-                      color: palette.accentMuted,
-                    }}
-                  >
-                    Loading…
-                  </span>
-                )}
-                {addressSuggestions.length > 0 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      background: '#fff',
-                      border: `1px solid ${palette.border}`,
-                      borderRadius: 12,
-                      marginTop: 4,
-                      maxHeight: 180,
-                      overflowY: 'auto',
-                      boxShadow: '0 18px 30px rgba(15,23,42,0.1)',
-                      zIndex: 2,
-                    }}
-                  >
-                    {addressSuggestions.map((suggestion) => (
-                      <button
-                        type="button"
-                        key={suggestion}
-                        onClick={() => {
-                          setNewProjectAddress(suggestion);
-                          setAddressSuggestions([]);
-                        }}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '10px 12px',
-                          border: 'none',
-                          background: 'transparent',
-                          cursor: 'pointer',
-                          fontSize: 13,
-                        }}
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Description</label>
-              <textarea
-                rows={3}
-                value={newProjectDescription}
-                onChange={(event) => setNewProjectDescription(event.target.value)}
-                placeholder="Give teammates context about this project"
-                style={{ padding: 10, borderRadius: 10, border: `1px solid ${palette.border}`, resize: 'vertical' }}
-                disabled={creatingProject}
-              />
-            </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 type="button"
                 onClick={() => {
                   setShowProjectForm(false);
                   setNewProjectName('');
-                  setNewProjectAddress('');
-                  setNewProjectDescription('');
                 }}
                 style={{
                   flex: 1,
@@ -2015,7 +1782,7 @@ useEffect(() => {
                   cursor: creatingProject ? 'not-allowed' : 'pointer',
                 }}
               >
-                {creatingProject ? 'Creating…' : 'Create project'}
+                {creatingProject ? 'Creating…' : 'Create'}
               </button>
             </div>
           </form>
@@ -2036,7 +1803,7 @@ useEffect(() => {
         minHeight: isMobile ? 176 : 272,
         backgroundColor: '#0f172a',
         color: '#fff',
-        overflow: 'hidden',
+        overflow: 'visible',
         margin: 0,
         padding: 0,
       }}
@@ -2057,45 +1824,105 @@ useEffect(() => {
           position: 'absolute',
           top: isMobile ? 16 : 24,
           right: isMobile ? 16 : 32,
-          zIndex: 2,
+          zIndex: 4,
         }}
       >
         <button
+          ref={(node) => {
+            heroMenuButtonRef.current = node;
+          }}
           type="button"
-          onClick={logout}
+          onClick={() => setHeroMenuOpen((prev) => !prev)}
+          aria-haspopup="menu"
+          aria-expanded={heroMenuOpen}
           style={{
             border: 'none',
             borderRadius: 999,
-            padding: isMobile ? '6px 12px' : '8px 16px',
-            fontSize: 13,
-            fontWeight: 600,
-            background: 'rgba(255,255,255,0.15)',
+            width: isMobile ? 38 : 44,
+            height: isMobile ? 38 : 44,
+            background: 'rgba(255,255,255,0.18)',
             color: '#fff',
-            backdropFilter: 'blur(8px)',
+            backdropFilter: 'blur(10px)',
             boxShadow: '0 10px 30px rgba(2,6,23,0.25)',
             cursor: 'pointer',
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            justifyContent: 'center',
           }}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.7"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            aria-hidden="true"
           >
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
+            <circle cx="12" cy="5" r="1.5" />
+            <circle cx="12" cy="12" r="1.5" />
+            <circle cx="12" cy="19" r="1.5" />
           </svg>
-          Sign out
         </button>
+        {heroMenuOpen && (
+          <div
+            ref={heroMenuRef}
+            role="menu"
+            style={{
+              position: 'absolute',
+              top: isMobile ? 46 : 52,
+              right: 0,
+              background: '#0f172a',
+              borderRadius: 14,
+              border: '1px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 20px 45px rgba(2,6,23,0.5)',
+              padding: 8,
+              minWidth: 180,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleHeroDeleteProject}
+              disabled={!selectedProjectId || actionLoading}
+              style={{
+                border: 'none',
+                borderRadius: 10,
+                padding: '10px 12px',
+                background: selectedProjectId ? '#fee2e2' : 'rgba(255,255,255,0.08)',
+                color: selectedProjectId ? '#b91c1c' : 'rgba(255,255,255,0.5)',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: !selectedProjectId || actionLoading ? 'not-allowed' : 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              Delete project
+            </button>
+            <button
+              type="button"
+              onClick={handleHeroLogout}
+              style={{
+                border: 'none',
+                borderRadius: 10,
+                padding: '10px 12px',
+                background: 'rgba(255,255,255,0.1)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
       <div
         style={{
@@ -2156,10 +1983,10 @@ useEffect(() => {
                 flexWrap: 'wrap',
               }}
             >
-              <div style={{ flex: '1 1 320px' }}>
+              <div style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <h1
                   style={{
-                    margin: '0 0 8px',
+                    margin: 0,
                     fontSize: isMobile ? 28 : 40,
                     fontWeight: 700,
                     color: '#fff',
@@ -2167,21 +1994,198 @@ useEffect(() => {
                     letterSpacing: '-0.5px',
                   }}
                 >
-                  {selectedProject?.name || 'Select a project'}
+                  {heroEditingField === 'name' ? (
+                    <input
+                      ref={(node) => {
+                        heroInputRef.current = node;
+                      }}
+                      type="text"
+                      value={heroEditingValue}
+                      onChange={(event) => setHeroEditingValue(event.target.value)}
+                      onKeyDown={handleHeroKeyDown}
+                      onBlur={handleHeroBlur}
+                      disabled={heroEditingSaving}
+                      style={{
+                        width: '100%',
+                        padding: '6px 10px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        background: 'rgba(15,23,42,0.15)',
+                        color: '#fff',
+                        fontSize: 'inherit',
+                        fontWeight: 'inherit',
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => beginHeroEdit('name')}
+                      disabled={!selectedProject}
+                      aria-label={selectedProject ? 'Edit project name' : 'Project name'}
+                      aria-describedby={heroNameDisplayId}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        border: 'none',
+                        padding: 0,
+                        background: 'transparent',
+                        color: '#fff',
+                        cursor: selectedProject ? 'pointer' : 'default',
+                        fontSize: 'inherit',
+                        fontWeight: 'inherit',
+                        fontFamily: 'inherit',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span id={heroNameDisplayId}>{heroDisplayValue('name') || 'Select a project'}</span>
+                      {selectedProject && (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ opacity: 0.85 }}
+                          aria-hidden="true"
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
                 </h1>
-                {selectedProject?.description ? (
-                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.85)', maxWidth: 560 }}>
-                    {selectedProject.description}
-                  </p>
+                {heroEditingField === 'description' ? (
+                  <textarea
+                    ref={(node) => {
+                      heroInputRef.current = node;
+                    }}
+                    rows={selectedProject?.description ? 3 : 2}
+                    value={heroEditingValue}
+                    onChange={(event) => setHeroEditingValue(event.target.value)}
+                    onKeyDown={handleHeroKeyDown}
+                    onBlur={handleHeroBlur}
+                    disabled={heroEditingSaving}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 12,
+                      border: '1px solid rgba(255,255,255,0.4)',
+                      background: 'rgba(15,23,42,0.15)',
+                      color: '#fff',
+                      fontSize: 15,
+                      lineHeight: 1.4,
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                    }}
+                  />
                 ) : (
-                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.82)', maxWidth: 520 }}>
-                    {selectedProject
-                      ? 'Monitor performance, manage documents, and share the portal with investors.'
-                      : 'Choose a project to start managing signatures, files, and investors.'}
+                  <p
+                    onClick={() => (selectedProject ? beginHeroEdit('description') : undefined)}
+                    style={{
+                      margin: 0,
+                      color: 'rgba(255,255,255,0.85)',
+                      maxWidth: 560,
+                      cursor: selectedProject ? 'pointer' : 'default',
+                    }}
+                  >
+                    {heroDisplayValue('description') ||
+                      (selectedProject
+                        ? 'Add a short overview so everyone stays aligned.'
+                        : 'Choose a project to start managing signatures, files, and investors.')}
                   </p>
                 )}
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14, color: 'rgba(255,255,255,0.88)' }}>
-                  {selectedProject?.address ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6, color: 'rgba(255,255,255,0.88)', flexWrap: 'wrap' }}>
+                  {heroEditingField === 'address' ? (
+                    <div style={{ position: 'relative', minWidth: 240, maxWidth: 420 }}>
+                      <input
+                        ref={(node) => {
+                          heroInputRef.current = node;
+                        }}
+                        type="text"
+                        value={heroEditingValue}
+                        onChange={(event) => setHeroEditingValue(event.target.value)}
+                        onKeyDown={handleHeroKeyDown}
+                        onBlur={handleHeroBlur}
+                        disabled={heroEditingSaving}
+                        placeholder="Project address"
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: 12,
+                          border: '1px solid rgba(255,255,255,0.4)',
+                          background: 'rgba(15,23,42,0.2)',
+                          color: '#fff',
+                          outline: 'none',
+                        }}
+                      />
+                      {heroAddressLoading && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            right: 12,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            fontSize: 12,
+                            color: 'rgba(255,255,255,0.7)',
+                          }}
+                        >
+                          Loading…
+                        </span>
+                      )}
+                      {heroAddressSuggestions.length > 0 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 6px)',
+                            left: 0,
+                            right: 0,
+                            background: '#0f172a',
+                            borderRadius: 12,
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            boxShadow: '0 20px 40px rgba(2,6,23,0.5)',
+                            maxHeight: 220,
+                            overflowY: 'auto',
+                            zIndex: 30,
+                          }}
+                        >
+                          {heroAddressSuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              onMouseDown={(event) => {
+                                event.preventDefault();
+                                clearHeroBlurTimeout();
+                              }}
+                              onClick={() => {
+                                setHeroEditingValue(suggestion);
+                                submitHeroEdit(suggestion);
+                              }}
+                              style={{
+                                width: '100%',
+                                textAlign: 'left',
+                                padding: '10px 12px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#fff',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {suggestion}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : selectedProject?.address ? (
                     <>
                       <a
                         href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedProject.address)}`}
@@ -2204,7 +2208,20 @@ useEffect(() => {
                           <circle cx="12" cy="11" r="2" />
                         </svg>
                       </a>
-                      <span style={{ fontWeight: 500 }}>{selectedProject.address}</span>
+                      <button
+                        type="button"
+                        onClick={() => beginHeroEdit('address')}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#fff',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        {selectedProject.address}
+                      </button>
                     </>
                   ) : (
                     <>
@@ -2220,9 +2237,20 @@ useEffect(() => {
                         <path d="M12 21s-6-4.35-6-10a6 6 0 1 1 12 0c0 5.65-6 10-6 10z" />
                         <circle cx="12" cy="11" r="2" />
                       </svg>
-                      <span style={{ fontWeight: 500 }}>
-                        {selectedProject ? `${investors.length} active investors` : 'Waiting for project selection'}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => (selectedProject ? beginHeroEdit('address') : undefined)}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#fff',
+                          fontWeight: 500,
+                          cursor: selectedProject ? 'pointer' : 'default',
+                          padding: 0,
+                        }}
+                      >
+                        {selectedProject ? 'Add project address' : 'Waiting for project selection'}
+                      </button>
                     </>
                   )}
                 </div>
@@ -3406,6 +3434,17 @@ useEffect(() => {
                     </button>
                     <button
                       type="button"
+                      onClick={() => {
+                        if (!selectedProjectId) return;
+                        setShowInvestorForm((prev) => !prev);
+                      }}
+                      disabled={!selectedProjectId}
+                      style={primaryButtonStyle(Boolean(selectedProjectId))}
+                    >
+                      {showInvestorForm ? 'Close form' : '+ Add investor'}
+                    </button>
+                    <button
+                      type="button"
                       onClick={toggleInvestorsManage}
                       disabled={!selectedProjectId}
                       data-testid="investor-manage-toggle"
@@ -3448,6 +3487,98 @@ useEffect(() => {
                 <p style={{ margin: '8px 0 0', fontSize: 13, color: palette.accentMuted }}>
                   {selectedProjectId ? 'These investors are linked to this project.' : 'Select a project to manage investors.'}
                 </p>
+                {selectedProjectId && showInvestorForm && (
+                  <div
+                    style={{
+                      border: `1px solid ${palette.border}`,
+                      marginTop: 12,
+                      marginBottom: 16,
+                      padding: 16,
+                      borderRadius: 16,
+                      background: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Name"
+                      value={newInvestorName}
+                      onChange={(event) => setNewInvestorName(event.target.value)}
+                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email"
+                      value={newInvestorEmail}
+                      onChange={(event) => setNewInvestorEmail(event.target.value)}
+                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                    />
+                    <textarea
+                      rows={3}
+                      placeholder="Mailing address"
+                      value={newInvestorMailing}
+                      onChange={(event) => setNewInvestorMailing(event.target.value)}
+                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}`, resize: 'vertical' }}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Units (e.g. 10000)"
+                      value={newInvestorUnits}
+                      onChange={(event) => setNewInvestorUnits(event.target.value)}
+                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Bank name"
+                      value={newInvestorBankName}
+                      onChange={(event) => setNewInvestorBankName(event.target.value)}
+                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Bank account number"
+                      value={newInvestorBankAccount}
+                      onChange={(event) => setNewInvestorBankAccount(event.target.value)}
+                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Routing number"
+                      value={newInvestorBankRouting}
+                      onChange={(event) => setNewInvestorBankRouting(event.target.value)}
+                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                    />
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowInvestorForm(false);
+                          resetInvestorForm();
+                        }}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: palette.accentMuted,
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={createInvestor}
+                        disabled={creatingInvestor}
+                        style={primaryButtonStyle(!creatingInvestor)}
+                      >
+                        {creatingInvestor ? 'Adding…' : 'Add investor'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </header>
               {!selectedProjectId ? (
                 <p style={{ color: palette.accentMuted }}>Choose a project to manage investors.</p>
@@ -3639,141 +3770,6 @@ useEffect(() => {
                       </div>
                     );
                   })}
-                </div>
-              )}
-              {manageInvestorsMode && selectedProjectId && (
-                <div style={{ borderTop: `1px solid ${palette.border}`, marginTop: 8, paddingTop: 12 }}>
-                  {!showInvestorForm ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowInvestorForm(true)}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: palette.accent,
-                        textAlign: 'left',
-                        padding: 0,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      + Add investor
-                    </button>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <input
-                        type="text"
-                        placeholder="Name"
-                        value={newInvestorName}
-                        onChange={(event) => setNewInvestorName(event.target.value)}
-                        style={{
-                          padding: 10,
-                          borderRadius: 8,
-                          border: `1px solid ${palette.border}`,
-                        }}
-                      />
-                      <input
-                        type="email"
-                        placeholder="Email"
-                        value={newInvestorEmail}
-                        onChange={(event) => setNewInvestorEmail(event.target.value)}
-                        style={{
-                          padding: 10,
-                          borderRadius: 8,
-                          border: `1px solid ${palette.border}`,
-                        }}
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="Units (e.g. 10000)"
-                        value={newInvestorUnits}
-                        onChange={(event) => setNewInvestorUnits(event.target.value)}
-                        style={{
-                          padding: 10,
-                          borderRadius: 8,
-                          border: `1px solid ${palette.border}`,
-                        }}
-                      />
-                      <textarea
-                        rows={3}
-                        placeholder="Mailing address"
-                        value={newInvestorMailing}
-                        onChange={(event) => setNewInvestorMailing(event.target.value)}
-                        style={{
-                          padding: 10,
-                          borderRadius: 8,
-                          border: `1px solid ${palette.border}`,
-                          resize: 'vertical',
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Bank name"
-                        value={newInvestorBankName}
-                        onChange={(event) => setNewInvestorBankName(event.target.value)}
-                        style={{
-                          padding: 10,
-                          borderRadius: 8,
-                          border: `1px solid ${palette.border}`,
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Bank account number"
-                        value={newInvestorBankAccount}
-                        onChange={(event) => setNewInvestorBankAccount(event.target.value)}
-                        style={{
-                          padding: 10,
-                          borderRadius: 8,
-                          border: `1px solid ${palette.border}`,
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Routing number"
-                        value={newInvestorBankRouting}
-                        onChange={(event) => setNewInvestorBankRouting(event.target.value)}
-                        style={{
-                          padding: 10,
-                          borderRadius: 8,
-                          border: `1px solid ${palette.border}`,
-                        }}
-                      />
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          type="button"
-                          onClick={createInvestor}
-                          disabled={creatingInvestor}
-                          style={{
-                            flex: 1,
-                            border: 'none',
-                            borderRadius: 999,
-                            padding: '10px 14px',
-                            background: creatingInvestor ? 'rgba(37,99,235,0.3)' : palette.accent,
-                            color: '#fff',
-                            fontWeight: 600,
-                            cursor: creatingInvestor ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          {creatingInvestor ? 'Adding…' : 'Add'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={resetInvestorForm}
-                          style={{
-                            border: 'none',
-                            background: 'transparent',
-                            color: palette.accentMuted,
-                            cursor: 'pointer',
-                            fontSize: 12,
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

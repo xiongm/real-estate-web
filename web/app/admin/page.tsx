@@ -2340,6 +2340,10 @@ useEffect(() => {
           gap: 16,
           boxShadow: 'none',
           borderRadius: 0,
+          position: isMobile ? 'relative' : 'sticky',
+          top: isMobile ? undefined : 0,
+          height: isMobile ? 'auto' : '100vh',
+          alignSelf: isMobile ? 'stretch' : 'flex-start',
         }}
       >
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>{projectSidebarContent}</div>
@@ -2503,12 +2507,12 @@ useEffect(() => {
                     <h3 style={{ margin: 0 }}>Signatures & Packets</h3>
                     <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>Monitor outgoing envelopes and completed packets.</p>
                   </div>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={goToRequestSign}
+                  <div style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end', width: isMobile ? '100%' : 'auto' }}>
+                    <button
+                      type="button"
+                      onClick={goToRequestSign}
                       disabled={!canRequestSignatures}
-                      style={usePrimaryButtonStyle(canRequestSignatures, requestButtonHovered)}
+                      style={{ ...usePrimaryButtonStyle(canRequestSignatures, requestButtonHovered), width: isMobile ? '100%' : undefined }}
                       onMouseEnter={() => canRequestSignatures && setRequestButtonHovered(true)}
                       onMouseLeave={() => canRequestSignatures && setRequestButtonHovered(false)}
                       title={
@@ -2534,48 +2538,58 @@ useEffect(() => {
                         Request signatures
                       </span>
                     </button>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 10,
+                    justifyContent: isMobile ? 'flex-start' : 'flex-end',
+                    alignItems: 'center',
+                  }}
+                >
+                  <button
+                    data-testid="signatures-manage-toggle"
+                    type="button"
+                    onClick={toggleDocumentsManage}
+                    disabled={!hasSignaturesAvailable}
+                    style={{
+                      borderRadius: 999,
+                      border: `1px solid ${palette.border}`,
+                      padding: '6px 14px',
+                      background: manageDocumentsMode ? palette.accent : '#fff',
+                      color: manageDocumentsMode ? '#fff' : palette.text,
+                      fontWeight: 600,
+                      cursor: hasSignaturesAvailable ? 'pointer' : 'not-allowed',
+                      opacity: hasSignaturesAvailable ? 1 : 0.6,
+                    }}
+                  >
+                    {manageDocumentsMode ? 'Done' : 'Manage'}
+                  </button>
+                  {manageDocumentsMode && (
                     <button
-                      data-testid="signatures-manage-toggle"
+                      data-testid="signatures-delete-selected"
                       type="button"
-                      onClick={toggleDocumentsManage}
-                      disabled={!hasSignaturesAvailable}
+                      onClick={deleteSelectedDocuments}
+                      disabled={
+                        (!selectedFinalIds.length && !selectedEnvelopeIds.length) || actionLoading || revokingEnvelopes
+                      }
                       style={{
                         borderRadius: 999,
-                        border: `1px solid ${palette.border}`,
+                        border: '1px solid #dc2626',
                         padding: '6px 14px',
-                        background: manageDocumentsMode ? palette.accent : '#fff',
-                        color: manageDocumentsMode ? '#fff' : palette.text,
+                        background: '#dc2626',
+                        color: '#fff',
                         fontWeight: 600,
-                        cursor: hasSignaturesAvailable ? 'pointer' : 'not-allowed',
-                        opacity: hasSignaturesAvailable ? 1 : 0.6,
+                        cursor:
+                          !selectedFinalIds.length && !selectedEnvelopeIds.length ? 'not-allowed' : 'pointer',
+                        opacity: !selectedFinalIds.length && !selectedEnvelopeIds.length ? 0.5 : 1,
                       }}
                     >
-                      {manageDocumentsMode ? 'Done' : 'Manage'}
+                      {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete'}
                     </button>
-                    {manageDocumentsMode && (
-                      <button
-                        data-testid="signatures-delete-selected"
-                        type="button"
-                        onClick={deleteSelectedDocuments}
-                        disabled={
-                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) || actionLoading || revokingEnvelopes
-                        }
-                        style={{
-                          borderRadius: 999,
-                          border: '1px solid #dc2626',
-                          padding: '6px 14px',
-                          background: '#dc2626',
-                          color: '#fff',
-                          fontWeight: 600,
-                          cursor:
-                            !selectedFinalIds.length && !selectedEnvelopeIds.length ? 'not-allowed' : 'pointer',
-                          opacity: !selectedFinalIds.length && !selectedEnvelopeIds.length ? 0.5 : 1,
-                        }}
-                      >
-                        {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete selected'}
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
                 {!hasSignaturesAvailable ? (
                   <div
@@ -3227,10 +3241,6 @@ useEffect(() => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {selectedProject ? (
                 <>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Project</p>
-                    <h3 style={{ margin: '4px 0 0', fontSize: 22 }}>{selectedProject.name}</h3>
-                  </div>
                   <div
                     style={{
                       borderRadius: 24,
@@ -3412,81 +3422,91 @@ useEffect(() => {
               <header>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <div>
-                    <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Investors</p>
-                    <h3 style={{ margin: 0 }}>{investors.length} contacts</h3>
+                    <h3 style={{ margin: 0 }}>Project Investors</h3>
+                    <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>Investor info and investment amounts.</p>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={exportInvestorsCsv}
-                      disabled={!investors.length}
-                      style={{
-                        border: `1px solid ${palette.border}`,
-                        background: investors.length ? '#fff' : '#f1f5f9',
-                        color: investors.length ? palette.text : palette.accentMuted,
-                        borderRadius: 999,
-                        padding: '4px 12px',
-                        fontSize: 12,
-                        cursor: investors.length ? 'pointer' : 'not-allowed',
-                      }}
-                    >
-                      Export CSV
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!selectedProjectId) return;
-                        setShowInvestorForm((prev) => !prev);
-                      }}
-                      disabled={!selectedProjectId}
-                      style={primaryButtonStyle(Boolean(selectedProjectId))}
-                    >
-                      {showInvestorForm ? 'Close form' : '+ Add investor'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={toggleInvestorsManage}
-                      disabled={!selectedProjectId}
-                      data-testid="investor-manage-toggle"
-                      style={{
-                        border: `1px solid ${palette.border}`,
-                        background: manageInvestorsMode ? palette.accent : '#fff',
-                        color: !selectedProjectId ? palette.accentMuted : manageInvestorsMode ? '#fff' : palette.text,
-                        borderRadius: 999,
-                        padding: '4px 10px',
-                        fontSize: 12,
-                        cursor: selectedProjectId ? 'pointer' : 'not-allowed',
-                        opacity: selectedProjectId ? 1 : 0.5,
-                        boxShadow: manageInvestorsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
-                      }}
-                    >
-                      {manageInvestorsMode ? 'Done' : 'Manage'}
-                    </button>
-                    {manageInvestorsMode && selectedProjectId && (
-                      <button
-                        type="button"
-                        onClick={deleteSelectedInvestors}
-                        disabled={!selectedInvestorIds.length || deletingInvestors}
-                        data-testid="investor-remove-button"
-                        style={{
-                          border: '1px solid #dc2626',
-                          color: '#fff',
-                          background: deletingInvestors ? 'rgba(220,38,38,0.6)' : '#dc2626',
-                          borderRadius: 999,
-                          padding: '6px 12px',
-                          fontSize: 12,
-                          cursor: !selectedInvestorIds.length || deletingInvestors ? 'not-allowed' : 'pointer',
-                          opacity: !selectedInvestorIds.length && !deletingInvestors ? 0.5 : 1,
-                        }}
-                      >
-                        {deletingInvestors ? 'Deleting…' : 'Delete'}
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedProjectId) return;
+                      setShowInvestorForm((prev) => !prev);
+                    }}
+                    disabled={!selectedProjectId}
+                    style={{
+                      ...primaryButtonStyle(Boolean(selectedProjectId)),
+                      minWidth: isMobile ? '100%' : 180,
+                    }}
+                  >
+                    {showInvestorForm ? 'Close form' : '+ Add investor'}
+                  </button>
                 </div>
-                <p style={{ margin: '8px 0 0', fontSize: 13, color: palette.accentMuted }}>
-                  {selectedProjectId ? 'These investors are linked to this project.' : 'Select a project to manage investors.'}
-                </p>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    marginTop: 12,
+                    justifyContent: isMobile ? 'flex-start' : 'flex-end',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={exportInvestorsCsv}
+                    disabled={!investors.length}
+                    style={{
+                      border: `1px solid ${palette.border}`,
+                      background: investors.length ? '#fff' : '#f1f5f9',
+                      color: investors.length ? palette.text : palette.accentMuted,
+                      borderRadius: 999,
+                      padding: '4px 12px',
+                      fontSize: 12,
+                      cursor: investors.length ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleInvestorsManage}
+                    disabled={!selectedProjectId}
+                    data-testid="investor-manage-toggle"
+                    style={{
+                      border: `1px solid ${palette.border}`,
+                      background: manageInvestorsMode ? palette.accent : '#fff',
+                      color: !selectedProjectId ? palette.accentMuted : manageInvestorsMode ? '#fff' : palette.text,
+                      borderRadius: 999,
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      cursor: selectedProjectId ? 'pointer' : 'not-allowed',
+                      opacity: selectedProjectId ? 1 : 0.5,
+                      boxShadow: manageInvestorsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
+                    }}
+                  >
+                    {manageInvestorsMode ? 'Done' : 'Manage'}
+                  </button>
+                  {manageInvestorsMode && selectedProjectId && (
+                    <button
+                      type="button"
+                      onClick={deleteSelectedInvestors}
+                      disabled={!selectedInvestorIds.length || deletingInvestors}
+                      data-testid="investor-remove-button"
+                      style={{
+                        border: '1px solid #dc2626',
+                        color: '#fff',
+                        background: deletingInvestors ? 'rgba(220,38,38,0.6)' : '#dc2626',
+                        borderRadius: 999,
+                        padding: '6px 12px',
+                        fontSize: 12,
+                        cursor: !selectedInvestorIds.length || deletingInvestors ? 'not-allowed' : 'pointer',
+                        opacity: !selectedInvestorIds.length && !deletingInvestors ? 0.5 : 1,
+                      }}
+                    >
+                      {deletingInvestors ? 'Deleting…' : 'Delete'}
+                    </button>
+                  )}
+                </div>
+                {selectedProjectId && <div style={{ height: 4 }} />}
                 {selectedProjectId && showInvestorForm && (
                   <div
                     style={{
@@ -3583,7 +3603,18 @@ useEffect(() => {
               {!selectedProjectId ? (
                 <p style={{ color: palette.accentMuted }}>Choose a project to manage investors.</p>
               ) : investors.length === 0 ? (
-                <p style={{ color: palette.accentMuted }}>No investors linked.</p>
+                <div
+                  style={{
+                    padding: 28,
+                    borderRadius: 16,
+                    border: '1px dashed rgba(148,163,184,0.6)',
+                    textAlign: 'center',
+                    color: palette.accentMuted,
+                    background: '#fff',
+                  }}
+                >
+                  No investors linked yet.
+                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {investors.map((investor) => {

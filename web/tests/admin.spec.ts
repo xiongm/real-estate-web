@@ -225,8 +225,28 @@ test.describe('Admin portal', () => {
       removeButton.click(),
     ]);
 
-    await expect(investorPanel.getByText('No investors linked.')).toBeVisible();
+    await expect(investorPanel.getByText('No investors linked yet.')).toBeVisible();
     await expect(investorPanel.getByTestId('investor-manage-toggle')).toHaveText('Manage');
+  });
+
+  test('project sidebar CTA stays anchored while switching tabs', async ({ page }) => {
+    await mockAdminData(page);
+    await completeLogin(page);
+    await waitForDashboard(page);
+
+    const newProjectButton = page.locator('.admin-sidebar').getByRole('button', { name: /New Project/i });
+    await newProjectButton.waitFor();
+    const initialBox = await newProjectButton.boundingBox();
+    expect(initialBox).not.toBeNull();
+
+    await page.getByTestId('tab-investors').click();
+    await expect(page.locator('.investor-panel')).toBeVisible();
+
+    const afterBox = await newProjectButton.boundingBox();
+    expect(afterBox).not.toBeNull();
+
+    const deltaY = Math.abs((afterBox?.y ?? 0) - (initialBox?.y ?? 0));
+    expect(deltaY).toBeLessThan(5);
   });
 
   test('signed documents deletion and envelope revoke actions update the dashboard', async ({ page }) => {

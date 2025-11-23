@@ -229,6 +229,45 @@ test.describe('Admin portal', () => {
     await expect(investorPanel.getByTestId('investor-manage-toggle')).toHaveText('Manage');
   });
 
+  test('clicking an investor card opens inline edit (no edit button)', async ({ page }) => {
+    await mockAdminData(page, {
+      investorsByProject: {
+        201: [{ id: 1, name: 'Alice Alpha', email: 'alice@example.com', units_invested: 12, role: 'Investor' }],
+      },
+    });
+
+    await completeLogin(page);
+    await waitForDashboard(page);
+    await openInvestorsTab(page);
+
+    const card = page.getByRole('button', { name: /Alice Alpha/i }).first();
+    await card.click();
+
+    await expect(page.locator('input[value="Alice Alpha"]')).toBeVisible();
+    await expect(page.locator('input[value="alice@example.com"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Edit$/ })).toHaveCount(0);
+  });
+
+  test('canceling inline investor edit returns to view state', async ({ page }) => {
+    await mockAdminData(page, {
+      investorsByProject: {
+        201: [{ id: 1, name: 'Alice Alpha', email: 'alice@example.com', units_invested: 12, role: 'Investor' }],
+      },
+    });
+
+    await completeLogin(page);
+    await waitForDashboard(page);
+    await openInvestorsTab(page);
+
+    const card = page.getByRole('button', { name: /Alice Alpha/i }).first();
+    await card.click();
+
+    await expect(page.locator('input[value="Alice Alpha"]')).toBeVisible();
+    await page.getByRole('button', { name: /^Cancel$/ }).click();
+    await expect(page.locator('input[value="Alice Alpha"]')).toHaveCount(0);
+    await expect(page.getByText('Mailing:', { exact: false })).toHaveCount(0); // ensures view mode summary renders without inputs
+  });
+
   test('project sidebar CTA stays anchored while switching tabs', async ({ page }) => {
     await mockAdminData(page);
     await completeLogin(page);
@@ -247,6 +286,27 @@ test.describe('Admin portal', () => {
 
     const deltaY = Math.abs((afterBox?.y ?? 0) - (initialBox?.y ?? 0));
     expect(deltaY).toBeLessThan(5);
+  });
+
+  test('investor validation banner clears after fixing required fields', async ({ page }) => {
+    await mockAdminData(page);
+    await completeLogin(page);
+    await waitForDashboard(page);
+    await openInvestorsTab(page);
+
+    // Open the add investor form and trigger validation
+    await page.getByRole('button', { name: /Add investor/i }).click();
+    const submitButton = page.getByRole('button', { name: /^Add investor$/ });
+    await submitButton.click();
+
+    const errorBanner = page.getByText('Name and email are required to add an investor.');
+    await expect(errorBanner).toBeVisible();
+
+    // Fix the fields and ensure the banner clears automatically
+    await page.getByPlaceholder('Name', { exact: true }).fill('New Investor');
+    await page.getByPlaceholder('Email', { exact: true }).fill('new@example.com');
+    await page.getByPlaceholder('Units (e.g. 10000)').fill('10');
+    await expect(errorBanner).toHaveCount(0);
   });
 
   test('signed documents deletion and envelope revoke actions update the dashboard', async ({ page }) => {
@@ -370,8 +430,8 @@ test.describe('Admin portal', () => {
     await waitForDashboard(page);
     await page.getByTestId('tab-signatures').click();
 
-    const viewButton = page.getByRole('button', { name: /view signees/i }).first();
-    await viewButton.click();
+    const signedCard = page.locator('[data-document-kind="signed"]').first();
+    await signedCard.click();
 
     await expect(page.getByText('Signer One')).toBeVisible();
     await expect(page.getByText('Signer Two')).toBeVisible();

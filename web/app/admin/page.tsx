@@ -97,7 +97,7 @@ const awaitingChipStyle = {
 };
 const documentLinkStyle: CSSProperties = {
   fontSize: 16,
-  color: palette.accent,
+  color: palette.text,
   fontWeight: 600,
   display: 'inline-flex',
   alignItems: 'center',
@@ -195,6 +195,9 @@ const [newInvestorMailing, setNewInvestorMailing] = useState('');
 const [newInvestorBankName, setNewInvestorBankName] = useState('');
 const [newInvestorBankAccount, setNewInvestorBankAccount] = useState('');
 const [newInvestorBankRouting, setNewInvestorBankRouting] = useState('');
+const [newInvestorAddressSuggestions, setNewInvestorAddressSuggestions] = useState<string[]>([]);
+const [newInvestorAddressLoading, setNewInvestorAddressLoading] = useState(false);
+const [newInvestorAddressChosen, setNewInvestorAddressChosen] = useState(false);
 const [creatingInvestor, setCreatingInvestor] = useState(false);
 const [hoveredInvestorId, setHoveredInvestorId] = useState<number | null>(null);
 const [editingInvestorId, setEditingInvestorId] = useState<number | null>(null);
@@ -205,6 +208,10 @@ const [editingInvestorMailing, setEditingInvestorMailing] = useState('');
 const [editingInvestorBankName, setEditingInvestorBankName] = useState('');
 const [editingInvestorBankAccount, setEditingInvestorBankAccount] = useState('');
 const [editingInvestorBankRouting, setEditingInvestorBankRouting] = useState('');
+const [editInvestorAddressSuggestions, setEditInvestorAddressSuggestions] = useState<string[]>([]);
+const [editInvestorAddressLoading, setEditInvestorAddressLoading] = useState(false);
+const [editInvestorAddressChosen, setEditInvestorAddressChosen] = useState(false);
+const [editInvestorAddressDirty, setEditInvestorAddressDirty] = useState(false);
 const [editingInvestorSaving, setEditingInvestorSaving] = useState(false);
 const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
 const [projectFilesLoading, setProjectFilesLoading] = useState(false);
@@ -239,6 +246,10 @@ const addressCache = useRef<Map<string, string[]>>(new Map());
   const [heroMenuHovered, setHeroMenuHovered] = useState(false);
   const heroMenuRef = useRef<HTMLDivElement | null>(null);
   const heroMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+const newInvestorAddressTimeout = useRef<NodeJS.Timeout | null>(null);
+const editInvestorAddressTimeout = useRef<NodeJS.Timeout | null>(null);
+const newInvestorAddressController = useRef<AbortController | null>(null);
+const editInvestorAddressController = useRef<AbortController | null>(null);
 const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors'>('documents');
   const [deletingInvestors, setDeletingInvestors] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -246,7 +257,12 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
   const [requestButtonHovered, setRequestButtonHovered] = useState(false);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [projectDetailsLoaded, setProjectDetailsLoaded] = useState(false);
-  const [initialPageReady, setInitialPageReady] = useState(false);
+const [initialPageReady, setInitialPageReady] = useState(false);
+const newInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
+const newInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
+const editInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
+const editInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
+  const clearError = () => setError(null);
   const closeDrawers = () => {
     setProjectDrawerOpen(false);
   };
@@ -257,6 +273,30 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
     if (heroAddressTimeout.current) {
       clearTimeout(heroAddressTimeout.current);
       heroAddressTimeout.current = null;
+    }
+  };
+  const clearNewInvestorAddressTimeout = () => {
+    if (newInvestorAddressTimeout.current) {
+      clearTimeout(newInvestorAddressTimeout.current);
+      newInvestorAddressTimeout.current = null;
+    }
+  };
+  const clearEditInvestorAddressTimeout = () => {
+    if (editInvestorAddressTimeout.current) {
+      clearTimeout(editInvestorAddressTimeout.current);
+      editInvestorAddressTimeout.current = null;
+    }
+  };
+  const cancelNewInvestorAddressRequest = () => {
+    if (newInvestorAddressController.current) {
+      newInvestorAddressController.current.abort();
+      newInvestorAddressController.current = null;
+    }
+  };
+  const cancelEditInvestorAddressRequest = () => {
+    if (editInvestorAddressController.current) {
+      editInvestorAddressController.current.abort();
+      editInvestorAddressController.current = null;
     }
   };
   const clearHeroBlurTimeout = () => {
@@ -290,6 +330,10 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
     return () => {
       clearHeroAddressTimeout();
       clearHeroBlurTimeout();
+      clearNewInvestorAddressTimeout();
+      clearEditInvestorAddressTimeout();
+      cancelNewInvestorAddressRequest();
+      cancelEditInvestorAddressRequest();
     };
   }, []);
   useEffect(() => {
@@ -344,6 +388,149 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
       controller.abort();
     };
   }, [heroEditingField, heroEditingValue, adminToken, adminVerified, baseApi]);
+  useEffect(() => {
+    clearNewInvestorAddressTimeout();
+    cancelNewInvestorAddressRequest();
+    if (newInvestorAddressChosen) {
+      setNewInvestorAddressSuggestions([]);
+      setNewInvestorAddressLoading(false);
+      setNewInvestorAddressChosen(false);
+      return;
+    }
+    const trimmed = newInvestorMailing.trim();
+    if (!adminVerified || !adminToken || trimmed.length < 3) {
+      setNewInvestorAddressSuggestions([]);
+      setNewInvestorAddressLoading(false);
+      return;
+    }
+    const cached = addressCache.current.get(trimmed.toLowerCase());
+    if (cached) {
+      setNewInvestorAddressSuggestions(cached);
+      setNewInvestorAddressLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    newInvestorAddressController.current = controller;
+    newInvestorAddressTimeout.current = setTimeout(async () => {
+      setNewInvestorAddressLoading(true);
+      try {
+        const resp = await fetch(
+          `${baseApi}/api/places/mapbox/autocomplete?query=${encodeURIComponent(trimmed)}`,
+          {
+            headers: { 'X-Access-Token': adminToken },
+            signal: controller.signal,
+          },
+        );
+        if (!resp.ok) throw new Error('Failed to fetch address suggestions');
+        const data = await resp.json();
+        const suggestions =
+          Array.isArray(data?.suggestions)
+            ? data.suggestions
+                .map((item: { label?: string }) => item?.label)
+                .filter((label: string | undefined): label is string => Boolean(label))
+            : [];
+        addressCache.current.set(trimmed.toLowerCase(), suggestions);
+        setNewInvestorAddressSuggestions(suggestions);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        setNewInvestorAddressSuggestions([]);
+      } finally {
+        setNewInvestorAddressLoading(false);
+        newInvestorAddressController.current = null;
+      }
+    }, 150);
+    return () => {
+      clearNewInvestorAddressTimeout();
+      cancelNewInvestorAddressRequest();
+      setNewInvestorAddressLoading(false);
+    };
+  }, [newInvestorMailing, adminToken, adminVerified, baseApi]);
+  useEffect(() => {
+    clearEditInvestorAddressTimeout();
+    cancelEditInvestorAddressRequest();
+    if (!editingInvestorId) {
+      setEditInvestorAddressSuggestions([]);
+      setEditInvestorAddressLoading(false);
+      return;
+    }
+    if (!editInvestorAddressDirty) {
+      setEditInvestorAddressSuggestions([]);
+      setEditInvestorAddressLoading(false);
+      return;
+    }
+    if (editInvestorAddressChosen) {
+      setEditInvestorAddressSuggestions([]);
+      setEditInvestorAddressLoading(false);
+      setEditInvestorAddressChosen(false);
+      return;
+    }
+    const trimmed = editingInvestorMailing.trim();
+    if (!adminVerified || !adminToken || trimmed.length < 3) {
+      setEditInvestorAddressSuggestions([]);
+      setEditInvestorAddressLoading(false);
+      return;
+    }
+    const cached = addressCache.current.get(trimmed.toLowerCase());
+    if (cached) {
+      setEditInvestorAddressSuggestions(cached);
+      setEditInvestorAddressLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    editInvestorAddressController.current = controller;
+    editInvestorAddressTimeout.current = setTimeout(async () => {
+      setEditInvestorAddressLoading(true);
+      try {
+        const resp = await fetch(
+          `${baseApi}/api/places/mapbox/autocomplete?query=${encodeURIComponent(trimmed)}`,
+          {
+            headers: { 'X-Access-Token': adminToken },
+            signal: controller.signal,
+          },
+        );
+        if (!resp.ok) throw new Error('Failed to fetch address suggestions');
+        const data = await resp.json();
+        const suggestions =
+          Array.isArray(data?.suggestions)
+            ? data.suggestions
+                .map((item: { label?: string }) => item?.label)
+                .filter((label: string | undefined): label is string => Boolean(label))
+            : [];
+        addressCache.current.set(trimmed.toLowerCase(), suggestions);
+        setEditInvestorAddressSuggestions(suggestions);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        setEditInvestorAddressSuggestions([]);
+      } finally {
+        setEditInvestorAddressLoading(false);
+        editInvestorAddressController.current = null;
+      }
+    }, 150);
+    return () => {
+      clearEditInvestorAddressTimeout();
+      cancelEditInvestorAddressRequest();
+      setEditInvestorAddressLoading(false);
+    };
+  }, [editingInvestorMailing, editingInvestorId, adminToken, adminVerified, baseApi]);
+  useEffect(() => {
+    const handleClickAway = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      const newInput = newInvestorAddressRef.current;
+      const newSuggestions = newInvestorSuggestionsRef.current;
+      const editInput = editInvestorAddressRef.current;
+      const editSuggestions = editInvestorSuggestionsRef.current;
+      const outsideNew = newInput && !newInput.contains(target) && (!newSuggestions || !newSuggestions.contains(target));
+      const outsideEdit = editInput && !editInput.contains(target) && (!editSuggestions || !editSuggestions.contains(target));
+      if (outsideNew) {
+        setNewInvestorAddressSuggestions([]);
+      }
+      if (outsideEdit) {
+        setEditInvestorAddressSuggestions([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickAway);
+    return () => document.removeEventListener('mousedown', handleClickAway);
+  }, []);
   useEffect(() => {
     if (heroEditingField && heroInputRef.current) {
       heroInputRef.current.focus();
@@ -564,6 +751,9 @@ useEffect(() => {
 useEffect(() => {
   setCenterTab('documents');
 }, [selectedProjectId]);
+  useEffect(() => {
+    clearError();
+  }, [centerTab]);
 
   useEffect(() => {
     if (initialPageReady) return;
@@ -580,9 +770,15 @@ useEffect(() => {
     setNewInvestorEmail('');
     setNewInvestorUnits('');
     setNewInvestorMailing('');
+    setNewInvestorAddressSuggestions([]);
+    setNewInvestorAddressLoading(false);
+    setNewInvestorAddressChosen(false);
+    clearNewInvestorAddressTimeout();
+    cancelNewInvestorAddressRequest();
     setNewInvestorBankName('');
     setNewInvestorBankAccount('');
     setNewInvestorBankRouting('');
+    clearError();
   };
 
   const loadProjectFiles = async (projectId: number) => {
@@ -1153,6 +1349,10 @@ useEffect(() => {
       typeof investor.units_invested === 'number' ? String(investor.units_invested) : '',
     );
     setEditingInvestorMailing(investor.mailing_address ?? '');
+    setEditInvestorAddressSuggestions([]);
+    setEditInvestorAddressLoading(false);
+    setEditInvestorAddressChosen(false);
+    setEditInvestorAddressDirty(false);
     setEditingInvestorBankName(investor.bank_name ?? '');
     setEditingInvestorBankAccount(investor.bank_account_number ?? '');
     setEditingInvestorBankRouting(investor.bank_routing_number ?? '');
@@ -1164,37 +1364,43 @@ useEffect(() => {
     setEditingInvestorEmail('');
     setEditingInvestorUnits('');
     setEditingInvestorMailing('');
+    setEditInvestorAddressSuggestions([]);
+    setEditInvestorAddressLoading(false);
+    setEditInvestorAddressChosen(false);
+    setEditInvestorAddressDirty(false);
+    clearEditInvestorAddressTimeout();
+    cancelEditInvestorAddressRequest();
     setEditingInvestorBankName('');
     setEditingInvestorBankAccount('');
     setEditingInvestorBankRouting('');
     setEditingInvestorSaving(false);
+    clearError();
   };
 
   const saveInvestorEdit = async () => {
     if (!selectedProjectId || !adminToken || !editingInvestorId) return;
+    clearError();
     const name = editingInvestorName.trim();
     const email = editingInvestorEmail.trim();
-    if (!name || !email) {
-      setError('Name and email are required to update an investor.');
+    const unitsTrimmed = editingInvestorUnits.trim();
+    if (!name || !email || !unitsTrimmed) {
+      setError('Name, email, and units are required to update an investor.');
+      return;
+    }
+    const parsedUnits = Number(unitsTrimmed);
+    if (Number.isNaN(parsedUnits)) {
+      setError('Units invested must be a valid number.');
       return;
     }
     const payload: Record<string, unknown> = {
       name,
       email,
+      units_invested: parsedUnits,
       mailing_address: editingInvestorMailing.trim(),
       bank_name: editingInvestorBankName.trim(),
       bank_account_number: editingInvestorBankAccount.trim(),
       bank_routing_number: editingInvestorBankRouting.trim(),
     };
-    const unitsTrimmed = editingInvestorUnits.trim();
-    if (unitsTrimmed.length) {
-      const parsedUnits = Number(unitsTrimmed);
-      if (Number.isNaN(parsedUnits)) {
-        setError('Units invested must be a valid number.');
-        return;
-      }
-      payload.units_invested = parsedUnits;
-    }
     setEditingInvestorSaving(true);
     try {
       const resp = await fetch(
@@ -1221,11 +1427,17 @@ useEffect(() => {
 
   const createInvestor = async () => {
     if (!adminToken || !selectedProjectId) return;
+    clearError();
     const name = newInvestorName.trim();
     const email = newInvestorEmail.trim();
-    const units = Number(newInvestorUnits) || 0;
-    if (!name || !email) {
-      setError('Name and email are required to add an investor.');
+    const unitsTrimmed = newInvestorUnits.trim();
+    if (!name || !email || !unitsTrimmed) {
+      setError('Name, email, and units are required to add an investor.');
+      return;
+    }
+    const units = Number(unitsTrimmed);
+    if (Number.isNaN(units)) {
+      setError('Units must be a valid number.');
       return;
     }
     setCreatingInvestor(true);
@@ -2552,7 +2764,38 @@ useEffect(() => {
                 })}
               </div>
             </header>
-            {error && <div style={{ color: '#fca5a5' }}>{error}</div>}
+            {error && (
+              <div
+                style={{
+                  color: '#b91c1c',
+                  background: '#fef2f2',
+                  border: '1px solid #fecdd3',
+                  borderRadius: 12,
+                  padding: '10px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}
+              >
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={clearError}
+                  style={{
+                    border: 'none',
+                    background: '#fff',
+                    color: '#b91c1c',
+                    borderRadius: 999,
+                    padding: '4px 10px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
             {centerTab === 'signatures' && selectedProject && (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <div
@@ -2708,7 +2951,6 @@ useEffect(() => {
                             signerList.filter((signer) => signer.status === 'completed').length;
                           const progressLabel =
                             totalSigners > 0 ? `${Math.min(completedSigners, totalSigners)}/${totalSigners} signed` : 'Incomplete setup';
-                          const buttonLabel = expanded ? 'Hide signees' : progressLabel;
                           const chipLabel = isAwaiting
                             ? totalSigners > 0
                               ? 'Awaiting'
@@ -2781,6 +3023,15 @@ useEffect(() => {
                               data-document-kind={isAwaiting ? 'awaiting' : 'signed'}
                               onMouseEnter={handleMouseEnter}
                               onMouseLeave={handleMouseLeave}
+                              onClick={() => toggleExpansion()}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  toggleExpansion();
+                                }
+                              }}
                               style={{
                                 border: selected || hovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
                                 borderRadius: 14,
@@ -2791,6 +3042,7 @@ useEffect(() => {
                                     ? '0 10px 22px rgba(37,99,235,0.12)'
                                     : '0 6px 16px rgba(15,23,42,0.08)',
                                 transition: 'border 0.2s ease, box-shadow 0.2s ease',
+                                cursor: 'pointer',
                               }}
                             >
                               <div
@@ -2851,10 +3103,10 @@ useEffect(() => {
                                           style={documentLinkStyle}
                                           className="admin-document-link"
                                         >
-                                          <strong style={{ fontSize: 16 }}>{documentLabel}</strong>
+                                          <span style={{ fontSize: 16 }}>{documentLabel}</span>
                                         </a>
                                       ) : (
-                                        <strong style={{ fontSize: 16 }}>{documentLabel}</strong>
+                                        <span style={{ fontSize: 16 }}>{documentLabel}</span>
                                       )}
                                       <div
                                         style={{
@@ -2941,21 +3193,9 @@ useEffect(() => {
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                                  <button
-                                    type="button"
-                                    onClick={toggleExpansion}
-                                    aria-label={expanded ? 'Hide signees' : 'View signees'}
-                                    style={{
-                                      borderRadius: 999,
-                                      border: '1px solid rgba(148,163,184,0.6)',
-                                      padding: '6px 12px',
-                                      background: '#fff',
-                                      cursor: 'pointer',
-                                      fontSize: 13,
-                                    }}
-                                  >
-                                    {buttonLabel}
-                                  </button>
+                                  {totalSigners > 0 && (
+                                    <span style={{ fontSize: 12, color: palette.accentMuted }}>{progressLabel}</span>
+                                  )}
                                 </div>
                               </div>
                               {expanded && signerList.length > 0 && (
@@ -2963,31 +3203,46 @@ useEffect(() => {
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     {signerList.map((signer) => {
                                       const completed = signer.status === 'completed';
-                                      return (
-                                        <div
-                                          key={`${key}-signer-${signer.id}`}
-                                          style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            gap: 16,
-                                            flexWrap: 'wrap',
-                                            fontSize: 13,
-                                          }}
-                                        >
-                                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <strong style={{ fontSize: 13 }}>{signer.name || 'Unnamed signer'}</strong>
-                                            <span style={{ color: palette.accentMuted }}>{signer.email || 'Email unavailable'}</span>
-                                          </div>
-                                          <div style={{ textAlign: 'right', minWidth: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                            <span style={{ color: completed ? '#15803d' : '#9ca3af', fontWeight: 600 }}>
-                                              {completed ? 'Signed' : signer.status || 'Pending'}
-                                            </span>
-                                            {signer.completed_at && (
+                                          return (
+                                            <div
+                                              key={`${key}-signer-${signer.id}`}
+                                              style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                gap: 16,
+                                                flexWrap: 'wrap',
+                                                fontSize: 13,
+                                              }}
+                                            >
+                                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <strong style={{ fontSize: 13 }}>{signer.name || 'Unnamed signer'}</strong>
+                                                <span style={{ color: palette.accentMuted }}>{signer.email || 'Email unavailable'}</span>
+                                              </div>
+                                              <div
+                                                style={{
+                                                  textAlign: 'right',
+                                                  display: 'flex',
+                                                  flexDirection: 'column',
+                                                  gap: 6,
+                                                  alignItems: 'flex-end',
+                                                }}
+                                              >
+                                                <span
+                                                  style={{
+                                                    ...(completed ? completedChipStyle : awaitingChipStyle),
+                                                    border: 'none',
+                                                    padding: '2px 10px',
+                                                    alignSelf: 'flex-end',
+                                                  }}
+                                                >
+                                                  {completed ? 'Completed' : 'Awaiting'}
+                                                </span>
+                                                {signer.completed_at && (
                                               <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
                                                 {formatLocalDateTime(signer.completed_at)}
                                               </p>
                                             )}
-                                            {signer.magic_link && (
+                                            {!completed && signer.magic_link && (
                                               <button
                                                 type="button"
                                                 onClick={() => copyMagicLink(signer.magic_link)}
@@ -3237,7 +3492,7 @@ useEffect(() => {
                                     target="_blank"
                                     rel="noreferrer"
                                     className="admin-document-link"
-                                    style={{ margin: 0, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                    style={documentLinkStyle}
                                   >
                                     {file.display_name}
                                   </a>
@@ -3582,27 +3837,97 @@ useEffect(() => {
                       gap: 10,
                     }}
                   >
+                    <label style={{ fontSize: 12, fontWeight: 600 }}>Name (required)</label>
                     <input
                       type="text"
                       placeholder="Name"
                       value={newInvestorName}
-                      onChange={(event) => setNewInvestorName(event.target.value)}
+                      onChange={(event) => {
+                        clearError();
+                        setNewInvestorName(event.target.value);
+                      }}
                       style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
                     />
+                    <label style={{ fontSize: 12, fontWeight: 600 }}>Email (required)</label>
                     <input
                       type="email"
                       placeholder="Email"
                       value={newInvestorEmail}
-                      onChange={(event) => setNewInvestorEmail(event.target.value)}
+                      onChange={(event) => {
+                        clearError();
+                        setNewInvestorEmail(event.target.value);
+                      }}
                       style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
                     />
-                    <textarea
+                    <label style={{ fontSize: 12, fontWeight: 600 }}>Mailing address</label>
+                    <div style={{ position: 'relative' }}>
+                      <textarea
                       rows={3}
                       placeholder="Mailing address"
                       value={newInvestorMailing}
                       onChange={(event) => setNewInvestorMailing(event.target.value)}
-                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}`, resize: 'vertical' }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !event.shiftKey && newInvestorAddressSuggestions.length > 0) {
+                          setNewInvestorAddressSuggestions([]);
+                          setNewInvestorAddressLoading(false);
+                          setNewInvestorAddressChosen(true);
+                        }
+                      }}
+                      ref={newInvestorAddressRef}
+                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}`, resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
                     />
+                    {(newInvestorAddressLoading || newInvestorAddressSuggestions.length > 0) && (
+                      <div
+                        style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            marginTop: 6,
+                            background: '#fff',
+                            border: `1px solid ${palette.border}`,
+                            borderRadius: 10,
+                            boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
+                            padding: 6,
+                            zIndex: 5,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 6,
+                            maxHeight: 220,
+                            overflowY: 'auto',
+                          }}
+                          ref={newInvestorSuggestionsRef}
+                        >
+                          {newInvestorAddressLoading && (
+                            <span style={{ fontSize: 12, color: palette.accentMuted }}>Searching addresses…</span>
+                          )}
+                          {newInvestorAddressSuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              onClick={() => {
+                                setNewInvestorMailing(suggestion);
+                            setNewInvestorAddressSuggestions([]);
+                                setNewInvestorAddressLoading(false);
+                                setNewInvestorAddressChosen(true);
+                                }}
+                              style={{
+                                textAlign: 'left',
+                                border: `1px solid ${palette.border}`,
+                                background: '#fff',
+                                borderRadius: 8,
+                                padding: '8px 10px',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                              }}
+                            >
+                              {suggestion}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <label style={{ fontSize: 12, fontWeight: 600 }}>Units (required)</label>
                     <input
                       type="number"
                       min="0"
@@ -3702,9 +4027,34 @@ useEffect(() => {
                           background: highlightBg,
                           boxShadow: highlightBg !== '#fff' ? '0 10px 24px rgba(37,99,235,0.15)' : '0 8px 18px rgba(15,23,42,0.04)',
                           transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                          cursor: manageInvestorsMode ? 'default' : 'pointer',
                         }}
                         onMouseEnter={() => setHoveredInvestorId(investor.id)}
                         onMouseLeave={() => setHoveredInvestorId((prev) => (prev === investor.id ? null : prev))}
+                        onClick={() => {
+                          if (manageInvestorsMode) return;
+                          if (editingInvestorId === investor.id) {
+                            cancelInvestorEdit();
+                            return;
+                          }
+                          beginInvestorEdit(investor);
+                        }}
+                        role={!manageInvestorsMode ? 'button' : undefined}
+                        tabIndex={!manageInvestorsMode ? 0 : undefined}
+                        onKeyDown={(event) => {
+                          if (manageInvestorsMode) return;
+                          if (editingInvestorId === investor.id) {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              cancelInvestorEdit();
+                            }
+                            return;
+                          }
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            beginInvestorEdit(investor);
+                          }
+                        }}
                       >
                         <div
                           style={{
@@ -3771,19 +4121,31 @@ useEffect(() => {
                           </div>
                         )}
                         {editing ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                          <div
+                            style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <label style={{ fontSize: 12, fontWeight: 600 }}>Name (required)</label>
                             <input
                               type="text"
                               value={editingInvestorName}
-                              onChange={(event) => setEditingInvestorName(event.target.value)}
+                              onChange={(event) => {
+                                clearError();
+                                setEditingInvestorName(event.target.value);
+                              }}
                               style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
                             />
+                            <label style={{ fontSize: 12, fontWeight: 600 }}>Email (required)</label>
                             <input
                               type="email"
                               value={editingInvestorEmail}
-                              onChange={(event) => setEditingInvestorEmail(event.target.value)}
+                              onChange={(event) => {
+                                clearError();
+                                setEditingInvestorEmail(event.target.value);
+                              }}
                               style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
                             />
+                            <label style={{ fontSize: 12, fontWeight: 600 }}>Units (required)</label>
                             <input
                               type="number"
                               min="0"
@@ -3795,9 +4157,78 @@ useEffect(() => {
                               rows={3}
                               placeholder="Mailing address"
                               value={editingInvestorMailing}
-                              onChange={(event) => setEditingInvestorMailing(event.target.value)}
+                              onChange={(event) => {
+                                clearError();
+                                setEditingInvestorMailing(event.target.value);
+                                setEditInvestorAddressDirty(true);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' && !event.shiftKey && editInvestorAddressSuggestions.length > 0) {
+                                  setEditInvestorAddressSuggestions([]);
+                                  setEditInvestorAddressLoading(false);
+                                  setEditInvestorAddressChosen(true);
+                                }
+                              }}
+                              ref={editInvestorAddressRef}
                               style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}`, resize: 'vertical' }}
                             />
+                            {(editInvestorAddressLoading || editInvestorAddressSuggestions.length > 0) && (
+                              <div
+                                style={{
+                                  position: 'relative',
+                                  width: '100%',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: 6,
+                                    left: 0,
+                                    right: 0,
+                                    background: '#fff',
+                                    border: `1px solid ${palette.border}`,
+                                    borderRadius: 10,
+                                    boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
+                                    padding: 6,
+                                    zIndex: 5,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 6,
+                                    maxHeight: 220,
+                                    overflowY: 'auto',
+                                  }}
+                                  ref={editInvestorSuggestionsRef}
+                                >
+                                  {editInvestorAddressLoading && (
+                                    <span style={{ fontSize: 12, color: palette.accentMuted }}>Searching addresses…</span>
+                                  )}
+                                  {editInvestorAddressSuggestions.map((suggestion) => (
+                                    <button
+                                      key={suggestion}
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingInvestorMailing(suggestion);
+                                        setEditInvestorAddressSuggestions([]);
+                                        setEditInvestorAddressLoading(false);
+                                        setEditInvestorAddressChosen(true);
+                                        setEditInvestorAddressDirty(false);
+                                      }}
+                                      style={{
+                                        textAlign: 'left',
+                                        border: `1px solid ${palette.border}`,
+                                        background: '#fff',
+                                        borderRadius: 8,
+                                        padding: '8px 10px',
+                                        cursor: 'pointer',
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      {suggestion}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             <input
                               type="text"
                               placeholder="Bank name"
@@ -3820,12 +4251,22 @@ useEffect(() => {
                               style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
                             />
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                              <button type="button" onClick={cancelInvestorEdit} style={{ border: 'none', background: 'transparent', color: palette.accentMuted, cursor: 'pointer' }}>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  cancelInvestorEdit();
+                                }}
+                                style={{ border: 'none', background: 'transparent', color: palette.accentMuted, cursor: 'pointer' }}
+                              >
                                 Cancel
                               </button>
                               <button
                                 type="button"
-                                onClick={saveInvestorEdit}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  saveInvestorEdit();
+                                }}
                                 disabled={editingInvestorSaving}
                                 style={{
                                   border: 'none',
@@ -3840,25 +4281,7 @@ useEffect(() => {
                               </button>
                             </div>
                           </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                            <button
-                              type="button"
-                              onClick={() => beginInvestorEdit(investor)}
-                              style={{
-                                border: `1px solid ${palette.border}`,
-                                borderRadius: 999,
-                                padding: '4px 10px',
-                                fontSize: 12,
-                                background: '#fff',
-                                color: palette.text,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        )}
+                        ) : null}
                       </div>
                     );
                   })}

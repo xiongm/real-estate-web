@@ -1,16 +1,18 @@
 
+from datetime import datetime, timedelta
 from sqlmodel import SQLModel, create_engine, Session
-from sqlalchemy import text, inspect
-from .config import DATABASE_URL
+from sqlalchemy import text, inspect, delete
+from .config import DATABASE_URL, AUDIT_RETENTION_DAYS
 
 engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
 
 def init_db():
-    from .models import Tenant, User, Project, Document, Envelope, Signer, Field, SigningSession, Event, FinalArtifact, SignerFieldValue, ProjectInvestor, ProjectFile
+    from .models import Tenant, User, Project, Document, Envelope, Signer, Field, SigningSession, Event, FinalArtifact, SignerFieldValue, ProjectInvestor, ProjectFile, AuditEvent
     SQLModel.metadata.create_all(engine)
     _ensure_project_access_column()
     _ensure_project_name_unique_index()
     _ensure_investor_contact_columns()
+    _prune_audit_events(AUDIT_RETENTION_DAYS)
 
 def get_session():
     with Session(engine) as session:
@@ -69,3 +71,16 @@ def _ensure_investor_contact_columns():
         for column, column_type in required.items():
             if column not in columns:
                 conn.execute(text(f"ALTER TABLE projectinvestor ADD COLUMN {column} {column_type}"))
+
+
+def _prune_audit_events(retention_days: int):
+    if not retention_days or retention_days <= 0:
+        return
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=retention_days)
+        from .models import AuditEvent
+        with Session(engine) as session:
+            session.exec(delete(AuditEvent).where(AuditEvent.created_at < cutoff))
+            session.commit()
+    except Exception as exc:
+        print("WARNING: failed to prune audit events:", exc)

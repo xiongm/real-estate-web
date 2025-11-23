@@ -2,7 +2,8 @@
 import os
 import secrets
 from urllib.parse import quote
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Response, status
+import json
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Response, status, Request
 from sqlmodel import Session, select
 from minio.error import S3Error
 from ..db import get_session
@@ -18,6 +19,7 @@ from ..models import (
     SigningSession,
     SignerFieldValue,
     Event,
+    AuditEvent,
 )
 from ..storage import put_bytes, get_bytes, delete_object
 from ..utils import sha256_bytes, make_token
@@ -27,8 +29,9 @@ from ..schemas import ProjectUpdate
 def _serialize_document(doc: Document):
     return {
         "id": doc.id,
+        "project_id": doc.project_id,
         "filename": doc.filename,
-        "created_at": doc.created_at,
+        "created_at": doc.created_at.isoformat() if doc.created_at else None,
     }
 
 def _serialize_final(entry):
@@ -52,6 +55,43 @@ def _serialize_project_file(doc: ProjectFile):
 
 router = APIRouter()
 
+
+def _record_audit(
+    session: Session,
+    *,
+    project_id: int,
+    action: str,
+    resource_type: str,
+    resource_id: str,
+    actor_type: str,
+    actor_id: str | None = None,
+    status: str = "success",
+    summary: str | None = None,
+    ip: str | None = None,
+    user_agent: str | None = None,
+    payload: dict | None = None,
+):
+    try:
+        event = AuditEvent(
+            project_id=project_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            actor_type=actor_type,
+            actor_id=actor_id,
+            status=status,
+            summary=summary,
+            ip=ip,
+            user_agent=user_agent,
+            payload_json=json.dumps(payload) if payload else None,
+        )
+        session.add(event)
+        session.commit()
+    except Exception:
+        session.rollback()
+        # Do not break the main workflow due to audit write failures
+        return
+
 def _content_disposition(filename: str) -> str:
     safe_ascii = filename.encode("ascii", errors="ignore").decode("ascii").strip().replace('"', "")
     if not safe_ascii:
@@ -66,6 +106,7 @@ def create_project(
     description: str = "",
     tenant_id: int = 1,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     existing = session.exec(select(Project).where(Project.name == name)).first()
@@ -81,7 +122,26 @@ def create_project(
     session.add(p)
     session.commit()
     session.refresh(p)
-    return p
+    _record_audit(
+        session,
+        project_id=p.id,
+        action="create",
+        resource_type="project",
+        resource_id=str(p.id),
+        actor_type=ctx.role,
+        summary=f"Created project {p.name}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+    return {
+        "id": p.id,
+        "name": p.name,
+        "status": p.status,
+        "access_token": p.access_token,
+        "address": p.address,
+        "description": p.description,
+        "tenant_id": p.tenant_id,
+    }
 
 @router.get("")
 def list_projects(
@@ -96,6 +156,7 @@ def update_project(
     project_id: int,
     payload: ProjectUpdate,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     project = session.get(Project, project_id)
@@ -115,13 +176,34 @@ def update_project(
     session.add(project)
     session.commit()
     session.refresh(project)
-    return project
+    _record_audit(
+        session,
+        project_id=project.id,
+        action="update",
+        resource_type="project",
+        resource_id=str(project.id),
+        actor_type=ctx.role,
+        summary="Updated project",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+        payload=data,
+    )
+    return {
+        "id": project.id,
+        "name": project.name,
+        "status": project.status,
+        "access_token": project.access_token,
+        "address": project.address,
+        "description": project.description,
+        "tenant_id": project.tenant_id,
+    }
 
 @router.post("/{project_id}/documents")
 async def upload_document(
     project_id: int,
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     project = session.get(Project, project_id)
@@ -138,7 +220,19 @@ async def upload_document(
     session.add(doc)
     session.commit()
     session.refresh(doc)
-    return doc
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="upload",
+        resource_type="document",
+        resource_id=str(doc.id),
+        actor_type=ctx.role,
+        summary=f"Uploaded {file.filename}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+        payload={"filename": file.filename, "content_type": file.content_type},
+    )
+    return _serialize_document(doc)
 
 @router.get("/{project_id}/documents")
 def list_project_documents(
@@ -156,6 +250,7 @@ def download_document_pdf(
     project_id: int,
     document_id: int,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_project_or_admin),
 ):
     document = session.get(Document, document_id)
@@ -166,6 +261,17 @@ def download_document_pdf(
     except S3Error:
         raise HTTPException(404, "stored file missing for this document")
     filename = document.filename or f"document-{document_id}.pdf"
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="download",
+        resource_type="document",
+        resource_id=str(document_id),
+        actor_type=ctx.role,
+        summary=f"Downloaded {filename}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -194,6 +300,7 @@ async def upload_project_file(
     file: UploadFile = File(...),
     label: str = Form(""),
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     project = session.get(Project, project_id)
@@ -217,6 +324,22 @@ async def upload_project_file(
     session.add(project_file)
     session.commit()
     session.refresh(project_file)
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="upload",
+        resource_type="file",
+        resource_id=str(project_file.id),
+        actor_type=ctx.role,
+        summary=f"Uploaded {project_file.display_name}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+        payload={
+            "display_name": project_file.display_name,
+            "stored_filename": project_file.stored_filename,
+            "content_type": project_file.content_type,
+        },
+    )
     return _serialize_project_file(project_file)
 
 @router.get("/{project_id}/files/{file_id}/download")
@@ -224,6 +347,7 @@ def download_project_file(
     project_id: int,
     file_id: int,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_project_or_admin),
 ):
     project_file = session.get(ProjectFile, file_id)
@@ -237,6 +361,17 @@ def download_project_file(
     if "." not in download_name and "." in (project_file.stored_filename or ""):
         extension = project_file.stored_filename.rsplit(".", 1)[-1]
         download_name = f"{download_name}.{extension}"
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="download",
+        resource_type="file",
+        resource_id=str(file_id),
+        actor_type=ctx.role,
+        summary=f"Downloaded {download_name}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
     return Response(
         content=file_bytes,
         media_type=project_file.content_type or "application/octet-stream",
@@ -248,6 +383,7 @@ def delete_project_file(
     project_id: int,
     file_id: int,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     project_file = session.get(ProjectFile, file_id)
@@ -256,6 +392,17 @@ def delete_project_file(
     delete_object(project_file.s3_key)
     session.delete(project_file)
     session.commit()
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="delete",
+        resource_type="file",
+        resource_id=str(file_id),
+        actor_type=ctx.role,
+        summary=f"Deleted file {project_file.display_name}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
 
 @router.get("/{project_id}/final-artifacts")
 def list_project_final_artifacts(
@@ -347,6 +494,7 @@ def download_final_pdf(
     project_id: int,
     envelope_id: int,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_project_or_admin),
 ):
     env = session.get(Envelope, envelope_id)
@@ -362,6 +510,17 @@ def download_final_pdf(
         raise HTTPException(404, "stored file missing for this envelope")
     filename_base = doc.filename if doc and doc.filename else f"envelope-{envelope_id}"
     filename = filename_base if filename_base.lower().endswith(".pdf") else f"{filename_base}.pdf"
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="download",
+        resource_type="final_artifact",
+        resource_id=str(envelope_id),
+        actor_type=ctx.role,
+        summary=f"Downloaded final PDF {filename}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -373,6 +532,7 @@ def delete_document(
     project_id: int,
     document_id: int,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     doc = session.get(Document, document_id)
@@ -381,12 +541,24 @@ def delete_document(
     delete_object(doc.s3_key)
     session.delete(doc)
     session.commit()
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="delete",
+        resource_type="document",
+        resource_id=str(document_id),
+        actor_type=ctx.role,
+        summary=f"Deleted document {doc.filename}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
 
 @router.delete("/{project_id}/final-artifacts/{envelope_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_final_artifact(
     project_id: int,
     envelope_id: int,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     env = session.get(Envelope, envelope_id)
@@ -399,6 +571,17 @@ def delete_final_artifact(
     delete_object(fa.s3_key_audit_json)
     session.delete(fa)
     session.commit()
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="delete",
+        resource_type="final_artifact",
+        resource_id=str(envelope_id),
+        actor_type=ctx.role,
+        summary="Deleted final artifact",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
 
 @router.get("/{project_id}/envelopes")
 def list_project_envelopes(
@@ -481,6 +664,7 @@ def revoke_envelope(
     project_id: int,
     envelope_id: int,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     envelope = session.get(Envelope, envelope_id)
@@ -488,11 +672,23 @@ def revoke_envelope(
         raise HTTPException(404, "envelope not found")
     _delete_envelope(session, envelope)
     session.commit()
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="revoke",
+        resource_type="envelope",
+        resource_id=str(envelope_id),
+        actor_type=ctx.role,
+        summary=f"Revoked envelope {envelope_id}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
     project_id: int,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     project = session.get(Project, project_id)
@@ -520,11 +716,23 @@ def delete_project(
 
     session.delete(project)
     session.commit()
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="delete",
+        resource_type="project",
+        resource_id=str(project_id),
+        actor_type=ctx.role,
+        summary=f"Deleted project {project.name}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
 
 @router.post("/{project_id}/access-token")
 def regenerate_project_token(
     project_id: int,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     project = session.get(Project, project_id)
@@ -534,4 +742,15 @@ def regenerate_project_token(
     session.add(project)
     session.commit()
     session.refresh(project)
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="regenerate_token",
+        resource_type="project",
+        resource_id=str(project_id),
+        actor_type=ctx.role,
+        summary="Regenerated project token",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
     return {"access_token": project.access_token}

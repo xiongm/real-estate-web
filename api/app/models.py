@@ -2,7 +2,7 @@
 from typing import Optional
 from datetime import datetime
 from sqlmodel import SQLModel, Field as ORMField
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, Index
 
 class Tenant(SQLModel, table=True):
     id: Optional[int] = ORMField(default=None, primary_key=True)
@@ -130,3 +130,24 @@ class FinalArtifact(SQLModel, table=True):
     s3_key_audit_json: str
     sha256_final: str
     completed_at: datetime = ORMField(default_factory=datetime.utcnow)
+
+class AuditEvent(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_audit_project_created_at", "project_id", "created_at"),
+        Index("ix_audit_action_created_at", "action", "created_at"),
+        Index("ix_audit_resource", "resource_type", "resource_id"),
+        Index("ix_audit_actor_created_at", "actor_type", "created_at"),
+    )
+    id: Optional[int] = ORMField(default=None, primary_key=True)
+    project_id: Optional[int] = ORMField(default=None, index=True)
+    resource_type: Optional[str] = None
+    resource_id: Optional[str] = None
+    action: str
+    actor_type: str  # admin_token | project_token | system | signer
+    actor_id: Optional[str] = None
+    ip: Optional[str] = None
+    user_agent: Optional[str] = None
+    status: str = "success"
+    summary: Optional[str] = None
+    payload_json: Optional[str] = None
+    created_at: datetime = ORMField(default_factory=datetime.utcnow)

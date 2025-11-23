@@ -1,7 +1,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import projects, documents, envelopes, signing, project_investors, places
+from .routers import projects, documents, envelopes, signing, project_investors, places, audit
 from .db import init_db
 
 app = FastAPI(title="Signing API (Python stamper)")
@@ -21,6 +21,7 @@ def on_startup():
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(documents.router, prefix="/api/projects", tags=["documents"])  # nested
 app.include_router(project_investors.router, prefix="/api/projects", tags=["project-investors"])
+app.include_router(audit.router, prefix="/api/projects", tags=["audit"])
 app.include_router(envelopes.router, prefix="/api/envelopes", tags=["envelopes"])
 app.include_router(signing.router, prefix="/api/sign", tags=["signing"])
 app.include_router(places.router, prefix="/api/places", tags=["places"])

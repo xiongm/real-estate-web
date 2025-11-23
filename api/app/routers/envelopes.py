@@ -1,9 +1,10 @@
 import os
 from html import escape
-from fastapi import APIRouter, Depends, HTTPException
+import json
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session, select
 from ..db import get_session
-from ..models import Envelope, Signer, Field, Document, Event, ProjectInvestor
+from ..models import Envelope, Signer, Field, Document, Event, ProjectInvestor, AuditEvent
 from ..schemas import EnvelopeCreate, EnvelopeSend
 from ..email import send_email, format_sender_name
 from ..utils import canonical_json, sha256_bytes, make_token
@@ -35,10 +36,46 @@ def _append_event(session: Session, env_id: int, actor: str, type_: str, meta: d
     session.add(event)
     session.commit()
 
+def _record_audit(
+    session: Session,
+    *,
+    project_id: int,
+    action: str,
+    resource_type: str,
+    resource_id: str,
+    actor_type: str,
+    actor_id: str | None = None,
+    summary: str | None = None,
+    ip: str | None = None,
+    user_agent: str | None = None,
+    payload: dict | None = None,
+):
+    try:
+        session.add(
+            AuditEvent(
+                project_id=project_id,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                status="success",
+                summary=summary,
+                ip=ip,
+                user_agent=user_agent,
+                payload_json=json.dumps(payload) if payload else None,
+            )
+        )
+        session.commit()
+    except Exception:
+        session.rollback()
+        return
+
 @router.post("")
 def create_envelope(
     data: EnvelopeCreate,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     doc = session.get(Document, data.document_id)
@@ -100,6 +137,17 @@ def create_envelope(
         ))
     session.commit()
     _append_event(session, env.id, "system", "created", {"envelope_id": env.id})
+    _record_audit(
+        session,
+        project_id=data.project_id,
+        action="create",
+        resource_type="envelope",
+        resource_id=str(env.id),
+        actor_type=ctx.role,
+        summary=f"Created envelope for doc {data.document_id}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
 
     # Return a small, explicit body so curl shows it
     return {"id": env.id, "status": env.status}
@@ -109,6 +157,7 @@ def send_envelope(
     envelope_id: int,
     payload: EnvelopeSend,
     session: Session = Depends(get_session),
+    request: Request = None,
     ctx=Depends(require_admin_access),
 ):
     env = session.get(Envelope, envelope_id)
@@ -183,6 +232,18 @@ Open document: {link}
         )
 
     _append_event(session, env.id, "system", "sent", {})
+    _record_audit(
+        session,
+        project_id=env.project_id,
+        action="send",
+        resource_type="envelope",
+        resource_id=str(env.id),
+        actor_type=ctx.role,
+        summary=f"Sent envelope {env.subject or env.id}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+        payload={"signers": [s.email for s in signers], "document_id": env.document_id},
+    )
     return {"ok": True}
 
 @router.get("/{envelope_id}")

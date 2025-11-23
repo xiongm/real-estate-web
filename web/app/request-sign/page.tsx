@@ -550,8 +550,27 @@ useEffect(() => {
         throw new Error(detail || `Upload failed (${response.status})`);
       }
       const doc = await response.json();
-      setDocumentInfo(doc);
-      setSubject(doc.filename || 'Please sign');
+      let resolvedDoc: { id?: number; filename?: string } | null = doc;
+      if (!doc?.id) {
+        try {
+          const listResp = await fetch(`${baseApi}/api/projects/${projectNumeric}/documents`, {
+            headers: { 'X-Access-Token': adminToken ?? '' },
+          });
+          if (listResp.ok) {
+            const list = await listResp.json();
+            if (Array.isArray(list) && list.length) {
+              resolvedDoc = list.find((item) => item?.filename === file.name) || list[0] || resolvedDoc;
+            }
+          }
+        } catch {
+          /* ignore and fallback to original response */
+        }
+      }
+      if (!resolvedDoc?.id) {
+        throw new Error('Upload succeeded but document id was not returned. Please retry.');
+      }
+      setDocumentInfo(resolvedDoc as { id: number; filename: string });
+      setSubject(resolvedDoc.filename || 'Please sign');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload document');
       throw err;
@@ -835,12 +854,22 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           routing_order: investor.routing_order,
         };
       })
-      .filter(Boolean);
+      .filter(
+        (value): value is { project_investor_id: number; name: string; email: string; role: string; routing_order: number } =>
+          Boolean(value),
+      );
+    const missingSigner = readySigners.find(
+      (signer) => !signer?.name?.trim() || !signer?.email?.trim(),
+    );
+    if (missingSigner) {
+      setError('Each signer needs a name and email. Please update the investor record.');
+      return;
+    }
     if (!projectNumeric) {
       setError('Open Request Sign from Admin so a project is selected.');
       return;
     }
-    if (!documentInfo) {
+    if (!documentInfo?.id) {
       setError('Upload a PDF to this project before submitting.');
       return;
     }

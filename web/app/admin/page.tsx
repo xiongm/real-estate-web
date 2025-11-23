@@ -163,6 +163,18 @@ const formatSentLabel = (timestamp?: string | null) => {
   return formatted ? `Sent ${formatted}` : 'Sent time unavailable';
 };
 
+const toIsoDateStart = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const toIsoDateEnd = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(`${value}T23:59:59.999Z`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
 export default function AdminPage() {
   const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const appVersion = (process.env.APP_VERSION ?? '').trim() || 'unknown';
@@ -250,14 +262,39 @@ const newInvestorAddressTimeout = useRef<NodeJS.Timeout | null>(null);
 const editInvestorAddressTimeout = useRef<NodeJS.Timeout | null>(null);
 const newInvestorAddressController = useRef<AbortController | null>(null);
 const editInvestorAddressController = useRef<AbortController | null>(null);
-const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors'>('documents');
+const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors' | 'audit'>('documents');
   const [deletingInvestors, setDeletingInvestors] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
   const [requestButtonHovered, setRequestButtonHovered] = useState(false);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [projectDetailsLoaded, setProjectDetailsLoaded] = useState(false);
-const [initialPageReady, setInitialPageReady] = useState(false);
+  const [initialPageReady, setInitialPageReady] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+const [auditEvents, setAuditEvents] = useState<
+  Array<{
+    id: number;
+    action: string;
+      resource_type: string | null;
+      resource_id: string | null;
+      actor_type: string;
+      actor_id: string | null;
+      status: string;
+      summary: string | null;
+      created_at: string;
+      payload_json?: string | null;
+    }>
+  >([]);
+const [auditPage, setAuditPage] = useState(1);
+const [auditTotal, setAuditTotal] = useState(0);
+const auditLimit = 20;
+const [auditFilters, setAuditFilters] = useState({ action: '', resource: '', actor: '', status: '', search: '' });
+const [auditRetentionDays, setAuditRetentionDays] = useState(30);
+const [auditDateFrom, setAuditDateFrom] = useState('');
+const [auditDateTo, setAuditDateTo] = useState('');
+const [auditRefreshKey, setAuditRefreshKey] = useState(0);
+const [auditExporting, setAuditExporting] = useState(false);
 const newInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
 const newInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
 const editInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
@@ -751,6 +788,13 @@ useEffect(() => {
 useEffect(() => {
   setCenterTab('documents');
 }, [selectedProjectId]);
+
+useEffect(() => {
+  if (centerTab === 'audit') {
+    setAuditPage(1);
+    setAuditRefreshKey((prev) => prev + 1);
+  }
+}, [centerTab, selectedProjectId]);
   useEffect(() => {
     clearError();
   }, [centerTab]);
@@ -763,6 +807,98 @@ useEffect(() => {
     if (!projectDetailsLoaded) return;
     setInitialPageReady(true);
   }, [initialPageReady, adminTokenLoading, adminVerified, projectsLoaded, projectDetailsLoaded]);
+
+  useEffect(() => {
+    if (!selectedProjectId || !adminVerified) return;
+    const fetchAudit = async () => {
+      setAuditLoading(true);
+      setAuditError(null);
+      try {
+        const params = new URLSearchParams();
+        params.set('page', String(auditPage));
+        params.set('limit', String(auditLimit));
+        if (auditFilters.action) params.set('action', auditFilters.action);
+        if (auditFilters.resource) params.set('resource', auditFilters.resource);
+        if (auditFilters.actor) params.set('actor_type', auditFilters.actor);
+        if (auditFilters.status) params.set('status', auditFilters.status);
+        if (auditDateFrom) {
+          const isoFrom = toIsoDateStart(auditDateFrom);
+          if (isoFrom) params.set('date_from', isoFrom);
+        }
+        if (auditDateTo) {
+          const isoTo = toIsoDateEnd(auditDateTo);
+          if (isoTo) params.set('date_to', isoTo);
+        }
+        if (auditFilters.search) params.set('search', auditFilters.search);
+        const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/audit?${params.toString()}`, {
+          headers: { 'X-Access-Token': adminToken },
+        });
+        if (!resp.ok) throw new Error(`Failed to load audit (${resp.status})`);
+        const data = await resp.json();
+        setAuditEvents(data?.items || []);
+        setAuditTotal(data?.total ?? data?.items?.length ?? 0);
+        if (typeof data?.retention_days === 'number') {
+          setAuditRetentionDays(data.retention_days);
+        }
+      } catch (err) {
+        setAuditError(err instanceof Error ? err.message : 'Failed to load audit');
+      } finally {
+        setAuditLoading(false);
+      }
+    };
+    fetchAudit();
+  }, [selectedProjectId, adminVerified, adminToken, auditPage, auditFilters, auditDateFrom, auditDateTo, baseApi, auditRefreshKey]);
+
+  const maybeRefreshAudit = () => {
+    if (centerTab === 'audit') {
+      setAuditPage(1);
+      // trigger useEffect refetch via filters state toggle
+      setAuditFilters((prev) => ({ ...prev }));
+    } else {
+      setAuditRefreshKey((prev) => prev + 1);
+    }
+  };
+
+  const exportAudit = async (format: 'csv' | 'json') => {
+    if (!selectedProjectId || !adminToken) return;
+    setAuditExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', '1');
+      params.set('limit', '500');
+      params.set('export', format);
+      if (auditFilters.action) params.set('action', auditFilters.action);
+      if (auditFilters.resource) params.set('resource', auditFilters.resource);
+      if (auditFilters.actor) params.set('actor_type', auditFilters.actor);
+      if (auditFilters.status) params.set('status', auditFilters.status);
+      if (auditDateFrom) {
+        const isoFrom = toIsoDateStart(auditDateFrom);
+        if (isoFrom) params.set('date_from', isoFrom);
+      }
+      if (auditDateTo) {
+        const isoTo = toIsoDateEnd(auditDateTo);
+        if (isoTo) params.set('date_to', isoTo);
+      }
+      if (auditFilters.search) params.set('search', auditFilters.search);
+      const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/audit?${params.toString()}`, {
+        headers: { 'X-Access-Token': adminToken },
+      });
+      if (!resp.ok) throw new Error(`Export failed (${resp.status})`);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-${selectedProjectId}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setAuditError(err instanceof Error ? err.message : 'Failed to export audit');
+    } finally {
+      setAuditExporting(false);
+    }
+  };
 
   const resetInvestorForm = () => {
     setShowInvestorForm(false);
@@ -829,6 +965,7 @@ useEffect(() => {
       setProjectFiles((prev) => [created, ...prev]);
       setProjectFileUploadFile(null);
       setProjectFileUploadName('');
+      maybeRefreshAudit();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload document');
     } finally {
@@ -848,6 +985,7 @@ useEffect(() => {
       });
       if (!resp.ok) throw new Error(`Failed to delete document (${resp.status})`);
       setProjectFiles((prev) => prev.filter((file) => file.id !== fileId));
+      maybeRefreshAudit();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete document');
     } finally {
@@ -1052,6 +1190,12 @@ useEffect(() => {
     [investors],
   );
   const totalDocumentsCount = documentEntries.length + projectFiles.length;
+  const auditTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(Math.max(auditTotal, auditEvents.length || 0) / auditLimit) || 1),
+    [auditTotal, auditEvents.length, auditLimit],
+  );
+  const auditShowingStart = auditTotal ? (auditPage - 1) * auditLimit + 1 : 0;
+  const auditShowingEnd = auditTotal ? Math.min(auditTotal, auditPage * auditLimit) : 0;
 
   const docStats = useMemo(
     () => [
@@ -1167,6 +1311,7 @@ useEffect(() => {
         });
         return next;
       });
+      maybeRefreshAudit();
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke envelopes');
@@ -1259,6 +1404,7 @@ useEffect(() => {
       }
       setFinals((prev) => prev.filter((item) => !selectedFinalIds.includes(item.envelope_id)));
       setSelectedFinalIds([]);
+      maybeRefreshAudit();
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete signed packets');
@@ -1333,6 +1479,7 @@ useEffect(() => {
       setInvestors((prev) => prev.filter((inv) => !selectedInvestorIds.includes(inv.id)));
       setSelectedInvestorIds([]);
       setManageInvestorsMode(false);
+      maybeRefreshAudit();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove investors');
     } finally {
@@ -1416,8 +1563,14 @@ useEffect(() => {
       );
       if (!resp.ok) throw new Error(`Failed to update investor (${resp.status})`);
       const updated = await resp.json();
-      setInvestors((prev) => prev.map((inv) => (inv.id === updated.id ? { ...inv, ...updated } : inv)));
+      if (updated?.id) {
+        setInvestors((prev) =>
+          prev.map((inv) => (inv.id === updated.id ? { ...inv, ...updated, units_invested: updated.units_invested } : inv)),
+        );
+      }
+      await loadInvestors(selectedProjectId);
       cancelInvestorEdit();
+      maybeRefreshAudit();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update investor');
     } finally {
@@ -1464,9 +1617,14 @@ useEffect(() => {
       });
       if (!resp.ok) throw new Error(`Failed to add investor (${resp.status})`);
       const created = await resp.json();
-      setInvestors((prev) => [...prev, created]);
+      if (created?.id) {
+        setInvestors((prev) => [...prev, created]);
+      } else {
+        await loadInvestors(selectedProjectId);
+      }
       resetInvestorForm();
       setShowInvestorForm(false);
+      maybeRefreshAudit();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add investor');
     } finally {
@@ -1556,6 +1714,7 @@ useEffect(() => {
       });
       if (!resp.ok) throw new Error(`Failed to regenerate token (${resp.status})`);
       await loadProjects(projectId);
+      maybeRefreshAudit();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to regenerate token');
     }
@@ -2731,7 +2890,8 @@ useEffect(() => {
                     { id: 'signatures', label: 'Signatures', icon: '✍️' },
                     { id: 'investors', label: 'Investors', icon: '👥' },
                     { id: 'share', label: 'Share', icon: '🔐' },
-                  ] as Array<{ id: 'signatures' | 'documents' | 'share' | 'investors'; label: string; icon: string }>
+                    { id: 'audit', label: 'Audit', icon: '🕵️' },
+                  ] as Array<{ id: 'signatures' | 'documents' | 'share' | 'investors' | 'audit'; label: string; icon: string }>
                 ).map((tab) => {
                   const active = centerTab === tab.id;
                   return (
@@ -4003,7 +4163,7 @@ useEffect(() => {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {investors.map((investor) => {
+                  {investors.map((investor, idx) => {
                     const selected = selectedInvestorIds.includes(investor.id);
                     const editing = editingInvestorId === investor.id;
                     const hovered = hoveredInvestorId === investor.id;
@@ -4019,7 +4179,7 @@ useEffect(() => {
                       (investor.mailing_address ? investor.mailing_address : 'Role not specified');
                     return (
                       <div
-                        key={investor.id}
+                      key={`${investor.id ?? investor.email ?? investor.name ?? 'investor'}-${idx}`}
                         style={{
                           borderRadius: 18,
                           border: `1px solid ${cardBorder}`,
@@ -4280,6 +4440,247 @@ useEffect(() => {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          )}
+          {centerTab === 'audit' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>Audit trail</h3>
+                  <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>
+                    Project-scoped events with filters. Audit retained for {auditRetentionDays} day{auditRetentionDays === 1 ? '' : 's'}.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Search (resource, actor, summary)"
+                    value={auditFilters.search}
+                    onChange={(e) => {
+                      setAuditPage(1);
+                      setAuditFilters((prev) => ({ ...prev, search: e.target.value }));
+                    }}
+                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}`, minWidth: 220 }}
+                  />
+                  <select
+                    value={auditFilters.action}
+                    onChange={(e) => {
+                      setAuditPage(1);
+                      setAuditFilters((prev) => ({ ...prev, action: e.target.value }));
+                    }}
+                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                  >
+                    <option value="">Action</option>
+                    <option value="upload">Upload</option>
+                    <option value="send">Send</option>
+                    <option value="revoke">Revoke</option>
+                    <option value="delete">Delete</option>
+                  </select>
+                  <select
+                    value={auditFilters.resource}
+                    onChange={(e) => {
+                      setAuditPage(1);
+                      setAuditFilters((prev) => ({ ...prev, resource: e.target.value }));
+                    }}
+                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                  >
+                    <option value="">Resource</option>
+                    <option value="document">Document</option>
+                    <option value="envelope">Envelope</option>
+                    <option value="investor">Investor</option>
+                    <option value="file">File</option>
+                    <option value="token">Token</option>
+                  </select>
+                  <select
+                    value={auditFilters.actor}
+                    onChange={(e) => {
+                      setAuditPage(1);
+                      setAuditFilters((prev) => ({ ...prev, actor: e.target.value }));
+                    }}
+                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                  >
+                    <option value="">Actor</option>
+                    <option value="admin_token">Admin token</option>
+                    <option value="project_token">Project token</option>
+                    <option value="system">System</option>
+                  </select>
+                  <select
+                    value={auditFilters.status}
+                    onChange={(e) => {
+                      setAuditPage(1);
+                      setAuditFilters((prev) => ({ ...prev, status: e.target.value }));
+                    }}
+                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                  >
+                    <option value="">Status</option>
+                    <option value="success">Success</option>
+                    <option value="fail">Fail</option>
+                  </select>
+                  <input
+                    type="date"
+                    value={auditDateFrom}
+                    onChange={(e) => {
+                      setAuditPage(1);
+                      setAuditDateFrom(e.target.value);
+                    }}
+                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                    placeholder="From"
+                  />
+                  <input
+                    type="date"
+                    value={auditDateTo}
+                    onChange={(e) => {
+                      setAuditPage(1);
+                      setAuditDateTo(e.target.value);
+                    }}
+                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                    placeholder="To"
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => exportAudit('csv')}
+                      disabled={auditExporting || !selectedProjectId}
+                      style={{
+                        borderRadius: 8,
+                        border: `1px solid ${palette.border}`,
+                        padding: '8px 12px',
+                        background: '#fff',
+                        cursor: auditExporting ? 'wait' : 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {auditExporting ? 'Exporting…' : 'Export CSV'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportAudit('json')}
+                      disabled={auditExporting || !selectedProjectId}
+                      style={{
+                        borderRadius: 8,
+                        border: `1px solid ${palette.border}`,
+                        padding: '8px 12px',
+                        background: '#fff',
+                        cursor: auditExporting ? 'wait' : 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {auditExporting ? 'Exporting…' : 'Export JSON'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {auditError && (
+                <div style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecdd3', borderRadius: 12, padding: '10px 12px' }}>
+                  {auditError}
+                </div>
+              )}
+              {auditLoading ? (
+                <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${palette.border}`, background: '#fff' }}>Loading audit…</div>
+              ) : auditEvents.length === 0 ? (
+                <div style={{ padding: 24, borderRadius: 12, border: `1px dashed ${palette.border}`, background: '#fff', color: palette.accentMuted }}>
+                  No audit events yet.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {auditEvents.map((event) => (
+                    <details
+                      key={event.id}
+                      style={{
+                        border: `1px solid ${palette.border}`,
+                        borderRadius: 12,
+                        padding: 12,
+                        background: '#fff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                      }}
+                    >
+                      <summary style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', cursor: 'pointer' }}>
+                        <div style={{ minWidth: 160, fontSize: 12, color: palette.accentMuted }}>{formatLocalDateTime(event.created_at) || event.created_at}</div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ ...awaitingChipStyle, background: '#e2e8f0', color: palette.text }}>Action: {event.action}</span>
+                          {event.resource_type && (
+                            <span style={{ ...awaitingChipStyle, background: '#ede9fe', color: palette.text }}>
+                              {event.resource_type}
+                              {event.resource_id ? ` #${event.resource_id}` : ''}
+                            </span>
+                          )}
+                          <span style={{ ...(event.status === 'success' ? completedChipStyle : awaitingChipStyle) }}>
+                            {event.status === 'success' ? 'Success' : 'Fail'}
+                          </span>
+                          <span style={{ ...awaitingChipStyle, background: '#dbeafe', color: '#1d4ed8' }}>Actor: {event.actor_type}</span>
+                        </div>
+                        {event.summary && <div style={{ flex: 1, fontSize: 13 }}>{event.summary}</div>}
+                      </summary>
+                      {event.payload_json && (
+                        <pre
+                          style={{
+                            margin: 0,
+                            padding: 12,
+                            borderRadius: 10,
+                            background: '#f8fafc',
+                            border: `1px solid ${palette.border}`,
+                            fontSize: 12,
+                            overflowX: 'auto',
+                          }}
+                        >
+                          {JSON.stringify(JSON.parse(event.payload_json), null, 2)}
+                        </pre>
+                      )}
+                    </details>
+                  ))}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 12,
+                      flexWrap: 'wrap',
+                      marginTop: 4,
+                    }}
+                  >
+                    <span style={{ fontSize: 13, color: palette.accentMuted }}>
+                      {auditTotal
+                        ? `Showing ${auditShowingStart}-${auditShowingEnd} of ${auditTotal} events`
+                        : `Showing ${auditEvents.length} events`}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => setAuditPage((prev) => Math.max(1, prev - 1))}
+                        disabled={auditPage <= 1}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 10,
+                          border: `1px solid ${palette.border}`,
+                          background: '#fff',
+                          cursor: auditPage <= 1 ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        Previous
+                      </button>
+                      <span style={{ fontSize: 13, color: palette.accentMuted }}>
+                        Page {auditPage} of {auditTotalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAuditPage((prev) => Math.min(auditTotalPages, prev + 1))}
+                        disabled={auditPage >= auditTotalPages}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 10,
+                          border: `1px solid ${palette.border}`,
+                          background: '#fff',
+                          cursor: auditPage >= auditTotalPages ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

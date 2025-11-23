@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlmodel import Session, select, delete
 from sqlalchemy.inspection import inspect as sa_inspect
 from ..db import get_session
-from ..models import Signer, Envelope, Field, Event, Document, FinalArtifact, SignerFieldValue
+from ..models import Signer, Envelope, Field, Event, Document, FinalArtifact, SignerFieldValue, AuditEvent
 from ..schemas import SignSave, ConsentAccept
 from ..utils import read_token, canonical_json, sha256_bytes
 from ..storage import get_bytes, put_bytes
@@ -14,6 +14,40 @@ import json
 router = APIRouter()
 
 # ---------- helpers ----------
+def _record_audit(
+    session: Session,
+    *,
+    project_id: int,
+    action: str,
+    resource_type: str,
+    resource_id: str,
+    actor_type: str,
+    actor_id: str | None = None,
+    summary: str | None = None,
+    ip: str | None = None,
+    user_agent: str | None = None,
+    payload: dict | None = None,
+):
+    try:
+        session.add(
+            AuditEvent(
+                project_id=project_id,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                status="success",
+                summary=summary,
+                ip=ip,
+                user_agent=user_agent,
+                payload_json=json.dumps(payload) if payload else None,
+            )
+        )
+        session.commit()
+    except Exception:
+        session.rollback()
+        return
 def _append_event(session: Session, env_id: int, actor: str, type_: str, meta: dict, ip=None, ua=None):
     last = session.exec(select(Event).where(Event.envelope_id==env_id).order_by(Event.id.desc())).first()
     prev_hash = last.hash if last else "0"*64
@@ -123,7 +157,21 @@ def load_signing_session(token: str, request: Request, session: Session = Depend
         if field.signer_id is None and field.role and signer.role and field.role != signer.role:
             continue
         filtered_fields.append(field)
-    _append_event(session, env.id, f"signer:{signer.id}", "opened", {}, ip=request.client.host, ua=request.headers.get("user-agent"))
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent")
+    _append_event(session, env.id, f"signer:{signer.id}", "opened", {}, ip=ip, ua=ua)
+    _record_audit(
+        session,
+        project_id=env.project_id,
+        action="open",
+        resource_type="envelope",
+        resource_id=str(env.id),
+        actor_type="signer",
+        actor_id=signer.email,
+        summary=f"Signer opened link ({signer.email})",
+        ip=ip,
+        user_agent=ua,
+    )
     return {
         "envelope": sa_to_dict(env),
         "signer": sa_to_dict(signer),
@@ -163,18 +211,32 @@ def get_final_pdf(token: str, session: Session = Depends(get_session)):
     return Response(content=pdf_bytes, media_type="application/pdf")
 
 @router.post("/{token}/save")
-def save_partial(token: str, payload: SignSave, session: Session = Depends(get_session)):
+def save_partial(token: str, payload: SignSave, session: Session = Depends(get_session), request: Request = None):
     data = read_token(token)
     signer = session.get(Signer, data.get("signer_id"))
     if not signer:
         raise HTTPException(404, "not found")
     env = session.get(Envelope, signer.envelope_id)
     _persist_field_values(session, signer, payload.values or {})
-    _append_event(session, env.id, f"signer:{signer.id}", "filled", {"values": payload.values})
+    ip = request.client.host if request and request.client else None
+    ua = request.headers.get("user-agent") if request else None
+    _append_event(session, env.id, f"signer:{signer.id}", "filled", {"values": payload.values}, ip=ip, ua=ua)
+    _record_audit(
+        session,
+        project_id=env.project_id,
+        action="filled",
+        resource_type="envelope",
+        resource_id=str(env.id),
+        actor_type="signer",
+        actor_id=signer.email,
+        summary=f"Signer saved progress ({signer.email})",
+        ip=ip,
+        user_agent=ua,
+    )
     return {"ok": True}
 
 @router.post("/{token}/consent")
-def accept_consent(token: str, payload: ConsentAccept, session: Session = Depends(get_session)):
+def accept_consent(token: str, payload: ConsentAccept, session: Session = Depends(get_session), request: Request = None):
     data = read_token(token)
     signer = session.get(Signer, data.get("signer_id"))
     if not signer:
@@ -182,11 +244,25 @@ def accept_consent(token: str, payload: ConsentAccept, session: Session = Depend
     env = session.get(Envelope, signer.envelope_id)
     if not payload.accepted:
         raise HTTPException(400, "consent required")
-    _append_event(session, env.id, f"signer:{signer.id}", "consented", {})
+    ip = request.client.host if request and request.client else None
+    ua = request.headers.get("user-agent") if request else None
+    _append_event(session, env.id, f"signer:{signer.id}", "consented", {}, ip=ip, ua=ua)
+    _record_audit(
+        session,
+        project_id=env.project_id,
+        action="consent",
+        resource_type="envelope",
+        resource_id=str(env.id),
+        actor_type="signer",
+        actor_id=signer.email,
+        summary=f"Signer accepted consent ({signer.email})",
+        ip=ip,
+        user_agent=ua,
+    )
     return {"ok": True}
 
 @router.post("/{token}/complete")
-def complete_signing(token: str, payload: SignSave, session: Session = Depends(get_session)):
+def complete_signing(token: str, payload: SignSave, session: Session = Depends(get_session), request: Request = None):
     data = read_token(token)
     signer = session.get(Signer, data.get("signer_id"))
     if not signer:
@@ -202,7 +278,22 @@ def complete_signing(token: str, payload: SignSave, session: Session = Depends(g
         select(Signer).where(Signer.envelope_id == env.id, Signer.status != "completed")
     ).all()
     response: dict = {"ok": True}
-    _append_event(session, env.id, f"signer:{signer.id}", "completed", {"signer_id": signer.id})
+    ip = request.client.host if request and request.client else None
+    ua = request.headers.get("user-agent") if request else None
+    _append_event(session, env.id, f"signer:{signer.id}", "completed", {"signer_id": signer.id}, ip=ip, ua=ua)
+    _record_audit(
+        session,
+        project_id=env.project_id,
+        action="complete",
+        resource_type="envelope",
+        resource_id=str(env.id),
+        actor_type="signer",
+        actor_id=signer.email,
+        summary=f"Signer completed ({signer.email})",
+        ip=ip,
+        user_agent=ua,
+        payload={"values": payload.values},
+    )
 
     if remaining:
         session.commit()

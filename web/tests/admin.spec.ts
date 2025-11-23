@@ -268,6 +268,45 @@ test.describe('Admin portal', () => {
     await expect(page.getByText('Mailing:', { exact: false })).toHaveCount(0); // ensures view mode summary renders without inputs
   });
 
+  test('audit tab loads events with filters and expandable payload', async ({ page }) => {
+    await mockAdminData(page);
+
+    // Mock audit endpoint
+    await page.route('**/api/projects/201/audit**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [
+            {
+              id: 1,
+              action: 'upload',
+              resource_type: 'document',
+              resource_id: 'doc-1',
+              actor_type: 'admin_token',
+              actor_id: 'admin',
+              status: 'success',
+              summary: 'Uploaded memo',
+              created_at: '2024-01-01T00:00:00Z',
+              payload_json: JSON.stringify({ filename: 'memo.pdf' }),
+            },
+          ],
+        }),
+      });
+    });
+
+    await completeLogin(page);
+    await waitForDashboard(page);
+    await page.getByTestId('tab-audit').click();
+
+    await expect(page.getByText('Uploaded memo')).toBeVisible();
+    await page.getByText('Action: upload').click();
+    await expect(page.getByText('filename')).toBeVisible();
+
+    // Filter should trigger new request
+    await page.getByPlaceholder('Search (resource, actor, summary)').fill('doc-1');
+  });
+
   test('project sidebar CTA stays anchored while switching tabs', async ({ page }) => {
     await mockAdminData(page);
     await completeLogin(page);
@@ -299,14 +338,55 @@ test.describe('Admin portal', () => {
     const submitButton = page.getByRole('button', { name: /^Add investor$/ });
     await submitButton.click();
 
-    const errorBanner = page.getByText('Name and email are required to add an investor.');
-    await expect(errorBanner).toBeVisible();
+    const errorBanner = page.getByText('Name, email, and units are required to add an investor.');
+    await expect(errorBanner).toBeVisible({ timeout: 2000 });
 
     // Fix the fields and ensure the banner clears automatically
     await page.getByPlaceholder('Name', { exact: true }).fill('New Investor');
     await page.getByPlaceholder('Email', { exact: true }).fill('new@example.com');
     await page.getByPlaceholder('Units (e.g. 10000)').fill('10');
     await expect(errorBanner).toHaveCount(0);
+  });
+
+  test('editing investor units refreshes KPI totals without full reload', async ({ page }) => {
+    const initialInvestors = [
+      { id: 1, name: 'Alex Example', email: 'alex@example.com', units_invested: 10000, role: 'Investor' },
+    ];
+    let currentInvestors = [...initialInvestors];
+
+    await mockAdminData(page, {
+      investorsByProject: { 201: initialInvestors },
+    });
+
+    await page.route('**/api/projects/201/investors', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill(jsonResponse(currentInvestors));
+        return;
+      }
+      await route.fulfill(jsonResponse({ ok: true }));
+    });
+    await page.route('**/api/projects/201/investors/1', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        currentInvestors = [{ ...currentInvestors[0], units_invested: 20000 }];
+        await route.fulfill(jsonResponse(currentInvestors[0]));
+        return;
+      }
+      await route.fulfill(jsonResponse(currentInvestors[0]));
+    });
+
+    await completeLogin(page);
+    await waitForDashboard(page);
+
+    await expect(page.getByText('$10,000')).toBeVisible();
+
+    await openInvestorsTab(page);
+    await page.getByText('Alex Example').click();
+    const editCard = page.getByRole('button', { name: /Alex Example\s+alex@example\.com/ }).first();
+    const unitsInput = editCard.locator('input[type="number"]').first();
+    await unitsInput.fill('20000');
+    await editCard.getByRole('button', { name: /^Save$/ }).click();
+
+    await expect(editCard.getByText('20,000 units')).toBeVisible({ timeout: 10000 });
   });
 
   test('signed documents deletion and envelope revoke actions update the dashboard', async ({ page }) => {
@@ -522,5 +602,69 @@ test.describe('Admin portal', () => {
     await page.waitForURL(`**/request-sign/sent/${createdEnvelopeId}`);
     expect(createCalls).toBe(1);
     expect(sendCalls).toBe(1);
+  });
+
+  test('request sign submits even when upload response lacks id', async ({ page }) => {
+    await mockAdminData(page, {
+      investorsByProject: {
+        201: [{ id: 1, name: 'Alex Example', email: 'alex@example.com', units_invested: 10, role: 'Investor' }],
+      },
+    });
+
+    const pdfFixture = path.join(process.cwd(), 'tests', 'fixtures', 'sample.pdf');
+    const createdEnvelopeId = 99001;
+    let createPayload: any = null;
+    let sendCalled = 0;
+
+    await page.route('**/api/projects/201/documents', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill(jsonResponse({})); // legacy empty response
+      } else {
+        await route.fulfill(
+          jsonResponse([
+            { id: 910, project_id: 201, filename: 'Test Packet.pdf', created_at: new Date().toISOString() },
+          ]),
+        );
+      }
+    });
+
+    await page.route('**/api/envelopes', async (route) => {
+      if (route.request().method() === 'POST') {
+        createPayload = route.request().postDataJSON();
+        await route.fulfill(jsonResponse({ id: createdEnvelopeId, status: 'draft' }));
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.route(`**/api/envelopes/${createdEnvelopeId}/send`, async (route) => {
+      sendCalled += 1;
+      await route.fulfill(jsonResponse({ ok: true }));
+    });
+
+    await page.goto('/request-sign?project=201');
+    await page.getByPlaceholder('Admin token').fill('valid-token');
+    await page.getByRole('button', { name: /continue/i }).click();
+
+    const fileInput = page.locator('input[type=\"file\"]');
+    await fileInput.setInputFiles(pdfFixture);
+    const pdfContainer = page.locator('[data-page-container]').first();
+    await pdfContainer.waitFor();
+
+    const signatureButton = page.getByRole('button', { name: /Signature field/i }).first();
+    await signatureButton.scrollIntoViewIfNeeded();
+    await signatureButton.dragTo(pdfContainer, { targetPosition: { x: 80, y: 120 } });
+
+    await page.getByRole('button', { name: /Review & Send/i }).click();
+    await page.getByPlaceholder('e.g. Alex Chen').fill('Admin Example');
+    await page.getByPlaceholder('you@example.com').fill('admin@example.com');
+    await page.getByRole('button', { name: 'Submit' }).click();
+
+    await page.waitForURL(`**/request-sign/sent/${createdEnvelopeId}`);
+
+    expect(createPayload?.document_id).toBe(910);
+    expect(Array.isArray(createPayload?.fields)).toBe(true);
+    expect(createPayload?.signers?.[0]?.project_investor_id).toBe(1);
+    expect(sendCalled).toBe(1);
   });
 });

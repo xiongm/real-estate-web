@@ -13,34 +13,80 @@ Zero-vendor-cost DocuSign‑lite skeleton. Stack: FastAPI + Postgres + Redis + C
 
 > This is a skeleton to get you moving fast. Tighten security, auth, error handling, and production hardening before real use.
 
-## Prereqs
-- Docker & Docker Compose
+## Quick start (install + run)
+### Windows via WSL2
+1) PowerShell (Admin): install WSL2 + Ubuntu, then reboot and confirm:
+   ```powershell
+   wsl --install -d Ubuntu
+   wsl --status
+   ```
+2) Install Docker Desktop and enable WSL integration for Ubuntu. In the WSL shell, confirm Docker works:
+   ```bash
+   docker info
+   ```
+3) Prep tooling inside WSL:
+   ```bash
+   sudo apt update && sudo apt install -y git curl build-essential
+   curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+   source ~/.nvm/nvm.sh
+   nvm install --lts
+   ```
+4) Clone and start the stack (inside WSL, not the Windows filesystem):
+   ```bash
+   git clone https://github.com/your-org/real-estate-web.git
+   cd real-estate-web
+   cp .env.example .env
+   docker compose up --build
+   ```
+5) Optional: run Next.js locally with Docker-backed services:
+   ```bash
+   ./scripts/dev-services.sh start
+   cd web
+   npm install
+   npm run dev
+   # stop services when done
+   ./scripts/dev-services.sh stop
+   ```
 
-## Quick start
-```bash
-cp .env.example .env
-docker compose up --build
-```
+### Linux
+1) Install Docker Engine + Compose plugin (Ubuntu example):
+   ```bash
+   sudo apt update
+   sudo apt install -y docker.io docker-compose-plugin
+   sudo usermod -aG docker $USER
+   newgrp docker
+   sudo systemctl enable --now docker
+   docker info
+   ```
+2) Install Node LTS (nvm):
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+   source ~/.nvm/nvm.sh
+   nvm install --lts
+   ```
+3) Clone and start the stack:
+   ```bash
+   git clone https://github.com/your-org/real-estate-web.git
+   cd real-estate-web
+   cp .env.example .env
+   docker compose up --build
+   ```
+4) Optional local Next.js dev:
+   ```bash
+   ./scripts/dev-services.sh start
+   cd web
+   npm install
+   npm run dev
+   ./scripts/dev-services.sh stop
+   ```
 
-Services:
+Services (when `docker compose` is running):
 - API: http://localhost:8000 (FastAPI docs: http://localhost:8000/docs)
 - Web: http://localhost:3000
 - MinIO: http://localhost:9001 (console; user/pass from .env)
 - Postgres: localhost:5432
 - Redis: localhost:6379
 - Tests: `docker compose run --rm api-tests`
-
-## Install locally (Windows WSL / Linux)
-**Windows Subsystem for Linux (WSL2)**
-- Install WSL2 with Ubuntu (PowerShell: `wsl --install -d Ubuntu`), reboot, and confirm `wsl --status` shows version 2.
-- Install Docker Desktop and enable WSL integration for your distro (or install Docker Engine inside WSL); verify inside WSL with `docker info`.
-- From the WSL shell, install basics: `sudo apt update && sudo apt install -y git curl build-essential`, then install Node LTS via nvm: `curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash` followed by `nvm install --lts`.
-- Clone the repo inside the WSL filesystem (e.g., `~/projects`), `cp .env.example .env`, and run `docker compose up --build`. For local Next.js dev, run `cd web && npm install && npm run dev` while Docker backs the API/DB.
-
-**Linux**
-- Install Docker Engine + the Compose plugin via your distro (e.g., Ubuntu: `sudo apt-get install docker.io docker-compose-plugin`, add your user to the `docker` group, and `sudo systemctl enable --now docker`).
-- Install Node 18/20 LTS (nvm recommended: `curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash` then `nvm install --lts`).
-- Clone the repo, copy `.env`, then either run `docker compose up --build` for the full stack or use the mixed loop (`./scripts/dev-services.sh start` + `cd web && npm install && npm run dev`) to run the web app locally against Dockerized services.
 
 ## Local dev loop (Docker backend + local Next.js)
 - Start supporting services (API worker, DB, Redis, MinIO) inside Docker while running `npm run dev` locally:

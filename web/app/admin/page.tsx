@@ -4043,13 +4043,7 @@ useEffect(() => {
                         tabIndex={!manageInvestorsMode ? 0 : undefined}
                         onKeyDown={(event) => {
                           if (manageInvestorsMode) return;
-                          if (editingInvestorId === investor.id) {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              cancelInvestorEdit();
-                            }
-                            return;
-                          }
+                          if (editingInvestorId === investor.id) return;
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
                             beginInvestorEdit(investor);
@@ -4124,6 +4118,7 @@ useEffect(() => {
                           <div
                             style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}
                             onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
                           >
                             <label style={{ fontSize: 12, fontWeight: 600 }}>Name (required)</label>
                             <input

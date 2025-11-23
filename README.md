@@ -30,6 +30,18 @@ Services:
 - Redis: localhost:6379
 - Tests: `docker compose run --rm api-tests`
 
+## Install locally (Windows WSL / Linux)
+**Windows Subsystem for Linux (WSL2)**
+- Install WSL2 with Ubuntu (PowerShell: `wsl --install -d Ubuntu`), reboot, and confirm `wsl --status` shows version 2.
+- Install Docker Desktop and enable WSL integration for your distro (or install Docker Engine inside WSL); verify inside WSL with `docker info`.
+- From the WSL shell, install basics: `sudo apt update && sudo apt install -y git curl build-essential`, then install Node LTS via nvm: `curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash` followed by `nvm install --lts`.
+- Clone the repo inside the WSL filesystem (e.g., `~/projects`), `cp .env.example .env`, and run `docker compose up --build`. For local Next.js dev, run `cd web && npm install && npm run dev` while Docker backs the API/DB.
+
+**Linux**
+- Install Docker Engine + the Compose plugin via your distro (e.g., Ubuntu: `sudo apt-get install docker.io docker-compose-plugin`, add your user to the `docker` group, and `sudo systemctl enable --now docker`).
+- Install Node 18/20 LTS (nvm recommended: `curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash` then `nvm install --lts`).
+- Clone the repo, copy `.env`, then either run `docker compose up --build` for the full stack or use the mixed loop (`./scripts/dev-services.sh start` + `cd web && npm install && npm run dev`) to run the web app locally against Dockerized services.
+
 ## Local dev loop (Docker backend + local Next.js)
 - Start supporting services (API worker, DB, Redis, MinIO) inside Docker while running `npm run dev` locally:
   ```bash

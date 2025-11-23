@@ -165,6 +165,7 @@ const formatSentLabel = (timestamp?: string | null) => {
 
 export default function AdminPage() {
   const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
+  const appVersion = (process.env.APP_VERSION ?? '').trim() || 'unknown';
   const [adminToken, setAdminToken] = useState('');
   const [adminVerified, setAdminVerified] = useState(false);
   const [adminTokenLoading, setAdminTokenLoading] = useState(true);
@@ -2312,6 +2313,30 @@ useEffect(() => {
                   </p>
                 )}
               </div>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: isMobile ? 'flex-start' : 'flex-end',
+              }}
+            >
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 8px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(255,255,255,0.16)',
+                  background: 'rgba(15,23,42,0.35)',
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: 11,
+                  letterSpacing: 0.3,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>Version</span>
+                <span style={{ fontWeight: 600, letterSpacing: 0 }}>{appVersion}</span>
+              </span>
             </div>
           </div>
         </div>

@@ -1803,12 +1803,14 @@ useEffect(() => {
       style={{
         position: 'relative',
         width: '100%',
-        minHeight: isMobile ? 176 : 272,
+        minHeight: isMobile ? 220 : 272,
         backgroundColor: '#0f172a',
         color: '#fff',
         overflow: 'visible',
         margin: 0,
         padding: 0,
+        paddingTop: isMobile ? 120 : 0,
+        boxSizing: 'border-box',
       }}
     >
       <div
@@ -1970,7 +1972,12 @@ useEffect(() => {
           alignItems: 'flex-end',
         }}
       >
-        <div style={{ width: '100%', padding: isMobile ? '20px 16px' : '32px 56px' }}>
+        <div
+          style={{
+            width: '100%',
+            padding: isMobile ? '20px 16px' : '32px 56px',
+          }}
+        >
           <div
             style={{
               maxWidth: 1200,
@@ -2385,7 +2392,7 @@ useEffect(() => {
       <aside
         className="admin-sidebar"
         style={{
-          width: isMobile ? '100%' : 320,
+          width: isMobile ? undefined : 320,
           padding: isMobile ? 16 : 24,
           borderRight: isMobile ? 'none' : '1px solid #e2e8f0',
           background: '#ffffff',
@@ -2394,9 +2401,9 @@ useEffect(() => {
           gap: 16,
           boxShadow: 'none',
           borderRadius: 0,
-          position: isMobile ? 'relative' : 'sticky',
+          position: isMobile ? undefined : 'sticky',
           top: isMobile ? undefined : 0,
-          height: isMobile ? 'auto' : '100vh',
+          height: isMobile ? undefined : '100vh',
           alignSelf: isMobile ? 'stretch' : 'flex-start',
         }}
       >
@@ -3882,7 +3889,8 @@ useEffect(() => {
           position: relative;
         }
         .admin-layout.mobile .admin-main {
-          padding: 16px !important;
+          padding: 0 !important;
+          overflow-x: hidden;
         }
         .admin-layout.mobile .admin-mobile-header {
           display: flex;

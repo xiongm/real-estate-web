@@ -121,6 +121,7 @@ tag_release() {
   log "Creating annotated tag $version"
   git tag -a "$version" -m "Release $version"
   log "Tag created. Inspect with: git show $version"
+  log "Next: run './scripts/release.sh publish $version' to push main, release/$version, and the tag."
 }
 
 publish() {

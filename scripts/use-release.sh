@@ -90,6 +90,16 @@ main() {
     git checkout -b "$TARGET" "origin/$TARGET"
   fi
   log "Now on branch $TARGET"
+
+  # Optional: remind about APP_VERSION drift
+  if [[ -f ".env" ]]; then
+    current_app_version="$(grep '^APP_VERSION=' .env | head -n1 | cut -d'=' -f2- || true)"
+    if [[ -n "$current_app_version" ]]; then
+      if [[ "$current_app_version" != "$ref" && "$current_app_version" != "${ref#release/}" ]]; then
+        log "Notice: .env APP_VERSION=$current_app_version does not match target $ref. Run ./release-version.sh if you want to sync to the latest tag."
+      fi
+    fi
+  fi
 }
 
 main "$@"

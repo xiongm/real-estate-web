@@ -294,7 +294,7 @@ const [auditRetentionDays, setAuditRetentionDays] = useState(30);
 const [auditDateFrom, setAuditDateFrom] = useState('');
 const [auditDateTo, setAuditDateTo] = useState('');
 const [auditRefreshKey, setAuditRefreshKey] = useState(0);
-const [auditExporting, setAuditExporting] = useState(false);
+ 
 const newInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
 const newInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
 const editInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
@@ -856,47 +856,6 @@ useEffect(() => {
       setAuditFilters((prev) => ({ ...prev }));
     } else {
       setAuditRefreshKey((prev) => prev + 1);
-    }
-  };
-
-  const exportAudit = async (format: 'csv' | 'json') => {
-    if (!selectedProjectId || !adminToken) return;
-    setAuditExporting(true);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', '1');
-      params.set('limit', '500');
-      params.set('export', format);
-      if (auditFilters.action) params.set('action', auditFilters.action);
-      if (auditFilters.resource) params.set('resource', auditFilters.resource);
-      if (auditFilters.actor) params.set('actor_type', auditFilters.actor);
-      if (auditFilters.status) params.set('status', auditFilters.status);
-      if (auditDateFrom) {
-        const isoFrom = toIsoDateStart(auditDateFrom);
-        if (isoFrom) params.set('date_from', isoFrom);
-      }
-      if (auditDateTo) {
-        const isoTo = toIsoDateEnd(auditDateTo);
-        if (isoTo) params.set('date_to', isoTo);
-      }
-      if (auditFilters.search) params.set('search', auditFilters.search);
-      const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/audit?${params.toString()}`, {
-        headers: { 'X-Access-Token': adminToken },
-      });
-      if (!resp.ok) throw new Error(`Export failed (${resp.status})`);
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `audit-${selectedProjectId}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setAuditError(err instanceof Error ? err.message : 'Failed to export audit');
-    } finally {
-      setAuditExporting(false);
     }
   };
 
@@ -2890,7 +2849,7 @@ useEffect(() => {
                     { id: 'signatures', label: 'Signatures', icon: '✍️' },
                     { id: 'investors', label: 'Investors', icon: '👥' },
                     { id: 'share', label: 'Share', icon: '🔐' },
-                    { id: 'audit', label: 'Audit', icon: '🕵️' },
+                  { id: 'audit', label: 'Logs', icon: '🕵️' },
                   ] as Array<{ id: 'signatures' | 'documents' | 'share' | 'investors' | 'audit'; label: string; icon: string }>
                 ).map((tab) => {
                   const active = centerTab === tab.id;
@@ -4447,12 +4406,12 @@ useEffect(() => {
           {centerTab === 'audit' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                  <h3 style={{ margin: 0 }}>Audit trail</h3>
-                  <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>
-                    Project-scoped events with filters. Audit retained for {auditRetentionDays} day{auditRetentionDays === 1 ? '' : 's'}.
-                  </p>
-                </div>
+              <div>
+                <h3 style={{ margin: 0 }}>Logs</h3>
+                <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>
+                  Project-scoped events with filters. Logs retained for {auditRetentionDays} day{auditRetentionDays === 1 ? '' : 's'}.
+                </p>
+              </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <input
                     type="text"
@@ -4538,38 +4497,6 @@ useEffect(() => {
                     style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
                     placeholder="To"
                   />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => exportAudit('csv')}
-                      disabled={auditExporting || !selectedProjectId}
-                      style={{
-                        borderRadius: 8,
-                        border: `1px solid ${palette.border}`,
-                        padding: '8px 12px',
-                        background: '#fff',
-                        cursor: auditExporting ? 'wait' : 'pointer',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {auditExporting ? 'Exporting…' : 'Export CSV'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => exportAudit('json')}
-                      disabled={auditExporting || !selectedProjectId}
-                      style={{
-                        borderRadius: 8,
-                        border: `1px solid ${palette.border}`,
-                        padding: '8px 12px',
-                        background: '#fff',
-                        cursor: auditExporting ? 'wait' : 'pointer',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {auditExporting ? 'Exporting…' : 'Export JSON'}
-                    </button>
-                  </div>
                 </div>
               </div>
               {auditError && (

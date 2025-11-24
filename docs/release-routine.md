@@ -33,10 +33,10 @@ Use `scripts/release.sh` to standardize releases. Steps stay manual/opt-in; the 
 1) `./scripts/release.sh prepare vX.Y.Z`
 2) Manually review diffs and edit `releases/vX.Y.Z.md`.
 3) `./scripts/release.sh tag vX.Y.Z`
-4) `./scripts/release.sh publish vX.Y.Z`
+4) `./scripts/release.sh publish vX.Y.Z` (pushes main, tag, and creates/pushes `release/vX.Y.Z`)
 
 If any step fails, fix the issue, keep the working tree clean, and rerun that step. Tests are encouraged; set `RUN_TESTS=0` only if you accept the risk.
 
 ## Server: switch to a release
 - Use `./scripts/use-release.sh [--allow-dirty] <ref>` to fetch origin and checkout a release branch/tag.
-- Accepts either the full branch (`release/vX.Y.Z`) or the tag (`vX.Y.Z`); tries origin branch first, then tag.
+- Accepts either the full branch (`release/vX.Y.Z`) or the tag (`vX.Y.Z`); tries origin branch first, then tag. After `publish`, the release branch should exist on origin so checkout stays on a branch (not detached).

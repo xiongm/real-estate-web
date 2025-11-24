@@ -128,8 +128,25 @@ publish() {
   require_clean_worktree
   ensure_branch "$DEFAULT_BRANCH"
   git rev-parse "$version" >/dev/null 2>&1 || die "Tag $version not found. Run tag step first."
-  log "Pushing branch $DEFAULT_BRANCH and tag $version"
+  local release_branch="release/$version"
+  local tag_commit
+  tag_commit="$(git rev-parse "$version")"
+
+  if git show-ref --verify --quiet "refs/heads/$release_branch"; then
+    local branch_commit
+    branch_commit="$(git rev-parse "$release_branch")"
+    if [[ "$branch_commit" != "$tag_commit" ]]; then
+      die "Local $release_branch at $branch_commit differs from tag $version ($tag_commit). Align manually or delete the branch."
+    fi
+    log "Local $release_branch already exists at $tag_commit"
+  else
+    log "Creating local branch $release_branch at $tag_commit"
+    git branch "$release_branch" "$version"
+  fi
+
+  log "Pushing branch $DEFAULT_BRANCH, release branch $release_branch, and tag $version"
   git push origin "$DEFAULT_BRANCH"
+  git push origin "$release_branch"
   git push origin "$version"
   log "Publish complete."
 }

@@ -10,6 +10,8 @@ RUN_TESTS="${RUN_TESTS:-1}"
 API_TEST_CMD="${API_TEST_CMD:-docker compose run --rm api-tests}"
 WEB_TEST_CMD="${WEB_TEST_CMD:-cd web && npm run test:e2e}"
 ALLOW_DOWNGRADE="${ALLOW_DOWNGRADE:-0}"
+# Flags (set via CLI options, not env)
+ALLOW_DIRTY=0
 
 ROOT_DIR="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 
@@ -18,8 +20,12 @@ die() { echo "[release][error] $*" >&2; exit 1; }
 
 require_clean_worktree() {
   if git status --porcelain | grep -q .; then
-    git status --short >&2
-    die "Working tree not clean. Commit/stash before continuing."
+    if [[ "$ALLOW_DIRTY" == "1" ]]; then
+      log "Working tree dirty; continuing because --allow-dirty is set."
+    else
+      git status --short >&2
+      die "Working tree not clean. Commit/stash or pass --allow-dirty to override."
+    fi
   fi
 }
 
@@ -130,10 +136,14 @@ publish() {
 
 usage() {
   cat <<EOF
-Usage: $0 {prepare|tag|publish} vX.Y.Z
+Usage: $0 [--allow-dirty] [--allow-downgrade] {prepare|tag|publish} vX.Y.Z
   prepare  - pull, (optionally) run tests, update APP_VERSION, create release note stub
   tag      - create annotated git tag
   publish  - push branch and tag
+
+Flags:
+  --allow-dirty      allow running with uncommitted changes
+  --allow-downgrade  allow tagging below the latest existing tag
 
 Environment:
   DEFAULT_BRANCH   (default: main)
@@ -145,6 +155,27 @@ EOF
 }
 
 main() {
+  # Parse optional flags before the command
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --allow-dirty)
+        ALLOW_DIRTY=1
+        shift
+        ;;
+      --allow-downgrade)
+        ALLOW_DOWNGRADE=1
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+
   local cmd="${1:-}"; shift || true
   case "$cmd" in
     prepare)

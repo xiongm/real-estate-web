@@ -14,6 +14,23 @@ def _ensure_project(session: Session, project_id: int):
         raise HTTPException(404, "project not found")
     return project
 
+def _serialize_investor(inv: ProjectInvestor):
+    return {
+        "id": inv.id,
+        "project_id": inv.project_id,
+        "name": inv.name,
+        "email": inv.email,
+        "role": inv.role,
+        "routing_order": inv.routing_order,
+        "units_invested": inv.units_invested,
+        "mailing_address": inv.mailing_address,
+        "bank_name": inv.bank_name,
+        "bank_account_number": inv.bank_account_number,
+        "bank_routing_number": inv.bank_routing_number,
+        "metadata_json": inv.metadata_json,
+        "created_at": inv.created_at,
+    }
+
 @router.get("/{project_id}/investors")
 def list_investors(
     project_id: int,
@@ -24,7 +41,7 @@ def list_investors(
     investors = session.exec(
         select(ProjectInvestor).where(ProjectInvestor.project_id == project_id).order_by(ProjectInvestor.routing_order, ProjectInvestor.id)
     ).all()
-    return investors
+    return [_serialize_investor(inv) for inv in investors]
 
 @router.post("/{project_id}/investors", status_code=201)
 def create_investor(
@@ -65,7 +82,7 @@ def create_investor(
         )
     )
     session.commit()
-    return investor
+    return _serialize_investor(investor)
 
 @router.patch("/{project_id}/investors/{investor_id}")
 def update_investor(
@@ -100,7 +117,7 @@ def update_investor(
         )
     )
     session.commit()
-    return investor
+    return _serialize_investor(investor)
 
 @router.delete("/{project_id}/investors/{investor_id}", status_code=204)
 def delete_investor(

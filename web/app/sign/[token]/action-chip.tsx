@@ -135,7 +135,7 @@ export function ActionChip({
         alignItems: 'center',
         gap: 8,
         cursor: 'pointer',
-        transition: 'top 0.2s ease',
+        transition: 'top 0.35s cubic-bezier(0.22, 0.61, 0.36, 1), left 0.25s ease',
         clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%)',
         minHeight: 42,
       }}

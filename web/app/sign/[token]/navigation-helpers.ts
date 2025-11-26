@@ -11,12 +11,16 @@ export type FieldValueMap = Record<string, any>;
 
 export function isRequiredField(field: SignField): boolean {
   if (!field) return false;
-  return Boolean(field.required) || field.type === 'signature' || field.type === 'initials';
+  const navTypes = ['signature', 'initials', 'date', 'datetime'];
+  return Boolean(field.required) || navTypes.includes(field.type);
 }
 
 export function isFieldComplete(field: SignField, values: FieldValueMap): boolean {
   const meta = values[String(field.id)];
   if (!meta) return false;
+  if ((field.type === 'text' || field.type === 'textarea') && meta.committed !== true) {
+    return false;
+  }
   if (field.type === 'checkbox') return meta.value === true;
   return Boolean(meta.value);
 }

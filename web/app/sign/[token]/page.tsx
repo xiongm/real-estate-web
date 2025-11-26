@@ -112,6 +112,12 @@ export default function SignPage() {
       setActiveFieldId(fieldId);
       setHighlightedFieldId(fieldId);
       const el = fieldRefs.current[fieldId];
+      if (!el) {
+        // Ref not mounted yet; retry shortly.
+        window.requestAnimationFrame(() => setPendingFocusId(fieldId));
+        window.setTimeout(() => setPendingFocusId(fieldId), 80);
+        return;
+      }
       if (el) {
         const parent = docScrollRef.current;
         if (parent) {
@@ -228,8 +234,11 @@ export default function SignPage() {
         if (next[key]) return;
         let defaultValue: any = '';
         if (field.type === 'checkbox') defaultValue = false;
-        if (field.type === 'date') defaultValue = new Date().toISOString().slice(0, 10);
-        next[key] = { ...field, value: defaultValue };
+        if (field.type === 'date') defaultValue = '';
+        if (field.type === 'datetime') defaultValue = '';
+        const committed =
+          field.type === 'text' || field.type === 'textarea' ? false : true;
+        next[key] = { ...field, value: defaultValue, committed };
       });
       return next;
     });
@@ -384,11 +393,18 @@ export default function SignPage() {
     setStatusMessage(message);
   }, [data?.signer?.status, data?.final_artifact?.sha256_final, data?.waiting_on]);
 
-  const handleFieldChange = (field: any, value: any) => {
+  const handleFieldChange = (field: any, value: any, options?: { commit?: boolean }) => {
     const key = String(field.id);
     let nextFocusId: string | null = null;
+    const commit =
+      options?.commit !== undefined ? options.commit : field.type !== 'text' && field.type !== 'textarea';
     setFieldValues((prev) => {
       const next = { ...prev, [key]: { ...field, value } };
+      if (commit) {
+        next[key].committed = true;
+      } else if (prev[key]?.committed) {
+        next[key].committed = prev[key].committed;
+      }
       const wasComplete = isFieldComplete(field, prev);
       const nowComplete = isFieldComplete(field, next);
       if (!wasComplete && nowComplete && isRequiredField(field)) {
@@ -397,10 +413,17 @@ export default function SignPage() {
       return next;
     });
     setActiveFieldId(String(field.id));
-    if (nextFocusId) {
+    const shouldAutoAdvance =
+      field.type === 'checkbox' ||
+      field.type === 'signature' ||
+      field.type === 'initials' ||
+      field.type === 'date' ||
+      field.type === 'datetime';
+    if (nextFocusId && shouldAutoAdvance) {
       setPendingFocusId(nextFocusId);
       if (typeof window !== 'undefined') {
         window.requestAnimationFrame(() => focusField(nextFocusId));
+        window.setTimeout(() => focusField(nextFocusId), 180);
       }
     }
   };
@@ -480,6 +503,9 @@ export default function SignPage() {
     if (nextId) {
       focusField(nextId);
     }
+    if (!nextId && firstIncompleteId) {
+      focusField(firstIncompleteId);
+    }
   }, [activeFieldId, findNextIncompleteAfter, focusField]);
   const handleBackToFirst = useCallback(() => {
     if (firstIncompleteId) {
@@ -487,10 +513,7 @@ export default function SignPage() {
     }
   }, [firstIncompleteId, focusField]);
 
-  const targetFieldId =
-    (activeFieldId && !isFieldComplete(fields.find((f) => String(f.id) === activeFieldId) || {}, fieldValues)
-      ? activeFieldId
-      : null) || firstIncompleteId;
+  const targetFieldId = remainingRequired === 0 ? null : activeFieldId || firstIncompleteId;
 
   useEffect(() => {
     if (!hasStarted) return;
@@ -534,11 +557,19 @@ export default function SignPage() {
               docRef={docScrollRef}
               fieldRefs={fieldRefs}
               onAction={() => {
+                const currentTargetId = targetFieldId || firstIncompleteId;
                 if (!hasStarted) {
-                  focusField(targetFieldId);
+                  if (currentTargetId) {
+                    focusField(currentTargetId);
+                    setPendingFocusId(currentTargetId);
+                  }
                   return;
                 }
-                if (signatureNavFields.length > 0) {
+                const currentTarget =
+                  fields.find((f) => String(f.id) === currentTargetId) || fields[0];
+                const targetIsSignature =
+                  currentTarget?.type === 'signature' || currentTarget?.type === 'initials';
+                if (targetIsSignature && signatureNavFields.length > 0) {
                   const ids = signatureNavFields.map((f) => String(f.id));
                   const currentId =
                     targetFieldId && ids.includes(targetFieldId) ? targetFieldId : ids[0];
@@ -547,9 +578,14 @@ export default function SignPage() {
                   focusField(ids[nextIndex]);
                   return;
                 }
-                const target = fields.find((f) => String(f.id) === targetFieldId);
-                if (!target) return;
-                focusField(targetFieldId);
+                const nextId = findNextIncompleteAfter(activeFieldId || currentTargetId);
+                if (nextId) {
+                  focusField(nextId);
+                  return;
+                }
+                if (currentTargetId) {
+                  focusField(currentTargetId);
+                }
               }}
               remaining={remainingRequired}
               showStartLabel={!hasStarted}
@@ -1832,7 +1868,9 @@ function FieldOverlay({
             ...baseStyle,
             display: 'flex',
             alignItems: 'center',
-            border: `1px solid ${palette.border}`,
+            borderWidth: 1,
+            borderStyle: 'solid',
+            borderColor: palette.border,
             borderRadius: 4,
             background: 'rgba(255,255,255,0.9)',
             justifyContent: 'flex-start',
@@ -1860,6 +1898,12 @@ function FieldOverlay({
           type="text"
           value={value ?? ''}
           onChange={(e) => onChange(field, e.target.value)}
+          onBlur={(e) => onChange(field, e.target.value, { commit: true })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              onChange(field, (e.target as HTMLInputElement).value, { commit: true });
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',
@@ -1875,7 +1919,8 @@ function FieldOverlay({
       </div>
     );
   }
-  if (field.type === 'date') {
+  if (field.type === 'date' || field.type === 'datetime') {
+    const inputType = field.type === 'datetime' ? 'datetime-local' : 'date';
     if (mode === 'view') {
       return (
         <div
@@ -1887,7 +1932,9 @@ function FieldOverlay({
             ...baseStyle,
             display: 'flex',
             alignItems: 'center',
-            border: `1px solid ${palette.border}`,
+            borderWidth: 1,
+            borderStyle: 'solid',
+            borderColor: palette.border,
             borderRadius: 4,
             background: 'rgba(255,255,255,0.9)',
             justifyContent: 'flex-start',
@@ -1912,9 +1959,15 @@ function FieldOverlay({
         }}
       >
         <input
-          type="date"
+          type={inputType}
           value={value ?? ''}
-          onChange={(e) => onChange(field, e.target.value)}
+          onChange={(e) => onChange(field, e.target.value, { commit: true })}
+          onBlur={(e) => onChange(field, e.target.value, { commit: true })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              onChange(field, (e.target as HTMLInputElement).value, { commit: true });
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',
@@ -1937,7 +1990,9 @@ function FieldOverlay({
           tabIndex={mode === 'edit' ? -1 : undefined}
           style={{
             ...baseStyle,
-            border: '2px solid #94a3b8',
+            borderWidth: 2,
+            borderStyle: 'solid',
+            borderColor: '#94a3b8',
             borderRadius: 4,
             background: 'rgba(255,255,255,0.9)',
             ...highlightStyle,
@@ -1955,7 +2010,9 @@ function FieldOverlay({
         tabIndex={mode === 'edit' ? -1 : undefined}
         style={{
           ...baseStyle,
-          border: '2px solid #94a3b8',
+          borderWidth: 2,
+          borderStyle: 'solid',
+          borderColor: '#94a3b8',
           borderRadius: 4,
           background: 'rgba(255,255,255,0.9)',
           ...highlightStyle,
@@ -1980,14 +2037,16 @@ function FieldOverlay({
     if (mode === 'view') {
       return (
         <div
-        ref={(el) => registerFieldRef?.(fieldId, el)}
-        onClick={handleFocus}
-        data-field-id={fieldId}
-        tabIndex={mode === 'edit' ? -1 : undefined}
-        style={{
-          ...baseStyle,
-          border: '2px solid #2563eb',
-          borderRadius: 6,
+          ref={(el) => registerFieldRef?.(fieldId, el)}
+          onClick={handleFocus}
+          data-field-id={fieldId}
+          tabIndex={mode === 'edit' ? -1 : undefined}
+          style={{
+            ...baseStyle,
+            borderWidth: 2,
+            borderStyle: 'solid',
+            borderColor: '#2563eb',
+            borderRadius: 6,
             background: 'rgba(255,255,255,0.9)',
             ...highlightStyle,
           }}

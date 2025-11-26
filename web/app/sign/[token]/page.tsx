@@ -88,10 +88,13 @@ export default function SignPage() {
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null);
   const [highlightedFieldId, setHighlightedFieldId] = useState<string | null>(null);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  const pendingAutoAdvanceId = useRef<string | null>(null);
+  const navIndexRef = useRef(0);
   const draftSaveTimer = useRef<number | null>(null);
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
+  const [chipIndex, setChipIndex] = useState(0);
   const consentRef = useRef<HTMLInputElement | null>(null);
   const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const enableDraftSave = process.env.NEXT_PUBLIC_SIGN_DRAFT_SAVE === 'true';
@@ -146,7 +149,7 @@ export default function SignPage() {
         }
         if (typeof window !== 'undefined') {
           const tryFocus = () => {
-            const focusable = el.querySelector('input, textarea, button, canvas') as HTMLElement | null;
+            const focusable = el.querySelector('canvas, input, textarea, button') as HTMLElement | null;
             if (focusable && 'focus' in focusable) {
               try {
                 focusable.focus({ preventScroll: true } as any);
@@ -294,6 +297,29 @@ export default function SignPage() {
     }
     return true;
   });
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (!activeFieldId) return;
+      const activeField = fields.find((f: any) => String(f.id) === activeFieldId);
+      if (!activeField) return;
+      if (activeField.type !== 'text' && activeField.type !== 'textarea') return;
+      const fieldEl = fieldRefs.current[activeFieldId];
+      if (fieldEl && fieldEl.contains(event.target as Node)) {
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') {
+          event.stopImmediatePropagation();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler, false);
+    window.addEventListener('keypress', handler, false);
+    window.addEventListener('keyup', handler, false);
+    return () => {
+      window.removeEventListener('keydown', handler, false);
+      window.removeEventListener('keypress', handler, false);
+      window.removeEventListener('keyup', handler, false);
+    };
+  }, [activeFieldId, fields]);
   const payloadValues = useMemo(() => {
     const entries = Object.entries(fieldValues).map(([fid, meta]) => [
       fid,
@@ -315,16 +341,18 @@ export default function SignPage() {
     () => fields.filter((field) => isRequiredField(field)).sort(sortFieldOrder),
     [fields]
   );
+  useEffect(() => {
+    const orderedIds = orderedRequiredFields.map((f) => String(f.id));
+    if (!orderedIds.length) return;
+    const idx = activeFieldId ? orderedIds.findIndex((id) => id === activeFieldId) : -1;
+    if (idx >= 0 && idx !== chipIndex) {
+      setChipIndex(idx);
+      navIndexRef.current = idx;
+    }
+  }, [activeFieldId, orderedRequiredFields, chipIndex]);
   const remainingRequired = useMemo(
     () => orderedRequiredFields.filter((field) => !isFieldComplete(field, fieldValues)).length,
     [orderedRequiredFields, fieldValues]
-  );
-  const signatureNavFields = useMemo(
-    () =>
-      orderedRequiredFields.filter(
-        (field) => field.type === 'signature' || field.type === 'initials'
-      ),
-    [orderedRequiredFields]
   );
   const firstIncompleteId = useMemo(() => {
     const target = orderedRequiredFields.find((field) => !isFieldComplete(field, fieldValues));
@@ -393,13 +421,30 @@ export default function SignPage() {
     setStatusMessage(message);
   }, [data?.signer?.status, data?.final_artifact?.sha256_final, data?.waiting_on]);
 
-  const handleFieldChange = (field: any, value: any, options?: { commit?: boolean }) => {
+  const handleFieldChange = (
+    field: any,
+    value: any,
+    options?: { commit?: boolean; allowAutoAdvance?: boolean; valid?: boolean; suppressActiveUpdate?: boolean }
+  ) => {
     const key = String(field.id);
-    let nextFocusId: string | null = null;
+    if ((field.type === 'text' || field.type === 'textarea') && options?.commit !== true) {
+      // Cancel any queued auto-advance while typing so focus stays put.
+      pendingAutoAdvanceId.current = null;
+      setPendingFocusId(null);
+    }
     const commit =
       options?.commit !== undefined ? options.commit : field.type !== 'text' && field.type !== 'textarea';
+    const allowAutoAdvance = options?.allowAutoAdvance !== false;
+    const explicitAllowAuto = options?.allowAutoAdvance === true;
+    const validity = options?.valid;
     setFieldValues((prev) => {
       const next = { ...prev, [key]: { ...field, value } };
+      next[key].touched = true;
+      if (validity !== undefined) {
+        next[key].valid = validity;
+      } else if (prev[key]?.valid !== undefined) {
+        next[key].valid = prev[key].valid;
+      }
       if (commit) {
         next[key].committed = true;
       } else if (prev[key]?.committed) {
@@ -408,25 +453,33 @@ export default function SignPage() {
       const wasComplete = isFieldComplete(field, prev);
       const nowComplete = isFieldComplete(field, next);
       if (!wasComplete && nowComplete && isRequiredField(field)) {
-        nextFocusId = findNextIncompleteAfter(String(field.id), next);
+        const nextId = findNextIncompleteAfter(String(field.id), next);
+        const fastAutoTypes = ['checkbox', 'signature', 'initials', 'date', 'datetime'];
+        const isTextual = field.type === 'text' || field.type === 'textarea';
+        const canAutoAdvance =
+          allowAutoAdvance &&
+          (fastAutoTypes.includes(field.type) ||
+            (isTextual && (explicitAllowAuto || !nextId)));
+        if (nextId && canAutoAdvance) {
+          pendingAutoAdvanceId.current = nextId;
+        }
       }
       return next;
     });
-    setActiveFieldId(String(field.id));
-    const shouldAutoAdvance =
-      field.type === 'checkbox' ||
-      field.type === 'signature' ||
-      field.type === 'initials' ||
-      field.type === 'date' ||
-      field.type === 'datetime';
-    if (nextFocusId && shouldAutoAdvance) {
-      setPendingFocusId(nextFocusId);
-      if (typeof window !== 'undefined') {
-        window.requestAnimationFrame(() => focusField(nextFocusId));
-        window.setTimeout(() => focusField(nextFocusId), 180);
-      }
+    if (!options?.suppressActiveUpdate) {
+      setActiveFieldId(String(field.id));
     }
   };
+  useEffect(() => {
+    const nextId = pendingAutoAdvanceId.current;
+    if (!nextId) return;
+    pendingAutoAdvanceId.current = null;
+    setPendingFocusId(nextId);
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => focusField(nextId));
+      window.setTimeout(() => focusField(nextId), 180);
+    }
+  }, [fieldValues, focusField]);
 
   const applyAdoptionToField = useCallback(
     (fieldId: string) => {
@@ -557,34 +610,117 @@ export default function SignPage() {
               docRef={docScrollRef}
               fieldRefs={fieldRefs}
               onAction={() => {
-                const currentTargetId = targetFieldId || firstIncompleteId;
+                const orderedIds = orderedRequiredFields.map((f) => String(f.id));
+                if (!orderedIds.length) return;
                 if (!hasStarted) {
-                  if (currentTargetId) {
-                    focusField(currentTargetId);
-                    setPendingFocusId(currentTargetId);
+                  const dest = orderedIds[0];
+                  navIndexRef.current = 0;
+                  setChipIndex(0);
+                  focusField(dest);
+                  setPendingFocusId(dest);
+                  return;
+                }
+                const anchorField =
+                  activeFieldId && fields.find((f: any) => String(f.id) === activeFieldId);
+                const anchorMeta = activeFieldId ? fieldValues[activeFieldId] : null;
+                const stickyAnchor =
+                  anchorField &&
+                  !isFieldComplete(anchorField, fieldValues) &&
+                  anchorField.type !== 'signature' &&
+                  anchorField.type !== 'initials' &&
+                  (anchorField.type === 'date' || anchorField.type === 'datetime'
+                    ? Boolean(anchorMeta?.value) || Boolean(anchorMeta?.touched)
+                    : true);
+                const anchorIndex = targetFieldId
+                  ? orderedIds.findIndex((id) => id === targetFieldId)
+                  : -1;
+                const baseIndex =
+                  anchorIndex >= 0
+                    ? anchorIndex
+                    : chipIndex >= 0 && chipIndex < orderedIds.length
+                    ? chipIndex
+                    : 0;
+                let destinationId = String(activeFieldId);
+                if (!stickyAnchor) {
+                  const nextIndex = (navIndexRef.current + 1) % orderedIds.length;
+                  navIndexRef.current = nextIndex;
+                  setChipIndex(nextIndex);
+                  destinationId = orderedIds[nextIndex];
+                }
+                if (destinationId) {
+                  const destinationField = fields.find((f: any) => String(f.id) === destinationId);
+                  setActiveFieldId(destinationId);
+                  setHighlightedFieldId(destinationId);
+                  if (typeof document !== 'undefined') {
+                    try {
+                      (document.activeElement as HTMLElement | null)?.blur?.();
+                    } catch {
+                      // ignore
+                    }
                   }
-                  return;
-                }
-                const currentTarget =
-                  fields.find((f) => String(f.id) === currentTargetId) || fields[0];
-                const targetIsSignature =
-                  currentTarget?.type === 'signature' || currentTarget?.type === 'initials';
-                if (targetIsSignature && signatureNavFields.length > 0) {
-                  const ids = signatureNavFields.map((f) => String(f.id));
-                  const currentId =
-                    targetFieldId && ids.includes(targetFieldId) ? targetFieldId : ids[0];
-                  const currentIndex = ids.findIndex((id) => id === currentId);
-                  const nextIndex = (currentIndex + 1) % ids.length;
-                  focusField(ids[nextIndex]);
-                  return;
-                }
-                const nextId = findNextIncompleteAfter(activeFieldId || currentTargetId);
-                if (nextId) {
-                  focusField(nextId);
-                  return;
-                }
-                if (currentTargetId) {
-                  focusField(currentTargetId);
+                  focusField(destinationId);
+                  setPendingFocusId(destinationId);
+                  const forceFocus = () => {
+                    const el = fieldRefs.current[String(destinationId)];
+                    const focusable =
+                      (el?.querySelector?.('canvas, input, textarea, button') as HTMLElement | null) ||
+                      (typeof document !== 'undefined'
+                        ? (document.querySelector(
+                            `[data-field-id="${destinationId}"] canvas`
+                          ) as HTMLElement | null)
+                        : null);
+                    try {
+                      (focusable || el)?.focus?.({ preventScroll: true } as any);
+                    } catch {
+                      // ignore focus errors
+                    }
+                  };
+                  forceFocus();
+                  if (typeof window !== 'undefined') {
+                    window.requestAnimationFrame(forceFocus);
+                    window.setTimeout(forceFocus, 60);
+                    if (
+                      destinationField &&
+                      (destinationField.type === 'signature' || destinationField.type === 'initials')
+                    ) {
+                      const focusCanvas = () => {
+                        const canvasById = document.querySelector(
+                          `#sig-canvas-${destinationId}`
+                        ) as HTMLElement | null;
+                        const canvases = Array.from(document.querySelectorAll('canvas')) as HTMLElement[];
+                        const indexGuess = orderedIds.findIndex((id) => id === destinationId);
+                        const canvasByIndex =
+                          indexGuess >= 0 && indexGuess < canvases.length
+                            ? canvases[indexGuess]
+                            : canvases[1] || canvases[0] || null;
+                        const canvas = canvasById || canvasByIndex;
+                        try {
+                          canvas?.focus?.({ preventScroll: true } as any);
+                          canvas?.dispatchEvent?.(
+                            new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+                          );
+                        } catch {
+                          // ignore
+                        }
+                      };
+                      window.setTimeout(focusCanvas, 120);
+                      window.setTimeout(focusCanvas, 260);
+                      window.setTimeout(focusCanvas, 420);
+                      window.setTimeout(focusCanvas, 820);
+                      window.setTimeout(() => {
+                        const canvases = Array.from(
+                          document.querySelectorAll('canvas')
+                        ) as HTMLElement[];
+                        const target = canvases[1];
+                        try {
+                          target?.focus?.({ preventScroll: true } as any);
+                        } catch {
+                          // ignore
+                        }
+                      }, 180);
+                      window.setTimeout(focusCanvas, 520);
+                    }
+                  }
                 }
               }}
               remaining={remainingRequired}
@@ -1898,10 +2034,13 @@ function FieldOverlay({
           type="text"
           value={value ?? ''}
           onChange={(e) => onChange(field, e.target.value)}
-          onBlur={(e) => onChange(field, e.target.value, { commit: true })}
+          onBlur={(e) => onChange(field, e.target.value, { commit: true, allowAutoAdvance: true })}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              onChange(field, (e.target as HTMLInputElement).value, { commit: true });
+              onChange(field, (e.target as HTMLInputElement).value, {
+                commit: true,
+                allowAutoAdvance: true,
+              });
             }
           }}
           style={{
@@ -1921,6 +2060,16 @@ function FieldOverlay({
   }
   if (field.type === 'date' || field.type === 'datetime') {
     const inputType = field.type === 'datetime' ? 'datetime-local' : 'date';
+    const handleDateChange = (event: ChangeEvent<HTMLInputElement>, opts?: { suppressActive?: boolean }) => {
+      const val = event.target.value;
+      const valid = event.target.validity?.valid ?? true;
+      onChange(field, val, {
+        commit: true,
+        valid,
+        allowAutoAdvance: valid,
+        suppressActiveUpdate: opts?.suppressActive,
+      });
+    };
     if (mode === 'view') {
       return (
         <div
@@ -1961,11 +2110,13 @@ function FieldOverlay({
         <input
           type={inputType}
           value={value ?? ''}
-          onChange={(e) => onChange(field, e.target.value, { commit: true })}
-          onBlur={(e) => onChange(field, e.target.value, { commit: true })}
+          onChange={handleDateChange}
+          onBlur={(e) => handleDateChange(e, { suppressActive: true })}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              onChange(field, (e.target as HTMLInputElement).value, { commit: true });
+              const target = e.target as HTMLInputElement;
+              const valid = target.validity?.valid ?? true;
+              onChange(field, target.value, { commit: true, valid, allowAutoAdvance: valid });
             }
           }}
           style={{
@@ -2083,16 +2234,15 @@ function FieldOverlay({
             inset: 0,
           }}
           width={screenWidth}
-        height={screenHeight}
-        value={value}
-        onChange={(val) => onChange(field, val)}
-        fieldId={fieldId}
-        registerFieldRef={registerFieldRef}
-        onFocusField={onFocusField}
-        active={active}
-        highlighted={highlighted}
-        frameless
-      />
+          height={screenHeight}
+          value={value}
+          onChange={(val) => onChange(field, val)}
+          fieldId={fieldId}
+          onFocusField={onFocusField}
+          active={active}
+          highlighted={highlighted}
+          frameless
+        />
         {showInsert && (
           <div
             style={{
@@ -2285,6 +2435,7 @@ function SignatureFieldCanvas({
     >
       <canvas
         ref={canvasRef}
+        id={`sig-canvas-${fieldId}`}
         tabIndex={0}
         style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
         onPointerDown={startDrawing}

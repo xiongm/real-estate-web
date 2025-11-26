@@ -9,6 +9,17 @@ export type SignField = {
 
 export type FieldValueMap = Record<string, any>;
 
+const Y_TOLERANCE = 10; // points; treat near-aligned rows as the same height
+
+const toNumber = (value: any, fallback: number): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+};
+
 export function isRequiredField(field: SignField): boolean {
   if (!field) return false;
   const navTypes = ['signature', 'initials', 'date', 'datetime'];
@@ -21,19 +32,23 @@ export function isFieldComplete(field: SignField, values: FieldValueMap): boolea
   if ((field.type === 'text' || field.type === 'textarea') && meta.committed !== true) {
     return false;
   }
+  if ((field.type === 'date' || field.type === 'datetime') && meta.valid === false) {
+    return false;
+  }
   if (field.type === 'checkbox') return meta.value === true;
   return Boolean(meta.value);
 }
 
 export function sortFieldOrder(a: SignField, b: SignField): number {
-  const pageA = a?.page || 1;
-  const pageB = b?.page || 1;
+  const pageA = toNumber(a?.page, 1);
+  const pageB = toNumber(b?.page, 1);
   if (pageA !== pageB) return pageA - pageB;
-  const yA = typeof a?.y === 'number' ? a.y : 0;
-  const yB = typeof b?.y === 'number' ? b.y : 0;
-  if (yA !== yB) return yB - yA;
-  const xA = typeof a?.x === 'number' ? a.x : 0;
-  const xB = typeof b?.x === 'number' ? b.x : 0;
+  const yA = toNumber(a?.y, 0);
+  const yB = toNumber(b?.y, 0);
+  const yDiff = yB - yA;
+  if (Math.abs(yDiff) > Y_TOLERANCE) return yDiff;
+  const xA = toNumber(a?.x, 0);
+  const xB = toNumber(b?.x, 0);
   return xA - xB;
 }
 

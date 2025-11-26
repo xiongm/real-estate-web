@@ -55,6 +55,28 @@ const orderedFields = [
     const ordered = fields.filter(isRequiredField).sort(sortFieldOrder).map((f) => f.id);
     expect(ordered).toEqual(['sig-a', 'dt-a', 'sig-b', 'dt-b']);
   });
+
+  test('sorts fields with string coordinates left-to-right on the same row', () => {
+    const fields = [
+      { id: 'right', type: 'signature', required: true, page: '1', x: '480', y: '500' },
+      { id: 'left', type: 'signature', required: true, page: '1', x: '140', y: '500' },
+      { id: 'middle', type: 'datetime', required: true, page: '1', x: '320', y: '500' },
+      { id: 'lower', type: 'signature', required: true, page: '1', x: '220', y: '200' },
+    ];
+    const ordered = fields.filter(isRequiredField).sort(sortFieldOrder).map((f) => f.id);
+    expect(ordered).toEqual(['left', 'middle', 'right', 'lower']);
+  });
+
+  test('treats near-equal y positions as the same row (left-to-right)', () => {
+    const fields = [
+      { id: 'left', type: 'signature', required: true, page: 1, x: 140, y: 500 },
+      { id: 'middle', type: 'signature', required: true, page: 1, x: 300, y: 500.8 },
+      { id: 'right', type: 'signature', required: true, page: 1, x: 460, y: 501.2 },
+      { id: 'lower', type: 'signature', required: true, page: 1, x: 220, y: 300 },
+    ];
+    const ordered = fields.filter(isRequiredField).sort(sortFieldOrder).map((f) => f.id);
+    expect(ordered).toEqual(['left', 'middle', 'right', 'lower']);
+  });
 });
 
 test.describe('signing navigation UI', () => {
@@ -265,6 +287,62 @@ test.describe('signing navigation UI', () => {
     await expect(textField2).toBeFocused();
   });
 
+  test('Pressing Enter in text field commits and advances', async ({ page }) => {
+    const token = 'text-enter-advance';
+    const fields = [
+      { id: 't1', type: 'text', required: true, page: 1, x: 120, y: 680, w: 220, h: 28 },
+      { id: 'c1', type: 'checkbox', required: true, page: 1, x: 120, y: 580, w: 20, h: 20 },
+    ];
+
+    await page.route(`**/api/sign/${token}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          signer: { id: 34, name: 'Text User', email: 'text@example.com', role: 'signer', status: 'pending' },
+          envelope: { subject: 'Text Enter Doc' },
+          fields,
+        }),
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/pdf`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        body: pdfBuffer,
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/final-pdf`, async (route) => {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'not ready' }),
+      });
+    });
+
+    await page.route('**/pdf.worker.min.mjs', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: workerScript,
+      });
+    });
+
+    await page.goto(`/sign/${token}`);
+    await expect(page.locator('img[alt^="Page"]')).toHaveCount(1);
+    const chip = page.getByTestId('action-chip');
+    const textField = page.locator('input[type="text"]').first();
+    const checkbox = page.locator('input[type="checkbox"]').first();
+
+    await chip.click();
+    await expect(textField).toBeFocused();
+    await textField.fill('Done');
+    await textField.press('Enter');
+    await expect(checkbox).toBeFocused();
+  });
+
   test('Datetime field participates in navigation', async ({ page }) => {
     const token = 'datetime-nav';
     const fields = [
@@ -325,6 +403,225 @@ test.describe('signing navigation UI', () => {
     await datetimeField.fill('2024-10-30T10:30');
     await expect(checkbox).toBeFocused();
     await checkbox.check();
+  });
+
+  test('Datetime input does not auto-advance on partial entry', async ({ page }) => {
+    const token = 'datetime-partial';
+    const fields = [
+      { id: 't1', type: 'text', required: true, page: 1, x: 120, y: 720, w: 220, h: 28 },
+      { id: 'd1', type: 'datetime', required: true, page: 1, x: 120, y: 620, w: 240, h: 28 },
+      { id: 't2', type: 'text', required: true, page: 1, x: 120, y: 520, w: 220, h: 28 },
+    ];
+
+    await page.route(`**/api/sign/${token}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          signer: { id: 35, name: 'Date User', email: 'date@example.com', role: 'signer', status: 'pending' },
+          envelope: { subject: 'Partial Datetime Doc' },
+          fields,
+        }),
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/pdf`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        body: pdfBuffer,
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/final-pdf`, async (route) => {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'not ready' }),
+      });
+    });
+
+    await page.route('**/pdf.worker.min.mjs', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: workerScript,
+      });
+    });
+
+    await page.goto(`/sign/${token}`);
+    await expect(page.locator('img[alt^="Page"]')).toHaveCount(1);
+
+    const chip = page.getByTestId('action-chip');
+    const firstText = page.locator('input[type="text"]').first();
+    const datetimeField = page.locator('input[type="datetime-local"]').first();
+    const secondText = page.locator('input[type="text"]').nth(1);
+
+    await chip.click();
+    await expect(firstText).toBeFocused();
+    await firstText.fill('Ready');
+
+    await chip.click();
+    await expect(datetimeField).toBeVisible();
+    await datetimeField.click({ force: true });
+    await datetimeField.type('2024-10-30T10'); // missing minutes, should not advance
+    await expect(datetimeField).toBeFocused();
+
+    await chip.click();
+    await datetimeField.click({ force: true });
+    await expect(datetimeField).toBeFocused();
+
+    await datetimeField.fill('2024-10-30T10:15');
+    await chip.click();
+    await expect(secondText).toBeFocused();
+  });
+
+  test('Chip cycles through signature and datetime fields in order', async ({ page }) => {
+    const token = 'sig-datetime-cycle';
+    const fields = [
+      { id: 'sig-1', type: 'signature', required: true, page: 1, x: 120, y: 720, w: 220, h: 60 },
+      { id: 'dt-1', type: 'datetime', required: true, page: 1, x: 120, y: 620, w: 220, h: 28 },
+      { id: 'sig-2', type: 'signature', required: true, page: 1, x: 120, y: 520, w: 220, h: 60 },
+    ];
+
+    await page.addInitScript(
+      ({ t, sig, init }) => {
+        localStorage.setItem(
+          `sign-adoption:${t}`,
+          JSON.stringify({ signature: sig, initials: init, method: 'draw' })
+        );
+      },
+      { t: token, sig: fakeSignature, init: fakeInitials }
+    );
+
+    await page.route(`**/api/sign/${token}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          signer: { id: 55, name: 'Sig User', email: 'sig@example.com', role: 'signer', status: 'pending' },
+          envelope: { subject: 'Sig Cycle Doc' },
+          fields,
+        }),
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/pdf`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        body: pdfBuffer,
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/final-pdf`, async (route) => {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'not ready' }),
+      });
+    });
+
+    await page.route('**/pdf.worker.min.mjs', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: workerScript,
+      });
+    });
+
+    await page.goto(`/sign/${token}`);
+    await expect(page.locator('img[alt^="Page"]')).toHaveCount(1);
+
+    const chip = page.getByTestId('action-chip');
+    const targetSelectors = ['[data-field-id="sig-1"]', '[data-field-id="dt-1"]', '[data-field-id="sig-2"]'];
+
+    for (let i = 0; i < targetSelectors.length; i += 1) {
+      await chip.click();
+      const { chipTop, fieldCenter } = await page.evaluate((sel) => {
+        const chipEl = document.querySelector('[data-testid="action-chip"]') as HTMLElement | null;
+        const fieldEl = document.querySelector(sel) as HTMLElement | null;
+        if (!chipEl || !fieldEl) return { chipTop: -1, fieldCenter: -1 };
+        const chipRect = chipEl.getBoundingClientRect();
+        const fieldRect = fieldEl.getBoundingClientRect();
+        return { chipTop: chipRect.top + chipRect.height / 2, fieldCenter: fieldRect.top + fieldRect.height / 2 };
+      }, targetSelectors[i]);
+      expect(Math.abs(chipTop - fieldCenter)).toBeLessThan(400);
+    }
+  });
+
+  test('Text field stays focused after auto-advance from signature', async ({ page }) => {
+    const token = 'sig-to-text';
+    const fields = [
+      { id: 'sig-1', type: 'signature', required: true, page: 1, x: 120, y: 720, w: 220, h: 60 },
+      { id: 'txt-1', type: 'text', required: true, page: 1, x: 120, y: 620, w: 240, h: 28 },
+      { id: 'chk-1', type: 'checkbox', required: true, page: 1, x: 120, y: 520, w: 20, h: 20 },
+    ];
+
+    await page.addInitScript(
+      ({ t, sig, init }) => {
+        localStorage.setItem(
+          `sign-adoption:${t}`,
+          JSON.stringify({ signature: sig, initials: init, method: 'type' })
+        );
+      },
+      { t: token, sig: fakeSignature, init: fakeInitials }
+    );
+
+    await page.route(`**/api/sign/${token}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          signer: { id: 77, name: 'Sig Text User', email: 'sigtext@example.com', role: 'signer', status: 'pending' },
+          envelope: { subject: 'Sig to Text Doc' },
+          fields,
+        }),
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/pdf`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        body: pdfBuffer,
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/final-pdf`, async (route) => {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'not ready' }),
+      });
+    });
+
+    await page.route('**/pdf.worker.min.mjs', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: workerScript,
+      });
+    });
+
+    await page.goto(`/sign/${token}`);
+    await expect(page.locator('img[alt^="Page"]')).toHaveCount(1);
+
+    const chip = page.getByTestId('action-chip');
+    const signatureField = page.locator('[data-field-id="sig-1"]');
+    const textField = page.locator('input[type="text"]').first();
+    const checkbox = page.locator('input[type="checkbox"]').first();
+
+    await chip.click();
+    await signatureField.locator('button', { hasText: /^Sign$/ }).click({ force: true });
+
+    await expect(textField).toBeVisible();
+    await textField.click({ force: true });
+    await textField.type('A');
+    await expect(textField).toBeFocused();
+
+    await chip.click();
+    await expect(checkbox).toBeFocused();
   });
 
   test('Action chip stays on the left and navigates without auto-filling signatures', async ({ page }) => {

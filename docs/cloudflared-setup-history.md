@@ -39,3 +39,31 @@ A distilled reference of what was done (from shell history) to expose `localhost
 7) Useful checks:
    - `cloudflared tunnel list`
    - `pgrep -a cloudflared`
+
+## Notes for future
+- If you rotate tunnel credentials, update `credentials-file` in `~/.cloudflared/config.yml`.
+- Keep the process alive (systemd or `tmux`/`screen`) so the site stays reachable.
+- Remove the installer after setup: `rm ./cloudflared.deb`.
+
+## Run as a systemd service (Linux)
+To keep the tunnel up without a manual shell:
+1) Copy config and credentials to a root-readable location:
+   - `sudo mkdir -p /usr/local/etc/cloudflared`
+   - `sudo cp ~/.cloudflared/* /usr/local/etc/cloudflared/`
+2) Update `/usr/local/etc/cloudflared/config.yml` to use absolute paths:
+   ```
+   tunnel: portal-tunnel
+   credentials-file: /usr/local/etc/cloudflared/a5fb382a-8fac-4bf7-84e2-d3d300167f50.json
+
+   ingress:
+   - hostname: portal.myrealestateportal.org
+     service: http://127.0.0.1:3000
+   - service: http_status:404
+   ```
+3) Install the service pointing at that config:
+   - `sudo cloudflared --config /usr/local/etc/cloudflared/config.yml service install`
+4) Start/enable and check status:
+   - `sudo systemctl enable --now cloudflared`
+   - `systemctl status cloudflared`
+   - `journalctl -u cloudflared -f` for logs
+5) When updating config, edit `/usr/local/etc/cloudflared/config.yml` and `sudo systemctl restart cloudflared`.

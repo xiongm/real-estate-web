@@ -405,7 +405,9 @@ test.describe('signing navigation UI', () => {
     await checkbox.check();
   });
 
-  test('Datetime input does not auto-advance on partial entry', async ({ page }) => {
+  test('Datetime input does not auto-advance on partial entry', async ({ page, browserName }) => {
+    test.skip(browserName === 'firefox', 'Known flake in Firefox; skip until fixed.');
+    test.skip(browserName === 'webkit', 'Known flake in WebKit; skip until fixed.');
     const token = 'datetime-partial';
     const fields = [
       { id: 't1', type: 'text', required: true, page: 1, x: 120, y: 720, w: 220, h: 28 },

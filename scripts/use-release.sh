@@ -8,6 +8,7 @@ set -euo pipefail
 #   ./scripts/use-release.sh release/v2.5.0
 
 ALLOW_DIRTY=0
+ROOT_DIR="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 
 log() { echo "[use-release] $*"; }
 die() { echo "[use-release][error] $*" >&2; exit 1; }
@@ -46,6 +47,20 @@ resolve_target() {
   die "Remote branch/tag not found for '$ref'. Tried origin/$ref, origin/release/$ref, and tag $ref."
 }
 
+sync_app_version() {
+  local script="${ROOT_DIR}/release-version.sh"
+  if [[ -x "$script" ]]; then
+    log "Updating APP_VERSION in .env via release-version.sh"
+    if (cd "$ROOT_DIR" && "$script"); then
+      log "APP_VERSION updated from latest tag."
+    else
+      log "Warning: release-version.sh failed; APP_VERSION may be stale."
+    fi
+  else
+    log "release-version.sh not found; skipping APP_VERSION update."
+  fi
+}
+
 main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -78,6 +93,7 @@ main() {
   if [[ "$TARGET_KIND" == "tag" ]]; then
     log "Checking out tag $TARGET"
     git checkout "$TARGET"
+    sync_app_version
     log "Now on tag $TARGET"
     exit 0
   fi
@@ -89,6 +105,7 @@ main() {
   else
     git checkout -b "$TARGET" "origin/$TARGET"
   fi
+  sync_app_version
   log "Now on branch $TARGET"
 
   # Optional: remind about APP_VERSION drift

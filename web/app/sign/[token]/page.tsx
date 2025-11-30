@@ -539,6 +539,7 @@ export default function SignPage() {
     data?.envelope?.name ||
     data?.document?.filename ||
     'Document';
+  const summaryText = (data?.envelope?.summary || '').trim();
   const showFinalPdf = Boolean(
     (completion && completion.sealed) ||
       data?.final_artifact?.sha256_final ||
@@ -587,7 +588,38 @@ export default function SignPage() {
       onRetryPdf={() => setCompletion(null)}
     />
   ) : (
-    <div className="sign-content">
+      <div className="sign-content">
+        <div className="sign-summary-card" role="status" aria-live="polite">
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>AI summary</p>
+              <strong style={{ fontSize: 16, color: palette.text }}>{documentLabel}</strong>
+            </div>
+            <span
+              style={{
+              fontSize: 11,
+              padding: '4px 10px',
+              borderRadius: 999,
+              background: '#e0e7ff',
+              color: '#312e81',
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            AI
+          </span>
+        </div>
+        <p
+          style={{
+            margin: '10px 0 0',
+            fontSize: 14,
+            color: summaryText ? palette.text : palette.accentMuted,
+            lineHeight: 1.6,
+          }}
+        >
+          {summaryText || 'A concise summary will appear here once available.'}
+        </p>
+      </div>
       <div className="sign-columns">
         <section className="sign-doc-section" ref={docScrollRef}>
           <PdfSigningSurface
@@ -876,6 +908,13 @@ export default function SignPage() {
           display: flex;
           flex-direction: column;
           gap: 24px;
+          box-shadow: ${shadows.card};
+        }
+        .sign-summary-card {
+          border: 1px solid ${palette.border};
+          border-radius: 20px;
+          padding: 20px 24px;
+          background: ${palette.card};
           box-shadow: ${shadows.card};
         }
         .sign-sidebar-action {

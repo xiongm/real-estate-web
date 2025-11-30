@@ -5,9 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session, select
 from ..db import get_session
 from ..models import Envelope, Signer, Field, Document, Event, ProjectInvestor, AuditEvent
-from ..schemas import EnvelopeCreate, EnvelopeSend
+from ..schemas import EnvelopeCreate, EnvelopeSend, EnvelopeSummaryUpdate
 from ..email import send_email, format_sender_name
 from ..utils import canonical_json, sha256_bytes, make_token
+from ..summary import kickoff_envelope_summary, generate_envelope_summary
+from ..config import DOC_SUMMARY_CHAR_LIMIT
 from ..auth import require_admin_access
 
 router = APIRouter()
@@ -148,6 +150,7 @@ def create_envelope(
         ip=getattr(request, "client", None).host if request and request.client else None,
         user_agent=request.headers.get("user-agent") if request else None,
     )
+    kickoff_envelope_summary(env.id)
 
     # Return a small, explicit body so curl shows it
     return {"id": env.id, "status": env.status}
@@ -172,9 +175,21 @@ def send_envelope(
             env.requester_name = payload.requester_name
         if payload.requester_email is not None:
             env.requester_email = payload.requester_email
+        if payload.summary is not None:
+            trimmed = (payload.summary or "").strip()
+            env.summary = trimmed[:DOC_SUMMARY_CHAR_LIMIT] if trimmed else None
     doc = session.get(Document, env.document_id)
     if not doc:
         raise HTTPException(404, "document not found")
+    enable_summary = payload.enable_summary if payload.enable_summary is not None else True
+    if enable_summary and not env.summary:
+        # Best-effort: try to generate summary synchronously before sending.
+        try:
+            generate_envelope_summary(session, env, doc, force=True)
+        except Exception as exc:  # pragma: no cover - fail-soft
+            # Do not block sending if summarization fails.
+            import logging
+            logging.getLogger(__name__).warning("Summary generation failed before send: %s", exc)
     env.status = "sent"; session.add(env); session.commit()
 
     signers = session.exec(
@@ -266,6 +281,7 @@ def get_envelope(
         "message": env.message,
         "requester_name": env.requester_name,
         "requester_email": env.requester_email,
+        "summary": env.summary,
         "status": env.status,
         "document": {"id": doc.id, "filename": doc.filename} if doc else None,
         "signers": [
@@ -279,6 +295,23 @@ def get_envelope(
             for s in signers
         ],
     }
+
+@router.patch("/{envelope_id}/summary")
+def update_envelope_summary(
+    envelope_id: int,
+    payload: EnvelopeSummaryUpdate,
+    session: Session = Depends(get_session),
+    ctx=Depends(require_admin_access),
+):
+    env = session.get(Envelope, envelope_id)
+    if not env:
+        raise HTTPException(404, "envelope not found")
+    summary = (payload.summary or "").strip()
+    env.summary = summary[:DOC_SUMMARY_CHAR_LIMIT] if summary else None
+    session.add(env)
+    session.commit()
+    session.refresh(env)
+    return {"id": env.id, "summary": env.summary}
 
 # Dev helper: get magic links without tailing logs
 @router.get("/{envelope_id}/dev-magic-links")

@@ -191,7 +191,10 @@ export default function RequestSignPage() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmSending, setConfirmSending] = useState(false);
+  const [confirmSendStage, setConfirmSendStage] = useState<'creating' | 'summary' | 'sending' | null>(null);
   const [pendingEnvelopePayload, setPendingEnvelopePayload] = useState<EnvelopeCreatePayload | null>(null);
+  const [enableAiSummary, setEnableAiSummary] = useState(true);
+  const [summaryDraft, setSummaryDraft] = useState('');
   const selectedField = useMemo(
     () => fields.find((field) => field.id === selectedFieldId) || null,
     [fields, selectedFieldId],
@@ -764,6 +767,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
 
   const closeConfirmPanel = () => {
+    if (confirmSending) return;
     setConfirmDrawerOpen(false);
     setTimeout(() => {
       setConfirmVisible(false);
@@ -785,6 +789,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       return;
     }
     setConfirmSending(true);
+    setConfirmSendStage('creating');
     setConfirmError(null);
     try {
       const createPayload: EnvelopeCreatePayload = {
@@ -806,6 +811,8 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       }
       const created = await createResp.json();
       const envelopeId = created.id;
+      setConfirmSendStage(enableAiSummary ? 'summary' : 'sending');
+      const trimmedSummary = summaryDraft.trim();
       const sendResp = await fetch(`${baseApi}/api/envelopes/${envelopeId}/send`, {
         method: 'POST',
         headers: {
@@ -817,6 +824,8 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
           message: confirmMessage,
           requester_name: requesterName.trim(),
           requester_email: requesterEmail.trim(),
+          enable_summary: enableAiSummary,
+          summary: trimmedSummary || undefined,
         }),
       });
       if (!sendResp.ok) {
@@ -829,6 +838,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       setConfirmError(err instanceof Error ? err.message : 'Failed to send envelope');
     } finally {
       setConfirmSending(false);
+      setConfirmSendStage(null);
     }
   };
 
@@ -1784,6 +1794,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               transition: 'transform 0.35s ease',
               display: 'flex',
               flexDirection: 'column',
+              position: 'relative',
             }}
             onClick={(event) => event.stopPropagation()}
           >
@@ -1806,13 +1817,15 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               <button
                 type="button"
                 onClick={closeConfirmPanel}
+                disabled={confirmSending}
                 style={{
                   border: 'none',
                   background: 'transparent',
                   color: '#6b7280',
                   fontSize: 24,
-                  cursor: 'pointer',
+                  cursor: confirmSending ? 'not-allowed' : 'pointer',
                   lineHeight: 1,
+                  opacity: confirmSending ? 0.6 : 1,
                 }}
                 aria-label="Close"
               >
@@ -1881,6 +1894,54 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </section>
+                  <section
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 12,
+                      padding: 20,
+                      background: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                    }}
+                  >
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={enableAiSummary}
+                        onChange={(event) => setEnableAiSummary(event.target.checked)}
+                      />
+                      <div>
+                        <strong style={{ display: 'block', fontSize: 14 }}>Enable AI summary</strong>
+                        <span style={{ fontSize: 12, color: '#64748b' }}>Generate a short summary for signers before sending. You can also edit or provide your own.</span>
+                      </div>
+                    </label>
+                    <div>
+                      <label htmlFor="ai-summary-draft" style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                        AI summary (optional)
+                      </label>
+                      <textarea
+                        id="ai-summary-draft"
+                        value={summaryDraft}
+                        onChange={(event) => setSummaryDraft(event.target.value)}
+                        rows={4}
+                        style={{
+                          width: '100%',
+                          border: '1px solid #cbd5f5',
+                          borderRadius: 8,
+                          padding: 10,
+                          resize: 'vertical',
+                          background: enableAiSummary ? '#eef2ff' : '#f8fafc',
+                          color: enableAiSummary ? '#94a3b8' : '#0f172a',
+                          cursor: enableAiSummary ? 'not-allowed' : 'text',
+                          pointerEvents: enableAiSummary ? 'none' : 'auto',
+                        }}
+                        placeholder="Add your own summary or leave blank to let AI generate one."
+                        disabled={enableAiSummary}
+                      />
+                      <p style={{ margin: '6px 0 0', fontSize: 12, color: '#94a3b8' }}>We cap summaries at 300 characters and prefer full sentences.</p>
                     </div>
                   </section>
                   <section
@@ -1991,6 +2052,41 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                 </>
               )}
             </div>
+            {confirmSending && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(15,23,42,0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  gap: 10,
+                  zIndex: 5,
+                  color: '#fff',
+                  fontWeight: 600,
+                  pointerEvents: 'all',
+                }}
+              >
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: '50%',
+                    border: '5px solid rgba(255,255,255,0.4)',
+                    borderTopColor: '#fff',
+                    animation: 'spin 1s linear infinite',
+                  }}
+                />
+                <div>
+                  {confirmSendStage === 'creating' && 'Creating envelope…'}
+                  {confirmSendStage === 'summary' && 'Generating AI summary…'}
+                  {confirmSendStage === 'sending' && 'Sending envelope…'}
+                  {!confirmSendStage && 'Sending…'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

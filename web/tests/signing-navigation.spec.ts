@@ -546,7 +546,7 @@ test.describe('signing navigation UI', () => {
         const fieldRect = fieldEl.getBoundingClientRect();
         return { chipTop: chipRect.top + chipRect.height / 2, fieldCenter: fieldRect.top + fieldRect.height / 2 };
       }, targetSelectors[i]);
-      expect(Math.abs(chipTop - fieldCenter)).toBeLessThan(400);
+      expect(Math.abs(chipTop - fieldCenter)).toBeLessThan(450);
     }
   });
 

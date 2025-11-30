@@ -613,6 +613,7 @@ def list_project_envelopes(
                 "document": {"id": doc.id if doc else None, "filename": doc.filename if doc else None},
                 "total_signers": len(signers),
                 "completed_signers": completed,
+                "summary": env.summary,
                 "signers": [
                     {
                         "id": s.id,

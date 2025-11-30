@@ -37,6 +37,11 @@ class EnvelopeSend(BaseModel):
     message: Optional[str] = None
     requester_name: Optional[str] = None
     requester_email: Optional[str] = None
+    enable_summary: Optional[bool] = None
+    summary: Optional[str] = None
+
+class EnvelopeSummaryUpdate(BaseModel):
+    summary: Optional[str] = None
 
 class SignSave(BaseModel):
     values: dict  # field_id -> value (text/date/checkbox/signature_png(base64))

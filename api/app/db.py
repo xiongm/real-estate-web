@@ -12,6 +12,7 @@ def init_db():
     _ensure_project_access_column()
     _ensure_project_name_unique_index()
     _ensure_investor_contact_columns()
+    _ensure_envelope_summary_column()
     _prune_audit_events(AUDIT_RETENTION_DAYS)
 
 def get_session():
@@ -71,6 +72,18 @@ def _ensure_investor_contact_columns():
         for column, column_type in required.items():
             if column not in columns:
                 conn.execute(text(f"ALTER TABLE projectinvestor ADD COLUMN {column} {column_type}"))
+
+
+def _ensure_envelope_summary_column():
+    inspector = inspect(engine)
+    try:
+        columns = [col["name"] for col in inspector.get_columns("envelope")]
+    except Exception:
+        return
+    if "summary" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE envelope ADD COLUMN summary TEXT"))
 
 
 def _prune_audit_events(retention_days: int):

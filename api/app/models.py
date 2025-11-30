@@ -44,6 +44,7 @@ class Envelope(SQLModel, table=True):
     expires_at: Optional[datetime] = None
     requester_name: Optional[str] = None
     requester_email: Optional[str] = None
+    summary: Optional[str] = None
     created_at: datetime = ORMField(default_factory=datetime.utcnow)
 
 class Signer(SQLModel, table=True):

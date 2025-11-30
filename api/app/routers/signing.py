@@ -9,6 +9,7 @@ from ..schemas import SignSave, ConsentAccept
 from ..utils import read_token, canonical_json, sha256_bytes
 from ..storage import get_bytes, put_bytes
 from ..email import send_email, format_sender_name
+from ..summary import kickoff_envelope_summary
 import json
 
 router = APIRouter()
@@ -146,6 +147,8 @@ def load_signing_session(token: str, request: Request, session: Session = Depend
     env = session.get(Envelope, signer.envelope_id)
     if not env:
         raise HTTPException(404, "not found")
+    if not env.summary:
+        kickoff_envelope_summary(env.id)
     final_artifact = session.exec(select(FinalArtifact).where(FinalArtifact.envelope_id == env.id)).first()
     all_signers = session.exec(select(Signer).where(Signer.envelope_id == env.id)).all()
     waiting_on = len([s for s in all_signers if s.status != "completed" and s.id != signer.id])

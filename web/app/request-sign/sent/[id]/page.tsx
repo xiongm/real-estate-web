@@ -8,6 +8,7 @@ type EnvelopeSummary = {
   subject: string;
   document?: { id: number; filename: string };
   signers: Array<{ id: number; name: string; email: string }>;
+  summary?: string | null;
 };
 
 export default function EnvelopeSentPage() {
@@ -195,6 +196,21 @@ export default function EnvelopeSentPage() {
                     </li>
                   ))}
                 </ul>
+              </div>
+              <div
+                style={{
+                  textAlign: 'left',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 12,
+                  padding: 14,
+                  background: '#f8fafc',
+                  marginBottom: 12,
+                }}
+              >
+                <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Document summary</p>
+                <p style={{ margin: '6px 0 0', fontSize: 14, color: '#111827', lineHeight: 1.6 }}>
+                  {summary?.summary?.trim() || 'Summary not available yet. It will appear here after processing.'}
+                </p>
               </div>
             </>
           )}

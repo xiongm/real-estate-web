@@ -15,3 +15,15 @@ try:
     AUDIT_RETENTION_DAYS = int(os.getenv("AUDIT_RETENTION_DAYS", "30") or "30")
 except ValueError:
     AUDIT_RETENTION_DAYS = 30
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ENABLE_DOC_SUMMARY = (os.getenv("ENABLE_DOC_SUMMARY") or "true").lower() == "true"
+DOC_SUMMARY_MODEL = os.getenv("DOC_SUMMARY_MODEL") or "gpt-5-mini"
+try:
+    DOC_SUMMARY_CHAR_LIMIT = int(os.getenv("DOC_SUMMARY_CHAR_LIMIT") or "300")
+except ValueError:
+    DOC_SUMMARY_CHAR_LIMIT = 300
+try:
+    DOC_SUMMARY_TIMEOUT = float(os.getenv("DOC_SUMMARY_TIMEOUT") or "15")
+except ValueError:
+    DOC_SUMMARY_TIMEOUT = 15.0

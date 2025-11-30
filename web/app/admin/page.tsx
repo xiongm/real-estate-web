@@ -26,6 +26,7 @@ type EnvelopeSummary = {
   subject: string;
   status: string;
   created_at: string;
+  summary?: string | null;
   document?: { id: number | null; filename: string | null };
   total_signers: number;
   completed_signers: number;
@@ -188,6 +189,9 @@ export default function AdminPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [finals, setFinals] = useState<FinalArtifact[]>([]);
   const [envelopes, setEnvelopes] = useState<EnvelopeSummary[]>([]);
+  const [summaryEdits, setSummaryEdits] = useState<Record<number, string>>({});
+  const [summarySaving, setSummarySaving] = useState<Record<number, boolean>>({});
+  const [summaryError, setSummaryError] = useState<Record<number, string | null>>({});
   const [expandedEnvelopes, setExpandedEnvelopes] = useState<Record<number, boolean>>({});
   const [expandedFinals, setExpandedFinals] = useState<Record<number, boolean>>({});
   const [selectedEnvelopeIds, setSelectedEnvelopeIds] = useState<number[]>([]);
@@ -727,6 +731,46 @@ const editInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
     } finally {
       setProjectsLoaded(true);
     }
+  };
+
+  const saveEnvelopeSummary = async (envelopeId: number, draftText?: string) => {
+    if (!adminToken) return;
+    const draft = (draftText ?? summaryEdits[envelopeId] ?? envelopes.find((env) => env.id === envelopeId)?.summary ?? '').trim();
+    setSummarySaving((prev) => ({ ...prev, [envelopeId]: true }));
+    setSummaryError((prev) => ({ ...prev, [envelopeId]: null }));
+    try {
+      const resp = await fetch(`${baseApi}/api/envelopes/${envelopeId}/summary`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Token': adminToken,
+        },
+        body: JSON.stringify({ summary: draft || null }),
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || `Failed to update summary (${resp.status})`);
+      }
+      const data = await resp.json();
+      setEnvelopes((prev) =>
+        prev.map((env) => (env.id === envelopeId ? { ...env, summary: data.summary } : env)),
+      );
+      setSummaryEdits((prev) => ({ ...prev, [envelopeId]: data.summary || '' }));
+    } catch (err) {
+      setSummaryError((prev) => ({
+        ...prev,
+        [envelopeId]: err instanceof Error ? err.message : 'Failed to update summary',
+      }));
+    } finally {
+      setSummarySaving((prev) => ({ ...prev, [envelopeId]: false }));
+    }
+  };
+
+  const handleSummaryBlur = (envelopeId: number) => {
+    const existing = envelopes.find((env) => env.id === envelopeId)?.summary?.trim() ?? '';
+    const draft = (summaryEdits[envelopeId] ?? existing).trim();
+    if (draft === existing) return;
+    saveEnvelopeSummary(envelopeId, draft);
   };
 
 useEffect(() => {
@@ -3317,71 +3361,123 @@ useEffect(() => {
                                   )}
                                 </div>
                               </div>
-                              {expanded && signerList.length > 0 && (
+                              {expanded && (
                                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${palette.border}` }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    {signerList.map((signer) => {
-                                      const completed = signer.status === 'completed';
-                                          return (
-                                            <div
-                                              key={`${key}-signer-${signer.id}`}
-                                              style={{
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                gap: 16,
-                                                flexWrap: 'wrap',
-                                                fontSize: 13,
-                                              }}
-                                            >
-                                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <strong style={{ fontSize: 13 }}>{signer.name || 'Unnamed signer'}</strong>
-                                                <span style={{ color: palette.accentMuted }}>{signer.email || 'Email unavailable'}</span>
-                                              </div>
-                                              <div
-                                                style={{
-                                                  textAlign: 'right',
-                                                  display: 'flex',
-                                                  flexDirection: 'column',
-                                                  gap: 6,
-                                                  alignItems: 'flex-end',
-                                                }}
-                                              >
-                                                <span
-                                                  style={{
-                                                    ...(completed ? completedChipStyle : awaitingChipStyle),
-                                                    border: 'none',
-                                                    padding: '2px 10px',
-                                                    alignSelf: 'flex-end',
-                                                  }}
-                                                >
-                                                  {completed ? 'Completed' : 'Awaiting'}
-                                                </span>
-                                                {signer.completed_at && (
-                                              <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
-                                                {formatLocalDateTime(signer.completed_at)}
-                                              </p>
-                                            )}
-                                            {!completed && signer.magic_link && (
-                                              <button
-                                                type="button"
-                                                onClick={() => copyMagicLink(signer.magic_link)}
-                                                style={{
-                                                  border: `1px solid ${palette.border}`,
-                                                  borderRadius: 999,
-                                                  padding: '4px 10px',
-                                                  background: '#fff',
-                                                  color: palette.accent,
-                                                  fontSize: 12,
-                                                  cursor: 'pointer',
-                                                }}
-                                              >
-                                                Copy link
-                                              </button>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    {(() => {
+                                      const summaryDraft = summaryEdits[envelopeId] ?? envelopeRecord.summary ?? '';
+                                      const saving = summarySaving[envelopeId] ?? false;
+                                      const err = summaryError[envelopeId];
+                                      return (
+                                        <div
+                                          onClick={(event) => event.stopPropagation()}
+                                          onKeyDown={(event) => event.stopPropagation()}
+                                          style={{
+                                            border: `1px solid ${palette.border}`,
+                                            borderRadius: 12,
+                                            padding: 12,
+                                            background: '#f8fafc',
+                                          }}
+                                        >
+                                          <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>AI summary</p>
+                                          <textarea
+                                            value={summaryDraft}
+                                            onChange={(event) =>
+                                              setSummaryEdits((prev) => ({ ...prev, [envelopeId]: event.target.value }))
+                                            }
+                                            onBlur={() => handleSummaryBlur(envelopeId)}
+                                            rows={3}
+                                            style={{
+                                              width: '100%',
+                                              marginTop: 6,
+                                              border: `1px solid ${palette.border}`,
+                                              borderRadius: 8,
+                                              padding: 10,
+                                              fontSize: 13,
+                                              fontFamily: 'inherit',
+                                              resize: 'vertical',
+                                              background: '#fff',
+                                            }}
+                                            placeholder="Click to edit the summary for signers."
+                                          />
+                                          {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: '6px 0 0' }}>{err}</p>}
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, alignItems: 'center' }}>
+                                            {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: 0 }}>{err}</p>}
+                                            {saving && (
+                                              <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                                                Saving…
+                                              </span>
                                             )}
                                           </div>
                                         </div>
                                       );
-                                    })}
+                                    })()}
+                                    {signerList.length > 0 && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {signerList.map((signer) => {
+                                          const completed = signer.status === 'completed';
+                                              return (
+                                                <div
+                                                  key={`${key}-signer-${signer.id}`}
+                                                  style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    gap: 16,
+                                                    flexWrap: 'wrap',
+                                                    fontSize: 13,
+                                                  }}
+                                                >
+                                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <strong style={{ fontSize: 13 }}>{signer.name || 'Unnamed signer'}</strong>
+                                                    <span style={{ color: palette.accentMuted }}>{signer.email || 'Email unavailable'}</span>
+                                                  </div>
+                                                  <div
+                                                    style={{
+                                                      textAlign: 'right',
+                                                      display: 'flex',
+                                                      flexDirection: 'column',
+                                                      gap: 6,
+                                                      alignItems: 'flex-end',
+                                                    }}
+                                                  >
+                                                    <span
+                                                      style={{
+                                                        ...(completed ? completedChipStyle : awaitingChipStyle),
+                                                        border: 'none',
+                                                        padding: '2px 10px',
+                                                        alignSelf: 'flex-end',
+                                                      }}
+                                                    >
+                                                      {completed ? 'Completed' : 'Awaiting'}
+                                                    </span>
+                                                    {signer.completed_at && (
+                                                  <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
+                                                    {formatLocalDateTime(signer.completed_at)}
+                                                  </p>
+                                                )}
+                                                {!completed && signer.magic_link && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => copyMagicLink(signer.magic_link)}
+                                                    style={{
+                                                      border: `1px solid ${palette.border}`,
+                                                      borderRadius: 999,
+                                                      padding: '4px 10px',
+                                                      background: '#fff',
+                                                      color: palette.accent,
+                                                      fontSize: 12,
+                                                      cursor: 'pointer',
+                                                    }}
+                                                  >
+                                                    Copy link
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               )}

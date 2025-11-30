@@ -15,6 +15,7 @@ from app.db import get_session  # noqa: E402
 from app import storage as storage_module  # noqa: E402
 from app.routers import projects as projects_router  # noqa: E402
 from app import email as email_module  # noqa: E402
+from app import summary as summary_module  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -52,7 +53,7 @@ def mock_storage(monkeypatch) -> Dict[str, bytes]:
 
     from app.routers import envelopes, signing  # noqa: E402
 
-    for target in (storage_module, projects_router, envelopes, signing):
+    for target in (storage_module, projects_router, envelopes, signing, summary_module):
         if hasattr(target, "put_bytes"):
             monkeypatch.setattr(target, "put_bytes", fake_put_bytes)
         if hasattr(target, "get_bytes"):

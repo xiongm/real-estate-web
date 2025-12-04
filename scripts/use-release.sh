@@ -49,15 +49,15 @@ resolve_target() {
 
 sync_app_version() {
   local script="${ROOT_DIR}/release-version.sh"
-  if [[ -x "$script" ]]; then
-    log "Updating APP_VERSION in .env via release-version.sh"
-    if (cd "$ROOT_DIR" && "$script"); then
-      log "APP_VERSION updated from latest tag."
-    else
-      log "Warning: release-version.sh failed; APP_VERSION may be stale."
-    fi
-  else
+  if [[ ! -f "$script" ]]; then
     log "release-version.sh not found; skipping APP_VERSION update."
+    return
+  fi
+  log "Updating APP_VERSION in .env via release-version.sh"
+  if (cd "$ROOT_DIR" && bash "$script"); then
+    log "APP_VERSION updated from latest tag."
+  else
+    log "Warning: release-version.sh failed; APP_VERSION may be stale."
   fi
 }
 

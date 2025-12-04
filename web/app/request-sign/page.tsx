@@ -1919,7 +1919,11 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       </div>
                     </label>
                     <div>
-                      <label htmlFor="ai-summary-draft" style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                      <label
+                        htmlFor="ai-summary-draft"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6b7280', marginBottom: 4 }}
+                      >
+                        <img src="/ai-technology.png" alt="AI" width={20} height={20} style={{ display: 'block' }} />
                         AI summary (optional)
                       </label>
                       <textarea

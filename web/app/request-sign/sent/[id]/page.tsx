@@ -199,19 +199,31 @@ export default function EnvelopeSentPage() {
               </div>
               <div
                 style={{
-                  textAlign: 'left',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 12,
-                  padding: 14,
-                  background: '#f8fafc',
-                  marginBottom: 12,
-                }}
-              >
-                <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>Document summary</p>
-                <p style={{ margin: '6px 0 0', fontSize: 14, color: '#111827', lineHeight: 1.6 }}>
-                  {summary?.summary?.trim() || 'Summary not available yet. It will appear here after processing.'}
-                </p>
-              </div>
+              textAlign: 'left',
+              border: '1px solid #e2e8f0',
+              borderRadius: 12,
+              padding: 14,
+              background: '#f8fafc',
+              marginBottom: 12,
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: '#6b7280',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <img src="/ai-technology.png" alt="AI" width={20} height={20} style={{ display: 'block' }} />
+              AI summary
+            </p>
+            <p style={{ margin: '6px 0 0', fontSize: 14, color: '#111827', lineHeight: 1.6 }}>
+              {summary?.summary?.trim() || 'Summary not available yet. It will appear here after processing.'}
+            </p>
+          </div>
             </>
           )}
           <button

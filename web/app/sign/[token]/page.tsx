@@ -590,25 +590,21 @@ export default function SignPage() {
   ) : (
       <div className="sign-content">
         <div className="sign-summary-card" role="status" aria-live="polite">
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>AI summary</p>
-              <strong style={{ fontSize: 16, color: palette.text }}>{documentLabel}</strong>
-            </div>
-            <span
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <p
               style={{
-              fontSize: 11,
-              padding: '4px 10px',
-              borderRadius: 999,
-              background: '#e0e7ff',
-              color: '#312e81',
-              fontWeight: 700,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            AI
-          </span>
-        </div>
+                margin: 0,
+                fontSize: 12,
+                color: palette.accentMuted,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <img src="/ai-technology.png" alt="AI" width={20} height={20} style={{ display: 'block' }} />
+              AI summary
+            </p>
+          </div>
         <p
           style={{
             margin: '10px 0 0',

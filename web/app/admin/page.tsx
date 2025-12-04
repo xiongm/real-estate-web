@@ -3381,7 +3381,25 @@ useEffect(() => {
                                             background: '#f8fafc',
                                           }}
                                         >
-                                          <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>AI summary</p>
+                                          <p
+                                            style={{
+                                              margin: 0,
+                                              fontSize: 12,
+                                              color: palette.accentMuted,
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: 6,
+                                            }}
+                                          >
+                                            <img
+                                              src="/ai-technology.png"
+                                              alt="AI"
+                                              width={20}
+                                              height={20}
+                                              style={{ display: 'block' }}
+                                            />
+                                            AI summary
+                                          </p>
                                           <textarea
                                             value={summaryDraft}
                                             onChange={(event) =>

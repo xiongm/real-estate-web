@@ -3419,6 +3419,9 @@ export default function AdminPage() {
                                               )}
                                             </div>
                                           )}
+                                          {totalSigners > 0 && (
+                                            <span style={{ fontSize: 12, color: palette.accentMuted }}>{progressLabel}</span>
+                                          )}
 
                                         </div>
                                       </div>

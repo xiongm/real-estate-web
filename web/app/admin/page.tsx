@@ -63,6 +63,8 @@ type ProjectFile = {
   uploaded_at: string;
 };
 
+type TabId = 'signatures' | 'documents' | 'share' | 'investors' | 'audit';
+
 const palette = {
   bg: theme.colors.page,
   panel: theme.colors.panel,
@@ -77,6 +79,13 @@ const palette = {
   code: theme.colors.code,
 };
 const shadows = theme.shadows;
+const TAB_ICONS: Record<TabId, string> = {
+  documents: '/icons/file.svg',
+  signatures: '/icons/signature.svg',
+  investors: '/icons/users-round.svg',
+  share: '/icons/share-2.svg',
+  audit: '/icons/monitor-check.svg',
+};
 const completedChipStyle = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -204,6 +213,8 @@ export default function AdminPage() {
   const [loadingInvestors, setLoadingInvestors] = useState(false);
   const [manageInvestorsMode, setManageInvestorsMode] = useState(false);
   const [selectedInvestorIds, setSelectedInvestorIds] = useState<number[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 const [showInvestorForm, setShowInvestorForm] = useState(false);
 const [newInvestorName, setNewInvestorName] = useState('');
 const [newInvestorEmail, setNewInvestorEmail] = useState('');
@@ -1709,6 +1720,14 @@ useEffect(() => {
     logout();
   };
 
+  const showToast = (message: string) => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setToastMessage(message);
+    toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 2200);
+  };
+
   const regenerateProjectToken = async (projectId: number) => {
     if (!adminToken) return;
     try {
@@ -1728,9 +1747,9 @@ useEffect(() => {
     if (!token) return;
     try {
       await navigator.clipboard.writeText(token);
-      alert('Token copied to clipboard.');
+      showToast('Link copied to clipboard.');
     } catch {
-      alert('Unable to copy token automatically.');
+      showToast('Unable to copy automatically; copy from the box.');
     }
   };
 
@@ -1738,9 +1757,9 @@ useEffect(() => {
     if (!link) return;
     try {
       await navigator.clipboard.writeText(link);
-      alert('Magic link copied to clipboard.');
+      showToast('Link copied to clipboard.');
     } catch {
-      alert('Unable to copy magic link automatically.');
+      showToast('Unable to copy automatically; copy from the box.');
     }
   };
 
@@ -2749,6 +2768,26 @@ useEffect(() => {
           text-decoration: underline;
         }
       `}</style>
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#0f172a',
+            color: '#fff',
+            padding: '10px 16px',
+            borderRadius: 999,
+            boxShadow: '0 12px 28px rgba(15,23,42,0.25)',
+            fontSize: 13,
+            fontWeight: 600,
+            zIndex: 200,
+          }}
+        >
+          {toastMessage}
+        </div>
+      )}
       {isMobile && (
         <div className="admin-mobile-header">
           <button
@@ -2892,14 +2931,16 @@ useEffect(() => {
               >
                 {(
                   [
-                    { id: 'documents', label: 'Documents', icon: '📁' },
-                    { id: 'signatures', label: 'Signatures', icon: '✍️' },
-                    { id: 'investors', label: 'Investors', icon: '👥' },
-                    { id: 'share', label: 'Share', icon: '🔐' },
-                  { id: 'audit', label: 'Logs', icon: '🕵️' },
-                  ] as Array<{ id: 'signatures' | 'documents' | 'share' | 'investors' | 'audit'; label: string; icon: string }>
+                    { id: 'documents', label: 'Documents' },
+                    { id: 'signatures', label: 'Signatures' },
+                    { id: 'investors', label: 'Investors' },
+                    { id: 'share', label: 'Share' },
+                    { id: 'audit', label: 'Logs' },
+                  ] as Array<{ id: TabId; label: string }>
                 ).map((tab) => {
                   const active = centerTab === tab.id;
+                  const iconColor = active ? palette.text : palette.accentMuted;
+                  const iconSrc = TAB_ICONS[tab.id];
                   return (
                     <button
                       key={tab.id}
@@ -2913,7 +2954,7 @@ useEffect(() => {
                         fontSize: 13,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 6,
+                        gap: 8,
                         background: active ? '#fff' : 'transparent',
                         color: active ? palette.text : palette.accentMuted,
                         cursor: 'pointer',
@@ -2923,7 +2964,23 @@ useEffect(() => {
                         boxShadow: active ? '0 12px 24px rgba(15,23,42,0.12)' : 'none',
                       }}
                     >
-                      <span aria-hidden="true">{tab.icon}</span>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: 16,
+                          height: 16,
+                          display: 'inline-block',
+                          backgroundColor: iconColor,
+                          maskImage: `url(${iconSrc})`,
+                          WebkitMaskImage: `url(${iconSrc})`,
+                          maskRepeat: 'no-repeat',
+                          WebkitMaskRepeat: 'no-repeat',
+                          maskPosition: 'center',
+                          WebkitMaskPosition: 'center',
+                          maskSize: 'contain',
+                          WebkitMaskSize: 'contain',
+                        }}
+                      />
                       {tab.label}
                     </button>
                   );
@@ -3462,7 +3519,10 @@ useEffect(() => {
                                                 {!completed && signer.magic_link && (
                                                   <button
                                                     type="button"
-                                                    onClick={() => copyMagicLink(signer.magic_link)}
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      copyMagicLink(signer.magic_link);
+                                                    }}
                                                     style={{
                                                       border: `1px solid ${palette.border}`,
                                                       borderRadius: 999,

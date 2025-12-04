@@ -126,6 +126,19 @@ const primaryButtonStyle = (enabled: boolean): CSSProperties => ({
   boxShadow: enabled ? shadows.subtle : 'none',
   transition: 'background 0.2s ease, box-shadow 0.2s ease',
 });
+const primaryPillCTA = (enabled: boolean): CSSProperties => ({
+  borderRadius: 999,
+  border: 'none',
+  padding: '10px 16px',
+  background: enabled ? palette.accent : '#cbd5e1',
+  color: '#fff',
+  fontWeight: 700,
+  cursor: enabled ? 'pointer' : 'not-allowed',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  boxShadow: enabled ? '0 10px 18px rgba(37,99,235,0.25)' : 'none',
+});
 const usePrimaryButtonStyle = (
   enabled: boolean,
   hovered: boolean,
@@ -3039,31 +3052,29 @@ useEffect(() => {
                       type="button"
                       onClick={goToRequestSign}
                       disabled={!canRequestSignatures}
-                      style={{ ...usePrimaryButtonStyle(canRequestSignatures, requestButtonHovered), width: isMobile ? '100%' : undefined }}
-                      onMouseEnter={() => canRequestSignatures && setRequestButtonHovered(true)}
-                      onMouseLeave={() => canRequestSignatures && setRequestButtonHovered(false)}
+                      style={{ ...primaryPillCTA(canRequestSignatures), width: isMobile ? '100%' : undefined }}
                       title={
                         canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
                       }
                     >
-                      <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width={16}
-                          height={16}
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="17 8 12 3 7 8" />
-                          <line x1="12" x2="12" y1="3" y2="15" />
-                        </svg>
-                        Request signatures
-                      </span>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: 16,
+                          height: 16,
+                          display: 'inline-block',
+                          backgroundColor: canRequestSignatures ? '#fff' : palette.accentMuted,
+                          maskImage: 'url(/icons/signature.svg)',
+                          WebkitMaskImage: 'url(/icons/signature.svg)',
+                          maskRepeat: 'no-repeat',
+                          WebkitMaskRepeat: 'no-repeat',
+                          maskPosition: 'center',
+                          WebkitMaskPosition: 'center',
+                          maskSize: 'contain',
+                          WebkitMaskSize: 'contain',
+                        }}
+                      />
+                      Request signatures
                     </button>
                   </div>
                 </div>
@@ -3601,34 +3612,25 @@ useEffect(() => {
                       <button
                         type="button"
                         onClick={() => setShowDocumentUpload((prev) => !prev)}
-                        style={{
-                          borderRadius: 10,
-                          border: 'none',
-                          padding: '10px 18px',
-                          background: palette.accent,
-                          color: '#fff',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
+                        style={primaryPillCTA(true)}
                       >
                         <svg
-                          xmlns="http://www.w3.org/2000/svg"
+                          aria-hidden="true"
                           width={18}
                           height={18}
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="17 8 12 3 7 8" />
-                          <line x1="12" x2="12" y1="3" y2="15" />
-                        </svg>
+                          style={{
+                            display: 'inline-block',
+                            backgroundColor: '#fff',
+                            maskImage: 'url(/icons/upload.svg)',
+                            WebkitMaskImage: 'url(/icons/upload.svg)',
+                            maskRepeat: 'no-repeat',
+                            WebkitMaskRepeat: 'no-repeat',
+                            maskPosition: 'center',
+                            WebkitMaskPosition: 'center',
+                            maskSize: 'contain',
+                            WebkitMaskSize: 'contain',
+                          }}
+                        />
                         {showDocumentUpload ? 'Close upload' : 'Upload documents'}
                       </button>
                     </div>
@@ -4027,12 +4029,26 @@ useEffect(() => {
                       setShowInvestorForm((prev) => !prev);
                     }}
                     disabled={!selectedProjectId}
-                    style={{
-                      ...primaryButtonStyle(Boolean(selectedProjectId)),
-                      minWidth: isMobile ? '100%' : 180,
-                    }}
+                    style={{ ...primaryPillCTA(Boolean(selectedProjectId)), minWidth: isMobile ? '100%' : 180, justifyContent: 'center' }}
                   >
-                    {showInvestorForm ? 'Close form' : '+ Add investor'}
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 16,
+                        height: 16,
+                        display: 'inline-block',
+                        backgroundColor: selectedProjectId ? '#fff' : palette.accentMuted,
+                        maskImage: 'url(/icons/user-plus.svg)',
+                        WebkitMaskImage: 'url(/icons/user-plus.svg)',
+                        maskRepeat: 'no-repeat',
+                        WebkitMaskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        WebkitMaskPosition: 'center',
+                        maskSize: 'contain',
+                        WebkitMaskSize: 'contain',
+                      }}
+                    />
+                    {showInvestorForm ? 'Close form' : 'Add investor'}
                   </button>
                 </div>
                 <div

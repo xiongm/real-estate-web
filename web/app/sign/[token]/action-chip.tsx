@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { RefObject } from 'react';
+import type React from 'react';
 import { theme } from '../../../lib/theme';
 
 const palette = {
@@ -43,39 +44,35 @@ export function ActionChip({
       if (!doc) return;
       const docRect = doc.getBoundingClientRect();
 
-      // Start state: park near the top-left of the first page.
-      if (showStartLabel || !targetField) {
-        const firstPage = doc.querySelector('[data-page-container]') as HTMLElement | null;
-        const firstImage = firstPage?.querySelector('img[alt^="Page"]') as HTMLElement | null;
-        const anchorEl = (firstImage as HTMLElement | null) || firstPage;
-        if (anchorEl) {
-          const inset = Math.min(32, (anchorEl.offsetHeight || 0) * 0.05);
-          const top = anchorEl.offsetTop + inset;
-          const left = (firstPage?.offsetLeft || 0) - GUTTER;
-          setPos({ top: Math.max(8, top), left: Math.max(8, left) });
-        } else {
-          const fallbackTop = doc.scrollTop + 12;
-          const fallbackLeft = doc.scrollLeft + 12;
-          setPos({ top: fallbackTop, left: fallbackLeft });
-        }
+      // Active state: anchor to current target field.
+      const ref = targetField ? fieldRefs.current[String(targetField.id)] : null;
+      if (ref) {
+        const rect = ref.getBoundingClientRect();
+        const pageElement =
+          (ref.closest?.('[data-page-container]') as HTMLElement | null) ||
+          (ref.parentElement as HTMLElement | null);
+        const pageRect = pageElement?.getBoundingClientRect();
+        const top = rect.top - docRect.top + doc.scrollTop + rect.height / 2 - 22;
+        const leftBase = pageRect
+          ? pageRect.left - docRect.left + doc.scrollLeft - GUTTER
+          : doc.scrollLeft + 12;
+        setPos({ top: Math.max(8, top), left: Math.max(8, leftBase) });
         return;
       }
 
-      // Active state: anchor to current target field.
-      const ref = fieldRefs.current[String(targetField.id)];
-      if (!ref) return;
-      const rect = ref.getBoundingClientRect();
-      const pageElement =
-        (ref.closest?.('[data-page-container]') as HTMLElement | null) ||
-        (ref.parentElement as HTMLElement | null);
-      const pageRect = pageElement?.getBoundingClientRect();
-      const top = rect.top - docRect.top + doc.scrollTop + rect.height / 2 - 22;
-      const leftBase = pageRect
-        ? pageRect.left - docRect.left + doc.scrollLeft - GUTTER
-        : doc.scrollLeft + 12;
-      setPos({ top: Math.max(8, top), left: Math.max(8, leftBase) });
+      // Start state: park near the top-left of the first page.
+      // Start state: dock near the top-left of the document container.
+      const firstPage = doc.querySelector('[data-page-container]') as HTMLElement | null;
+      const anchorRect = firstPage?.getBoundingClientRect();
+      if (anchorRect) {
+        const top = anchorRect.top - docRect.top + doc.scrollTop - 12;
+        const left = anchorRect.left - docRect.left + doc.scrollLeft + 4;
+        setPos({ top: Math.max(0, top), left: Math.max(0, left) });
+      } else {
+        setPos({ top: Math.max(0, doc.scrollTop), left: Math.max(0, doc.scrollLeft) });
+      }
     },
-    [targetField, docRef, fieldRefs, showStartLabel]
+    [targetField, docRef, fieldRefs]
   );
 
   useLayoutEffect(() => {
@@ -86,7 +83,7 @@ export function ActionChip({
     if (!showStartLabel) return;
     const doc = docRef.current;
     if (!doc) return;
-    const img = doc.querySelector('[data-page-container] img[alt^=\"Page\"]') as HTMLImageElement | null;
+    const img = doc.querySelector('[data-page-container] img[alt^="Page"]') as HTMLImageElement | null;
     if (img && !img.complete) {
       const handler = () => updatePosition();
       img.addEventListener('load', handler);
@@ -112,7 +109,7 @@ export function ActionChip({
     };
   }, [docRef, updatePosition]);
 
-  if (!targetField) return null;
+  if (!targetField && !showStartLabel) return null;
 
   return (
     <button

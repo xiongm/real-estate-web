@@ -604,20 +604,6 @@ export default function SignPage() {
         </AISummaryCard>
       <div className="sign-columns">
         <section className="sign-doc-section" ref={docScrollRef}>
-          <PdfSigningSurface
-            pages={pdfPages}
-            loading={pdfLoading}
-            error={pdfError}
-            fields={fields}
-            values={fieldValues}
-            onChange={handleFieldChange}
-            registerFieldRef={registerFieldRef}
-            activeFieldId={activeFieldId}
-            highlightedFieldId={highlightedFieldId}
-            onFocusField={(fid) => focusField(fid)}
-            adoption={adoption}
-            onInsertAdoption={applyAdoptionToField}
-          />
           {targetFieldId && (
             <ActionChip
               targetField={fields.find((f) => String(f.id) === targetFieldId)}
@@ -741,6 +727,20 @@ export default function SignPage() {
               showStartLabel={!hasStarted}
             />
           )}
+          <PdfSigningSurface
+            pages={pdfPages}
+            loading={pdfLoading}
+            error={pdfError}
+            fields={fields}
+            values={fieldValues}
+            onChange={handleFieldChange}
+            registerFieldRef={registerFieldRef}
+            activeFieldId={activeFieldId}
+            highlightedFieldId={highlightedFieldId}
+            onFocusField={(fid) => focusField(fid)}
+            adoption={adoption}
+            onInsertAdoption={applyAdoptionToField}
+          />
         </section>
         <aside className="sign-sidebar">
           <div className="sign-sidebar-card">
@@ -858,8 +858,7 @@ export default function SignPage() {
           max-height: calc(100vh - 220px);
           min-height: calc(100vh - 220px);
           overflow-y: auto;
-          padding-right: 8px;
-          padding-bottom: 24px;
+          padding: 16px 8px 24px 0;
           scroll-behavior: smooth;
           scroll-padding-top: ${SCROLL_PADDING}px;
           position: relative;

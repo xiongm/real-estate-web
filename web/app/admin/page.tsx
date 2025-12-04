@@ -228,40 +228,40 @@ export default function AdminPage() {
   const [selectedInvestorIds, setSelectedInvestorIds] = useState<number[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<number | null>(null);
-const [showInvestorForm, setShowInvestorForm] = useState(false);
-const [newInvestorName, setNewInvestorName] = useState('');
-const [newInvestorEmail, setNewInvestorEmail] = useState('');
-const [newInvestorUnits, setNewInvestorUnits] = useState<string>('');
-const [newInvestorMailing, setNewInvestorMailing] = useState('');
-const [newInvestorBankName, setNewInvestorBankName] = useState('');
-const [newInvestorBankAccount, setNewInvestorBankAccount] = useState('');
-const [newInvestorBankRouting, setNewInvestorBankRouting] = useState('');
-const [newInvestorAddressSuggestions, setNewInvestorAddressSuggestions] = useState<string[]>([]);
-const [newInvestorAddressLoading, setNewInvestorAddressLoading] = useState(false);
-const [newInvestorAddressChosen, setNewInvestorAddressChosen] = useState(false);
-const [creatingInvestor, setCreatingInvestor] = useState(false);
-const [hoveredInvestorId, setHoveredInvestorId] = useState<number | null>(null);
-const [editingInvestorId, setEditingInvestorId] = useState<number | null>(null);
-const [editingInvestorName, setEditingInvestorName] = useState('');
-const [editingInvestorEmail, setEditingInvestorEmail] = useState('');
-const [editingInvestorUnits, setEditingInvestorUnits] = useState<string>('');
-const [editingInvestorMailing, setEditingInvestorMailing] = useState('');
-const [editingInvestorBankName, setEditingInvestorBankName] = useState('');
-const [editingInvestorBankAccount, setEditingInvestorBankAccount] = useState('');
-const [editingInvestorBankRouting, setEditingInvestorBankRouting] = useState('');
-const [editInvestorAddressSuggestions, setEditInvestorAddressSuggestions] = useState<string[]>([]);
-const [editInvestorAddressLoading, setEditInvestorAddressLoading] = useState(false);
-const [editInvestorAddressChosen, setEditInvestorAddressChosen] = useState(false);
-const [editInvestorAddressDirty, setEditInvestorAddressDirty] = useState(false);
-const [editingInvestorSaving, setEditingInvestorSaving] = useState(false);
-const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
-const [projectFilesLoading, setProjectFilesLoading] = useState(false);
-const [projectFileUploadName, setProjectFileUploadName] = useState('');
-const [projectFileUploadFile, setProjectFileUploadFile] = useState<File | null>(null);
-const [projectFileUploading, setProjectFileUploading] = useState(false);
-const [projectFileDeletingId, setProjectFileDeletingId] = useState<number | null>(null);
-const [showDocumentUpload, setShowDocumentUpload] = useState(false);
-const [hoveredProjectFileId, setHoveredProjectFileId] = useState<number | null>(null);
+  const [showInvestorForm, setShowInvestorForm] = useState(false);
+  const [newInvestorName, setNewInvestorName] = useState('');
+  const [newInvestorEmail, setNewInvestorEmail] = useState('');
+  const [newInvestorUnits, setNewInvestorUnits] = useState<string>('');
+  const [newInvestorMailing, setNewInvestorMailing] = useState('');
+  const [newInvestorBankName, setNewInvestorBankName] = useState('');
+  const [newInvestorBankAccount, setNewInvestorBankAccount] = useState('');
+  const [newInvestorBankRouting, setNewInvestorBankRouting] = useState('');
+  const [newInvestorAddressSuggestions, setNewInvestorAddressSuggestions] = useState<string[]>([]);
+  const [newInvestorAddressLoading, setNewInvestorAddressLoading] = useState(false);
+  const [newInvestorAddressChosen, setNewInvestorAddressChosen] = useState(false);
+  const [creatingInvestor, setCreatingInvestor] = useState(false);
+  const [hoveredInvestorId, setHoveredInvestorId] = useState<number | null>(null);
+  const [editingInvestorId, setEditingInvestorId] = useState<number | null>(null);
+  const [editingInvestorName, setEditingInvestorName] = useState('');
+  const [editingInvestorEmail, setEditingInvestorEmail] = useState('');
+  const [editingInvestorUnits, setEditingInvestorUnits] = useState<string>('');
+  const [editingInvestorMailing, setEditingInvestorMailing] = useState('');
+  const [editingInvestorBankName, setEditingInvestorBankName] = useState('');
+  const [editingInvestorBankAccount, setEditingInvestorBankAccount] = useState('');
+  const [editingInvestorBankRouting, setEditingInvestorBankRouting] = useState('');
+  const [editInvestorAddressSuggestions, setEditInvestorAddressSuggestions] = useState<string[]>([]);
+  const [editInvestorAddressLoading, setEditInvestorAddressLoading] = useState(false);
+  const [editInvestorAddressChosen, setEditInvestorAddressChosen] = useState(false);
+  const [editInvestorAddressDirty, setEditInvestorAddressDirty] = useState(false);
+  const [editingInvestorSaving, setEditingInvestorSaving] = useState(false);
+  const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
+  const [projectFilesLoading, setProjectFilesLoading] = useState(false);
+  const [projectFileUploadName, setProjectFileUploadName] = useState('');
+  const [projectFileUploadFile, setProjectFileUploadFile] = useState<File | null>(null);
+  const [projectFileUploading, setProjectFileUploading] = useState(false);
+  const [projectFileDeletingId, setProjectFileDeletingId] = useState<number | null>(null);
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+  const [hoveredProjectFileId, setHoveredProjectFileId] = useState<number | null>(null);
   const [manageSignedMode, setManageSignedMode] = useState(false);
   const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
   const [manageDocumentsMode, setManageDocumentsMode] = useState(false);
@@ -270,10 +270,10 @@ const [hoveredProjectFileId, setHoveredProjectFileId] = useState<number | null>(
   const [hoveredProjectId, setHoveredProjectId] = useState<number | null>(null);
   const [hoveredSignerKey, setHoveredSignerKey] = useState<string | null>(null);
   const [revokingEnvelopes, setRevokingEnvelopes] = useState(false);
-const [newProjectName, setNewProjectName] = useState('');
-const [creatingProject, setCreatingProject] = useState(false);
-const [showProjectForm, setShowProjectForm] = useState(false);
-const addressCache = useRef<Map<string, string[]>>(new Map());
+  const [newProjectName, setNewProjectName] = useState('');
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const addressCache = useRef<Map<string, string[]>>(new Map());
   const [heroEditingField, setHeroEditingField] = useState<'name' | 'address' | 'description' | null>(null);
   const [heroEditingValue, setHeroEditingValue] = useState('');
   const [heroEditingSaving, setHeroEditingSaving] = useState(false);
@@ -287,11 +287,11 @@ const addressCache = useRef<Map<string, string[]>>(new Map());
   const [heroMenuHovered, setHeroMenuHovered] = useState(false);
   const heroMenuRef = useRef<HTMLDivElement | null>(null);
   const heroMenuButtonRef = useRef<HTMLButtonElement | null>(null);
-const newInvestorAddressTimeout = useRef<NodeJS.Timeout | null>(null);
-const editInvestorAddressTimeout = useRef<NodeJS.Timeout | null>(null);
-const newInvestorAddressController = useRef<AbortController | null>(null);
-const editInvestorAddressController = useRef<AbortController | null>(null);
-const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors' | 'audit'>('documents');
+  const newInvestorAddressTimeout = useRef<NodeJS.Timeout | null>(null);
+  const editInvestorAddressTimeout = useRef<NodeJS.Timeout | null>(null);
+  const newInvestorAddressController = useRef<AbortController | null>(null);
+  const editInvestorAddressController = useRef<AbortController | null>(null);
+  const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors' | 'audit'>('documents');
   const [deletingInvestors, setDeletingInvestors] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
@@ -301,10 +301,10 @@ const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' 
   const [initialPageReady, setInitialPageReady] = useState(false);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
-const [auditEvents, setAuditEvents] = useState<
-  Array<{
-    id: number;
-    action: string;
+  const [auditEvents, setAuditEvents] = useState<
+    Array<{
+      id: number;
+      action: string;
       resource_type: string | null;
       resource_id: string | null;
       actor_type: string;
@@ -315,19 +315,19 @@ const [auditEvents, setAuditEvents] = useState<
       payload_json?: string | null;
     }>
   >([]);
-const [auditPage, setAuditPage] = useState(1);
-const [auditTotal, setAuditTotal] = useState(0);
-const auditLimit = 20;
-const [auditFilters, setAuditFilters] = useState({ action: '', resource: '', actor: '', status: '', search: '' });
-const [auditRetentionDays, setAuditRetentionDays] = useState(30);
-const [auditDateFrom, setAuditDateFrom] = useState('');
-const [auditDateTo, setAuditDateTo] = useState('');
-const [auditRefreshKey, setAuditRefreshKey] = useState(0);
- 
-const newInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
-const newInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
-const editInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
-const editInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const auditLimit = 20;
+  const [auditFilters, setAuditFilters] = useState({ action: '', resource: '', actor: '', status: '', search: '' });
+  const [auditRetentionDays, setAuditRetentionDays] = useState(30);
+  const [auditDateFrom, setAuditDateFrom] = useState('');
+  const [auditDateTo, setAuditDateTo] = useState('');
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
+
+  const newInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
+  const newInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
+  const editInvestorAddressRef = useRef<HTMLTextAreaElement | null>(null);
+  const editInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
   const clearError = () => setError(null);
   const closeDrawers = () => {
     setProjectDrawerOpen(false);
@@ -437,8 +437,8 @@ const editInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
         const suggestions =
           Array.isArray(data?.suggestions)
             ? data.suggestions
-                .map((item: { label?: string }) => item?.label)
-                .filter((label: string | undefined): label is string => Boolean(label))
+              .map((item: { label?: string }) => item?.label)
+              .filter((label: string | undefined): label is string => Boolean(label))
             : [];
         addressCache.current.set(trimmed.toLowerCase(), suggestions);
         setHeroAddressSuggestions(suggestions);
@@ -492,8 +492,8 @@ const editInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
         const suggestions =
           Array.isArray(data?.suggestions)
             ? data.suggestions
-                .map((item: { label?: string }) => item?.label)
-                .filter((label: string | undefined): label is string => Boolean(label))
+              .map((item: { label?: string }) => item?.label)
+              .filter((label: string | undefined): label is string => Boolean(label))
             : [];
         addressCache.current.set(trimmed.toLowerCase(), suggestions);
         setNewInvestorAddressSuggestions(suggestions);
@@ -559,8 +559,8 @@ const editInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
         const suggestions =
           Array.isArray(data?.suggestions)
             ? data.suggestions
-                .map((item: { label?: string }) => item?.label)
-                .filter((label: string | undefined): label is string => Boolean(label))
+              .map((item: { label?: string }) => item?.label)
+              .filter((label: string | undefined): label is string => Boolean(label))
             : [];
         addressCache.current.set(trimmed.toLowerCase(), suggestions);
         setEditInvestorAddressSuggestions(suggestions);
@@ -798,10 +798,10 @@ const editInvestorSuggestionsRef = useRef<HTMLDivElement | null>(null);
     saveEnvelopeSummary(envelopeId, draft);
   };
 
-useEffect(() => {
-  if (!adminVerified || !adminToken) return;
-  loadProjects(projectParamId);
-}, [adminVerified, adminToken, projectParamId]);
+  useEffect(() => {
+    if (!adminVerified || !adminToken) return;
+    loadProjects(projectParamId);
+  }, [adminVerified, adminToken, projectParamId]);
 
   useEffect(() => {
     if (!adminToken) return;
@@ -846,24 +846,24 @@ useEffect(() => {
     };
   }, [selectedProjectId, adminToken]);
 
-useEffect(() => {
-  if (!selectedProjectId || !adminToken) {
-    setProjectFiles([]);
-    return;
-  }
-  loadProjectFiles(selectedProjectId);
-}, [selectedProjectId, adminToken]);
+  useEffect(() => {
+    if (!selectedProjectId || !adminToken) {
+      setProjectFiles([]);
+      return;
+    }
+    loadProjectFiles(selectedProjectId);
+  }, [selectedProjectId, adminToken]);
 
-useEffect(() => {
-  setCenterTab('documents');
-}, [selectedProjectId]);
+  useEffect(() => {
+    setCenterTab('documents');
+  }, [selectedProjectId]);
 
-useEffect(() => {
-  if (centerTab === 'audit') {
-    setAuditPage(1);
-    setAuditRefreshKey((prev) => prev + 1);
-  }
-}, [centerTab, selectedProjectId]);
+  useEffect(() => {
+    if (centerTab === 'audit') {
+      setAuditPage(1);
+      setAuditRefreshKey((prev) => prev + 1);
+    }
+  }, [centerTab, selectedProjectId]);
   useEffect(() => {
     clearError();
   }, [centerTab]);
@@ -1959,10 +1959,10 @@ useEffect(() => {
             project.status === 'active'
               ? '#22c55e'
               : project.status === 'funding'
-              ? '#f97316'
-              : project.status === 'completed'
-              ? '#94a3b8'
-              : '#a5b4fc';
+                ? '#f97316'
+                : project.status === 'completed'
+                  ? '#94a3b8'
+                  : '#a5b4fc';
           const investorsLabel =
             selectedProjectId === project.id ? `${investors.length} investor${investors.length === 1 ? '' : 's'}` : 'Investors';
           const badgeLabel =
@@ -1988,8 +1988,8 @@ useEffect(() => {
                 boxShadow: active
                   ? '0 25px 45px rgba(59,130,246,0.25)'
                   : hovered
-                  ? '0 20px 38px rgba(15,23,42,0.1)'
-                  : '0 6px 18px rgba(15,23,42,0.05)',
+                    ? '0 20px 38px rgba(15,23,42,0.1)'
+                    : '0 6px 18px rgba(15,23,42,0.05)',
                 cursor: 'pointer',
                 transition: 'border 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
               }}
@@ -2316,51 +2316,51 @@ useEffect(() => {
               onMouseLeave={() => setHeroMenuHoveredItem(null)}
               onFocus={() => setHeroMenuHoveredItem('delete')}
               onBlur={() => setHeroMenuHoveredItem(null)}
-            style={{
-              border: 'none',
-              borderRadius: 8,
-              padding: '10px 12px',
-              background:
-                !selectedProjectId || actionLoading
-                  ? 'rgba(255,255,255,0.08)'
-                  : heroMenuHoveredItem === 'delete'
-                    ? 'rgba(255,255,255,0.18)'
-                    : 'rgba(255,255,255,0.1)',
-              color: !selectedProjectId || actionLoading ? 'rgba(255,255,255,0.5)' : '#fff',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: !selectedProjectId || actionLoading ? 'not-allowed' : 'pointer',
-              textAlign: 'left',
-              boxShadow: 'none',
-              transition: 'background 0.15s ease',
-            }}
-          >
-            Delete project
-          </button>
-          <button
-            type="button"
-            onClick={handleHeroLogout}
-            onMouseEnter={() => setHeroMenuHoveredItem('logout')}
-            onMouseLeave={() => setHeroMenuHoveredItem(null)}
-            onFocus={() => setHeroMenuHoveredItem('logout')}
-            onBlur={() => setHeroMenuHoveredItem(null)}
-            style={{
-              border: 'none',
-              borderRadius: 8,
-              padding: '10px 12px',
-              background:
-                heroMenuHoveredItem === 'logout' ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.1)',
-              color: '#fff',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              textAlign: 'left',
-              boxShadow: 'none',
-              transition: 'background 0.15s ease',
-            }}
-          >
-            Sign out
-          </button>
+              style={{
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 12px',
+                background:
+                  !selectedProjectId || actionLoading
+                    ? 'rgba(255,255,255,0.08)'
+                    : heroMenuHoveredItem === 'delete'
+                      ? 'rgba(255,255,255,0.18)'
+                      : 'rgba(255,255,255,0.1)',
+                color: !selectedProjectId || actionLoading ? 'rgba(255,255,255,0.5)' : '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: !selectedProjectId || actionLoading ? 'not-allowed' : 'pointer',
+                textAlign: 'left',
+                boxShadow: 'none',
+                transition: 'background 0.15s ease',
+              }}
+            >
+              Delete project
+            </button>
+            <button
+              type="button"
+              onClick={handleHeroLogout}
+              onMouseEnter={() => setHeroMenuHoveredItem('logout')}
+              onMouseLeave={() => setHeroMenuHoveredItem(null)}
+              onFocus={() => setHeroMenuHoveredItem('logout')}
+              onBlur={() => setHeroMenuHoveredItem(null)}
+              style={{
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 12px',
+                background:
+                  heroMenuHoveredItem === 'logout' ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.1)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                textAlign: 'left',
+                boxShadow: 'none',
+                transition: 'background 0.15s ease',
+              }}
+            >
+              Sign out
+            </button>
           </div>
         )}
       </div>
@@ -2866,292 +2866,292 @@ useEffect(() => {
               gap: isMobile ? 20 : 32,
             }}
           >
-          <div
-            style={{
-              borderRadius: isMobile ? 18 : 32,
-              background: 'inherit',
-              border: '1px solid transparent',
-              boxShadow: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 18,
-              padding: isMobile ? 8 : 12,
-            }}
-          >
             <div
               style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? 'repeat(auto-fit, minmax(160px, 1fr))' : 'repeat(4, minmax(0, 1fr))',
-                gap: 10,
-                marginBottom: isMobile ? 4 : 8,
+                borderRadius: isMobile ? 18 : 32,
+                background: 'inherit',
+                border: '1px solid transparent',
+                boxShadow: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 18,
+                padding: isMobile ? 8 : 12,
               }}
             >
-              {docStats.map((stat) => (
-                <div
-                  key={stat.label}
-                  style={{
-                    background: '#fff',
-                    borderRadius: 16,
-                    border: '1px solid #e2e8f0',
-                    padding: isMobile ? 14 : 18,
-                    boxShadow: '0 12px 20px rgba(15,23,42,0.08)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
-                >
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? 'repeat(auto-fit, minmax(160px, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+                  gap: 10,
+                  marginBottom: isMobile ? 4 : 8,
+                }}
+              >
+                {docStats.map((stat) => (
                   <div
+                    key={stat.label}
                     style={{
-                      width: 44,
-                      height: 44,
+                      background: '#fff',
                       borderRadius: 16,
-                      background: stat.iconBg,
-                      color: stat.iconColor,
+                      border: '1px solid #e2e8f0',
+                      padding: isMobile ? 14 : 18,
+                      boxShadow: '0 12px 20px rgba(15,23,42,0.08)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      gap: 12,
                     }}
                   >
-                    {stat.icon}
-                  </div>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>{stat.label}</p>
-                    <strong style={{ fontSize: 28, marginTop: 4, display: 'block' }}>{stat.value}</strong>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <header
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-start',
-                alignItems: 'center',
-                paddingBottom: 16,
-                borderBottom: '1px solid #e2e8f0',
-              }}
-            >
-              <div
-                style={{
-                  display: 'inline-flex',
-                  gap: 4,
-                  padding: 4,
-                  borderRadius: 999,
-                  background: '#e0e7ff',
-                  border: '1px solid #c7d2fe',
-                  width: isMobile ? '100%' : 'auto',
-                  overflowX: isMobile ? 'auto' : 'visible',
-                }}
-              >
-                {(
-                  [
-                    { id: 'documents', label: 'Documents' },
-                    { id: 'signatures', label: 'Signatures' },
-                    { id: 'investors', label: 'Investors' },
-                    { id: 'share', label: 'Share' },
-                    { id: 'audit', label: 'Logs' },
-                  ] as Array<{ id: TabId; label: string }>
-                ).map((tab) => {
-                  const active = centerTab === tab.id;
-                  const iconColor = active ? palette.text : palette.accentMuted;
-                  const iconSrc = TAB_ICONS[tab.id];
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      data-testid={`tab-${tab.id}`}
-                      onClick={() => setCenterTab(tab.id)}
+                    <div
                       style={{
-                        borderRadius: 999,
-                        border: '1px solid transparent',
-                        padding: '8px 18px',
-                        fontSize: 13,
-                        display: 'inline-flex',
+                        width: 44,
+                        height: 44,
+                        borderRadius: 16,
+                        background: stat.iconBg,
+                        color: stat.iconColor,
+                        display: 'flex',
                         alignItems: 'center',
-                        gap: 8,
-                        background: active ? '#fff' : 'transparent',
-                        color: active ? palette.text : palette.accentMuted,
-                        cursor: 'pointer',
-                        fontWeight: active ? 600 : 500,
-                        flex: isMobile ? '0 0 auto' : undefined,
-                        whiteSpace: 'nowrap',
-                        boxShadow: active ? '0 12px 24px rgba(15,23,42,0.12)' : 'none',
+                        justifyContent: 'center',
                       }}
                     >
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          display: 'inline-block',
-                          backgroundColor: iconColor,
-                          maskImage: `url(${iconSrc})`,
-                          WebkitMaskImage: `url(${iconSrc})`,
-                          maskRepeat: 'no-repeat',
-                          WebkitMaskRepeat: 'no-repeat',
-                          maskPosition: 'center',
-                          WebkitMaskPosition: 'center',
-                          maskSize: 'contain',
-                          WebkitMaskSize: 'contain',
-                        }}
-                      />
-                      {tab.label}
-                    </button>
-                  );
-                })}
+                      {stat.icon}
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>{stat.label}</p>
+                      <strong style={{ fontSize: 28, marginTop: 4, display: 'block' }}>{stat.value}</strong>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </header>
-            {error && (
-              <div
+              <header
                 style={{
-                  color: '#b91c1c',
-                  background: '#fef2f2',
-                  border: '1px solid #fecdd3',
-                  borderRadius: 12,
-                  padding: '10px 12px',
                   display: 'flex',
+                  justifyContent: 'flex-start',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
+                  paddingBottom: 16,
+                  borderBottom: '1px solid #e2e8f0',
                 }}
               >
-                <span>{error}</span>
-                <button
-                  type="button"
-                  onClick={clearError}
-                  style={{
-                    border: 'none',
-                    background: '#fff',
-                    color: '#b91c1c',
-                    borderRadius: 999,
-                    padding: '4px 10px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
-            {centerTab === 'signatures' && selectedProject && (
-              <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <div
                   style={{
+                    display: 'inline-flex',
+                    gap: 4,
+                    padding: 4,
+                    borderRadius: 999,
+                    background: '#e0e7ff',
+                    border: '1px solid #c7d2fe',
+                    width: isMobile ? '100%' : 'auto',
+                    overflowX: isMobile ? 'auto' : 'visible',
+                  }}
+                >
+                  {(
+                    [
+                      { id: 'documents', label: 'Documents' },
+                      { id: 'signatures', label: 'Signatures' },
+                      { id: 'investors', label: 'Investors' },
+                      { id: 'share', label: 'Share' },
+                      { id: 'audit', label: 'Logs' },
+                    ] as Array<{ id: TabId; label: string }>
+                  ).map((tab) => {
+                    const active = centerTab === tab.id;
+                    const iconColor = active ? palette.text : palette.accentMuted;
+                    const iconSrc = TAB_ICONS[tab.id];
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        data-testid={`tab-${tab.id}`}
+                        onClick={() => setCenterTab(tab.id)}
+                        style={{
+                          borderRadius: 999,
+                          border: '1px solid transparent',
+                          padding: '8px 18px',
+                          fontSize: 13,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          background: active ? '#fff' : 'transparent',
+                          color: active ? palette.text : palette.accentMuted,
+                          cursor: 'pointer',
+                          fontWeight: active ? 600 : 500,
+                          flex: isMobile ? '0 0 auto' : undefined,
+                          whiteSpace: 'nowrap',
+                          boxShadow: active ? '0 12px 24px rgba(15,23,42,0.12)' : 'none',
+                        }}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            width: 16,
+                            height: 16,
+                            display: 'inline-block',
+                            backgroundColor: iconColor,
+                            maskImage: `url(${iconSrc})`,
+                            WebkitMaskImage: `url(${iconSrc})`,
+                            maskRepeat: 'no-repeat',
+                            WebkitMaskRepeat: 'no-repeat',
+                            maskPosition: 'center',
+                            WebkitMaskPosition: 'center',
+                            maskSize: 'contain',
+                            WebkitMaskSize: 'contain',
+                          }}
+                        />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </header>
+              {error && (
+                <div
+                  style={{
+                    color: '#b91c1c',
+                    background: '#fef2f2',
+                    border: '1px solid #fecdd3',
+                    borderRadius: 12,
+                    padding: '10px 12px',
                     display: 'flex',
-                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
                     gap: 12,
                   }}
                 >
-                  <div>
-                    <h3 style={{ margin: 0 }}>Signatures & Packets</h3>
-                    <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>Monitor outgoing envelopes and completed packets.</p>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end', width: isMobile ? '100%' : 'auto' }}>
-                    <button
-                      type="button"
-                      onClick={goToRequestSign}
-                      disabled={!canRequestSignatures}
-                      style={{ ...primaryPillCTA(canRequestSignatures), width: isMobile ? '100%' : undefined }}
-                      title={
-                        canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
-                      }
-                    >
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          display: 'inline-block',
-                          backgroundColor: canRequestSignatures ? '#fff' : palette.accentMuted,
-                          maskImage: 'url(/icons/signature.svg)',
-                          WebkitMaskImage: 'url(/icons/signature.svg)',
-                          maskRepeat: 'no-repeat',
-                          WebkitMaskRepeat: 'no-repeat',
-                          maskPosition: 'center',
-                          WebkitMaskPosition: 'center',
-                          maskSize: 'contain',
-                          WebkitMaskSize: 'contain',
-                        }}
-                      />
-                      Request signatures
-                    </button>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 10,
-                    justifyContent: isMobile ? 'flex-start' : 'flex-end',
-                    alignItems: 'center',
-                  }}
-                >
+                  <span>{error}</span>
                   <button
-                    data-testid="signatures-manage-toggle"
                     type="button"
-                    onClick={toggleDocumentsManage}
-                    disabled={!hasSignaturesAvailable}
+                    onClick={clearError}
                     style={{
+                      border: 'none',
+                      background: '#fff',
+                      color: '#b91c1c',
                       borderRadius: 999,
-                      border: `1px solid ${palette.border}`,
-                      padding: '6px 14px',
-                      background: manageDocumentsMode ? palette.accent : '#fff',
-                      color: manageDocumentsMode ? '#fff' : palette.text,
+                      padding: '4px 10px',
+                      cursor: 'pointer',
                       fontWeight: 600,
-                      cursor: hasSignaturesAvailable ? 'pointer' : 'not-allowed',
-                      opacity: hasSignaturesAvailable ? 1 : 0.6,
                     }}
                   >
-                    {manageDocumentsMode ? 'Done' : 'Manage'}
+                    Dismiss
                   </button>
-                  {manageDocumentsMode && (
-                    <button
-                      data-testid="signatures-delete-selected"
-                      type="button"
-                      onClick={deleteSelectedDocuments}
-                      disabled={
-                        (!selectedFinalIds.length && !selectedEnvelopeIds.length) || actionLoading || revokingEnvelopes
-                      }
-                      style={{
-                        borderRadius: 999,
-                        border: '1px solid #dc2626',
-                        padding: '6px 14px',
-                        background: '#dc2626',
-                        color: '#fff',
-                        fontWeight: 600,
-                        cursor:
-                          !selectedFinalIds.length && !selectedEnvelopeIds.length ? 'not-allowed' : 'pointer',
-                        opacity: !selectedFinalIds.length && !selectedEnvelopeIds.length ? 0.5 : 1,
-                      }}
-                    >
-                      {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete'}
-                    </button>
-                  )}
                 </div>
-                {!hasSignaturesAvailable ? (
+              )}
+              {centerTab === 'signatures' && selectedProject && (
+                <section style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div
                     style={{
-                      padding: 28,
-                      border: '1px dashed rgba(148,163,184,0.45)',
-                      borderRadius: 16,
-                      textAlign: 'center',
-                      color: palette.accentMuted,
-                      background: '#fff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 12,
                     }}
                   >
-                    Upload a PDF and add investors to start sending signature requests.
+                    <div>
+                      <h3 style={{ margin: 0 }}>Signatures & Packets</h3>
+                      <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>Monitor outgoing envelopes and completed packets.</p>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end', width: isMobile ? '100%' : 'auto' }}>
+                      <button
+                        type="button"
+                        onClick={goToRequestSign}
+                        disabled={!canRequestSignatures}
+                        style={{ ...primaryPillCTA(canRequestSignatures), width: isMobile ? '100%' : undefined }}
+                        title={
+                          canRequestSignatures ? 'Launch the Request Sign flow' : 'Add investors first to request signatures'
+                        }
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            width: 16,
+                            height: 16,
+                            display: 'inline-block',
+                            backgroundColor: canRequestSignatures ? '#fff' : palette.accentMuted,
+                            maskImage: 'url(/icons/signature.svg)',
+                            WebkitMaskImage: 'url(/icons/signature.svg)',
+                            maskRepeat: 'no-repeat',
+                            WebkitMaskRepeat: 'no-repeat',
+                            maskPosition: 'center',
+                            WebkitMaskPosition: 'center',
+                            maskSize: 'contain',
+                            WebkitMaskSize: 'contain',
+                          }}
+                        />
+                        Request signatures
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      justifyContent: isMobile ? 'flex-start' : 'flex-end',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <button
+                      data-testid="signatures-manage-toggle"
+                      type="button"
+                      onClick={toggleDocumentsManage}
+                      disabled={!hasSignaturesAvailable}
+                      style={{
+                        borderRadius: 999,
+                        border: `1px solid ${palette.border}`,
+                        padding: '6px 14px',
+                        background: manageDocumentsMode ? palette.accent : '#fff',
+                        color: manageDocumentsMode ? '#fff' : palette.text,
+                        fontWeight: 600,
+                        cursor: hasSignaturesAvailable ? 'pointer' : 'not-allowed',
+                        opacity: hasSignaturesAvailable ? 1 : 0.6,
+                      }}
+                    >
+                      {manageDocumentsMode ? 'Done' : 'Manage'}
+                    </button>
+                    {manageDocumentsMode && (
+                      <button
+                        data-testid="signatures-delete-selected"
+                        type="button"
+                        onClick={deleteSelectedDocuments}
+                        disabled={
+                          (!selectedFinalIds.length && !selectedEnvelopeIds.length) || actionLoading || revokingEnvelopes
+                        }
+                        style={{
+                          borderRadius: 999,
+                          border: '1px solid #dc2626',
+                          padding: '6px 14px',
+                          background: '#dc2626',
+                          color: '#fff',
+                          fontWeight: 600,
+                          cursor:
+                            !selectedFinalIds.length && !selectedEnvelopeIds.length ? 'not-allowed' : 'pointer',
+                          opacity: !selectedFinalIds.length && !selectedEnvelopeIds.length ? 0.5 : 1,
+                        }}
+                      >
+                        {actionLoading || revokingEnvelopes ? 'Deleting…' : 'Delete'}
+                      </button>
+                    )}
+                  </div>
+                  {!hasSignaturesAvailable ? (
+                    <div
+                      style={{
+                        padding: 28,
+                        border: '1px dashed rgba(148,163,184,0.45)',
+                        borderRadius: 16,
+                        textAlign: 'center',
+                        color: palette.accentMuted,
+                        background: '#fff',
+                      }}
+                    >
+                      Upload a PDF and add investors to start sending signature requests.
+                    </div>
+                  ) : (
+                    <>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {documentEntries.map((entry) => {
-                          const isAwaiting = entry.kind === 'awaiting';
-                          const final = entry.kind === 'signed' ? entry.final : null;
-                          const envelopeRecord = isAwaiting
-                            ? entry.env
-                            : envelopeMap[final!.envelope_id] ??
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {documentEntries.map((entry) => {
+                            const isAwaiting = entry.kind === 'awaiting';
+                            const final = entry.kind === 'signed' ? entry.final : null;
+                            const envelopeRecord = isAwaiting
+                              ? entry.env
+                              : envelopeMap[final!.envelope_id] ??
                               ({
                                 id: final?.envelope_id ?? 0,
                                 subject: final?.document_name ?? 'Signed packet',
@@ -3164,842 +3164,404 @@ useEffect(() => {
                                 completed_signers: 0,
                                 signers: [],
                               } as EnvelopeSummary);
-                          if (!envelopeRecord) return null;
-                          const envelopeId = envelopeRecord.id;
-                          const finalId = final?.envelope_id ?? envelopeId;
-                          const expanded = isAwaiting
-                            ? expandedEnvelopes[envelopeId] ?? false
-                            : expandedFinals[finalId] ?? false;
-                          const hovered = isAwaiting
-                            ? hoveredEnvelopeId === envelopeId
-                            : hoveredFinalId === finalId;
-                          const selected = isAwaiting
-                            ? selectedEnvelopeIds.includes(envelopeId)
-                            : selectedFinalIds.includes(finalId);
-                          const signerList = envelopeRecord.signers || [];
-                          const signerAvatars = signerList.slice(0, 10);
-                          const extraSigners = Math.max(0, signerList.length - signerAvatars.length);
-                          const totalSigners = envelopeRecord.total_signers || signerList.length || 0;
-                          const completedSigners =
-                            envelopeRecord.completed_signers ??
-                            signerList.filter((signer) => signer.status === 'completed').length;
-                          const progressLabel =
-                            totalSigners > 0 ? `${Math.min(completedSigners, totalSigners)}/${totalSigners} signed` : 'Incomplete setup';
-                          const chipLabel = isAwaiting
-                            ? totalSigners > 0
-                              ? 'Awaiting'
-                              : 'Needs setup'
-                            : 'Completed';
-                          const chipStyle =
-                            isAwaiting && totalSigners === 0
-                              ? { ...awaitingChipStyle, background: '#fef3c7', color: '#92400e' }
-                              : isAwaiting
-                                ? awaitingChipStyle
-                                : completedChipStyle;
-                          const timelineLabel = isAwaiting
-                            ? formatSentLabel(envelopeRecord.created_at)
-                            : `Completed ${formatLocalDateTime(final?.completed_at) ?? 'time unavailable'}`;
-                          const documentLabel = isAwaiting
-                            ? envelopeRecord.document?.filename || 'Untitled PDF'
-                            : final?.document_name || envelopeRecord.document?.filename || 'Signed packet';
-                          const docNameForExt =
-                            isAwaiting && envelopeRecord.document?.filename
-                              ? envelopeRecord.document.filename
-                              : final?.document_name || envelopeRecord.document?.filename || documentLabel;
-                          const fileExtLabel = docNameForExt
-                            ? (docNameForExt.split('.').pop() ?? '').toUpperCase() || 'PDF'
-                            : 'PDF';
-                          const documentUrl = isAwaiting
-                            ? selectedProjectId && envelopeRecord.document?.id
-                              ? `${baseApi}/api/projects/${selectedProjectId}/documents/${envelopeRecord.document.id}/pdf${tokenParam}`
-                              : null
-                            : `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${finalId}/pdf${tokenParam}`;
-                          const showCheckbox = isAwaiting ? manageEnvelopesMode : manageSignedMode;
-                          const showRevoke = isAwaiting && manageEnvelopesMode;
-                          const key = isAwaiting ? `env-${envelopeId}` : `final-${finalId}`;
-                          const handleMouseEnter = () => {
-                            if (isAwaiting) {
-                              setHoveredEnvelopeId(envelopeId);
-                            } else {
-                              setHoveredFinalId(finalId);
-                            }
-                          };
-                          const handleMouseLeave = () => {
-                            if (isAwaiting) {
-                              setHoveredEnvelopeId((prev) => (prev === envelopeId ? null : prev));
-                            } else {
-                              setHoveredFinalId((prev) => (prev === finalId ? null : prev));
-                            }
-                          };
-                          const toggleSelection = () => {
-                            if (isAwaiting) {
-                              toggleEnvelopeSelection(envelopeId);
-                            } else {
-                              toggleFinalSelection(finalId);
-                            }
-                          };
-                          const toggleExpansion = () => {
-                            if (isAwaiting) {
-                              toggleEnvelopeExpansion(envelopeId);
-                            } else {
-                              toggleFinalExpansion(finalId);
-                            }
-                          };
-                          const getSignerColor = (status?: string) => {
-                            if (status === 'completed') return '#22c55e';
-                            if (status === 'declined' || status === 'voided') return '#dc2626';
-                            return '#94a3b8';
-                          };
+                            if (!envelopeRecord) return null;
+                            const envelopeId = envelopeRecord.id;
+                            const finalId = final?.envelope_id ?? envelopeId;
+                            const expanded = isAwaiting
+                              ? expandedEnvelopes[envelopeId] ?? false
+                              : expandedFinals[finalId] ?? false;
+                            const hovered = isAwaiting
+                              ? hoveredEnvelopeId === envelopeId
+                              : hoveredFinalId === finalId;
+                            const selected = isAwaiting
+                              ? selectedEnvelopeIds.includes(envelopeId)
+                              : selectedFinalIds.includes(finalId);
+                            const signerList = envelopeRecord.signers || [];
+                            const signerAvatars = signerList.slice(0, 10);
+                            const extraSigners = Math.max(0, signerList.length - signerAvatars.length);
+                            const totalSigners = envelopeRecord.total_signers || signerList.length || 0;
+                            const completedSigners =
+                              envelopeRecord.completed_signers ??
+                              signerList.filter((signer) => signer.status === 'completed').length;
+                            const progressLabel =
+                              totalSigners > 0 ? `${Math.min(completedSigners, totalSigners)}/${totalSigners} signed` : 'Incomplete setup';
+                            const chipLabel = isAwaiting
+                              ? totalSigners > 0
+                                ? 'Awaiting'
+                                : 'Needs setup'
+                              : 'Completed';
+                            const chipStyle =
+                              isAwaiting && totalSigners === 0
+                                ? { ...awaitingChipStyle, background: '#fef3c7', color: '#92400e' }
+                                : isAwaiting
+                                  ? awaitingChipStyle
+                                  : completedChipStyle;
+                            const timelineLabel = isAwaiting
+                              ? formatSentLabel(envelopeRecord.created_at)
+                              : `Completed ${formatLocalDateTime(final?.completed_at) ?? 'time unavailable'}`;
+                            const documentLabel = isAwaiting
+                              ? envelopeRecord.document?.filename || 'Untitled PDF'
+                              : final?.document_name || envelopeRecord.document?.filename || 'Signed packet';
+                            const docNameForExt =
+                              isAwaiting && envelopeRecord.document?.filename
+                                ? envelopeRecord.document.filename
+                                : final?.document_name || envelopeRecord.document?.filename || documentLabel;
+                            const fileExtLabel = docNameForExt
+                              ? (docNameForExt.split('.').pop() ?? '').toUpperCase() || 'PDF'
+                              : 'PDF';
+                            const documentUrl = isAwaiting
+                              ? selectedProjectId && envelopeRecord.document?.id
+                                ? `${baseApi}/api/projects/${selectedProjectId}/documents/${envelopeRecord.document.id}/pdf${tokenParam}`
+                                : null
+                              : `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${finalId}/pdf${tokenParam}`;
+                            const showCheckbox = isAwaiting ? manageEnvelopesMode : manageSignedMode;
+                            const showRevoke = isAwaiting && manageEnvelopesMode;
+                            const key = isAwaiting ? `env-${envelopeId}` : `final-${finalId}`;
+                            const handleMouseEnter = () => {
+                              if (isAwaiting) {
+                                setHoveredEnvelopeId(envelopeId);
+                              } else {
+                                setHoveredFinalId(finalId);
+                              }
+                            };
+                            const handleMouseLeave = () => {
+                              if (isAwaiting) {
+                                setHoveredEnvelopeId((prev) => (prev === envelopeId ? null : prev));
+                              } else {
+                                setHoveredFinalId((prev) => (prev === finalId ? null : prev));
+                              }
+                            };
+                            const toggleSelection = () => {
+                              if (isAwaiting) {
+                                toggleEnvelopeSelection(envelopeId);
+                              } else {
+                                toggleFinalSelection(finalId);
+                              }
+                            };
+                            const toggleExpansion = () => {
+                              if (isAwaiting) {
+                                toggleEnvelopeExpansion(envelopeId);
+                              } else {
+                                toggleFinalExpansion(finalId);
+                              }
+                            };
+                            const getSignerColor = (status?: string) => {
+                              if (status === 'completed') return '#22c55e';
+                              if (status === 'declined' || status === 'voided') return '#dc2626';
+                              return '#94a3b8';
+                            };
 
-                          return (
-                            <div
-                              key={key}
-                              data-document-kind={isAwaiting ? 'awaiting' : 'signed'}
-                              onMouseEnter={handleMouseEnter}
-                              onMouseLeave={handleMouseLeave}
-                              onClick={() => toggleExpansion()}
-                              role="button"
-                              tabIndex={0}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
-                                  event.preventDefault();
-                                  toggleExpansion();
-                                }
-                              }}
-                              style={{
-                                border: selected || hovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
-                                borderRadius: 14,
-                                padding: 16,
-                                background: '#fff',
-                                boxShadow:
-                                  selected || hovered
-                                    ? '0 10px 22px rgba(37,99,235,0.12)'
-                                    : '0 6px 16px rgba(15,23,42,0.08)',
-                                transition: 'border 0.2s ease, box-shadow 0.2s ease',
-                                cursor: 'pointer',
-                              }}
-                            >
+                            return (
                               <div
+                                key={key}
+                                data-document-kind={isAwaiting ? 'awaiting' : 'signed'}
+                                onMouseEnter={handleMouseEnter}
+                                onMouseLeave={handleMouseLeave}
+                                onClick={() => toggleExpansion()}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    toggleExpansion();
+                                  }
+                                }}
                                 style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'flex-start',
-                                  gap: 12,
-                                  flexWrap: 'wrap',
+                                  border: selected || hovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                                  borderRadius: 14,
+                                  padding: 16,
+                                  background: '#fff',
+                                  boxShadow:
+                                    selected || hovered
+                                      ? '0 10px 22px rgba(37,99,235,0.12)'
+                                      : '0 6px 16px rgba(15,23,42,0.08)',
+                                  transition: 'border 0.2s ease, box-shadow 0.2s ease',
+                                  cursor: 'pointer',
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 260px' }}>
-                                  {showCheckbox && (
-                                    <input
-                                      type="checkbox"
-                                      checked={selected}
-                                      onChange={toggleSelection}
-                                      onClick={(event) => event.stopPropagation()}
-                                    />
-                                  )}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-                                    <div
-                                      style={{
-                                        width: 48,
-                                        height: 48,
-                                        borderRadius: 12,
-                                        background: '#f1f5f9',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                      }}
-                                    >
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="24"
-                                        height="24"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        style={{ color: '#dc2626' }}
-                                      >
-                                        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-                                        <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-                                        <path d="M10 9H8" />
-                                        <path d="M16 13H8" />
-                                        <path d="M16 17H8" />
-                                      </svg>
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                      {documentUrl ? (
-                                        <a
-                                          href={documentUrl}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          style={documentLinkStyle}
-                                          className="admin-document-link"
-                                        >
-                                          <span style={{ fontSize: 16 }}>{documentLabel}</span>
-                                        </a>
-                                      ) : (
-                                        <span style={{ fontSize: 16 }}>{documentLabel}</span>
-                                      )}
-                                      <div
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: 8,
-                                          flexWrap: 'wrap',
-                                          color: palette.accentMuted,
-                                          marginTop: 4,
-                                        }}
-                                      >
-                                        <span
-                                          style={{
-                                            padding: '2px 8px',
-                                            borderRadius: 999,
-                                            background: '#fee2e2',
-                                            color: '#b91c1c',
-                                            fontSize: 11,
-                                            fontWeight: 600,
-                                          }}
-                                        >
-                                          {fileExtLabel}
-                                        </span>
-                                        <span>•</span>
-                                        <span style={{ fontSize: 12 }}>{timelineLabel}</span>
-                                      </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-                                        <span style={chipStyle}>{chipLabel}</span>
-                                        {signerList.length > 0 && (
-                                          <div style={{ display: 'flex', alignItems: 'center' }}>
-                                            {signerAvatars.map((signer, idx) => (
-                                              <div
-                                                key={`${key}-avatar-${signer.id}`}
-                                                title={`${signer.name || signer.email || 'Signer'} - ${signer.status || 'pending'}`}
-                                                style={{
-                                                  width: 28,
-                                                  height: 28,
-                                                  borderRadius: '50%',
-                                                  border: '2px solid #fff',
-                                                  background: getSignerColor(signer.status),
-                                                  color: '#fff',
-                                                  fontWeight: 700,
-                                                  fontSize: 12,
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  marginLeft: idx === 0 ? 0 : -8,
-                                                  textTransform: 'uppercase',
-                                                  boxShadow: '0 6px 14px rgba(15,23,42,0.18)',
-                                                }}
-                                              >
-                                                {(signer.name || signer.email || '?').trim().charAt(0) || '?'}
-                                              </div>
-                                            ))}
-                                            {extraSigners > 0 && (
-                                              <div
-                                                title={`${extraSigners} more signer${extraSigners > 1 ? 's' : ''}`}
-                                                style={{
-                                                  width: 28,
-                                                  height: 28,
-                                                  borderRadius: '50%',
-                                                  border: '2px solid #fff',
-                                                  background: '#1e293b',
-                                                  color: '#fff',
-                                                  fontWeight: 700,
-                                                  fontSize: 11,
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  marginLeft: signerAvatars.length ? -8 : 0,
-                                                  boxShadow: '0 6px 14px rgba(15,23,42,0.18)',
-                                                }}
-                                              >
-                                                +{extraSigners}
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
-                                        {totalSigners > 0 && (
-                                          <span style={{ fontSize: 12, color: palette.accentMuted }}>{progressLabel}</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                                  {totalSigners > 0 && (
-                                    <span style={{ fontSize: 12, color: palette.accentMuted }}>{progressLabel}</span>
-                                  )}
-                                </div>
-                              </div>
-                              {expanded && (
-                                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${palette.border}` }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                    {(() => {
-                                      const summaryDraft = summaryEdits[envelopeId] ?? envelopeRecord.summary ?? '';
-                                      const saving = summarySaving[envelopeId] ?? false;
-                                      const err = summaryError[envelopeId];
-                                      return (
-                                        <div
-                                          onClick={(event) => event.stopPropagation()}
-                                          onKeyDown={(event) => event.stopPropagation()}
-                                          style={{
-                                            padding: 0,
-                                            background: 'transparent',
-                                            border: 'none',
-                                            boxShadow: 'none',
-                                          }}
-                                        >
-                                          <AISummaryCard label="AI summary">
-                                            <textarea
-                                              value={summaryDraft}
-                                              onChange={(event) =>
-                                                setSummaryEdits((prev) => ({ ...prev, [envelopeId]: event.target.value }))
-                                              }
-                                              onBlur={() => handleSummaryBlur(envelopeId)}
-                                              rows={3}
-                                              style={{
-                                                width: '100%',
-                                                marginTop: 6,
-                                                border: `1px solid ${palette.border}`,
-                                                borderRadius: 8,
-                                                padding: 10,
-                                                fontSize: 13,
-                                                fontFamily: 'inherit',
-                                                resize: 'vertical',
-                                                background: '#fff',
-                                              }}
-                                              placeholder="Click to edit the summary for signers."
-                                            />
-                                            {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: '6px 0 0' }}>{err}</p>}
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, alignItems: 'center' }}>
-                                              {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: 0 }}>{err}</p>}
-                                              {saving && (
-                                                <span style={{ fontSize: 12, color: palette.accentMuted }}>
-                                                  Saving…
-                                                </span>
-                                              )}
-                                            </div>
-                                          </AISummaryCard>
-                                        </div>
-                                      );
-                                    })()}
-                                    {signerList.length > 0 && (
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                        {signerList.map((signer) => {
-                                          const completed = signer.status === 'completed';
-                                              return (
-                                                <div
-                                                  key={`${key}-signer-${signer.id}`}
-                                                  style={{
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    gap: 16,
-                                                    flexWrap: 'wrap',
-                                                    fontSize: 13,
-                                                  }}
-                                                >
-                                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <strong style={{ fontSize: 13 }}>{signer.name || 'Unnamed signer'}</strong>
-                                                    <span style={{ color: palette.accentMuted }}>{signer.email || 'Email unavailable'}</span>
-                                                  </div>
-                                                  <div
-                                                    style={{
-                                                      textAlign: 'right',
-                                                      display: 'flex',
-                                                      flexDirection: 'column',
-                                                      gap: 6,
-                                                      alignItems: 'flex-end',
-                                                    }}
-                                                  >
-                                                    <span
-                                                      style={{
-                                                        ...(completed ? completedChipStyle : awaitingChipStyle),
-                                                        border: 'none',
-                                                        padding: '2px 10px',
-                                                        alignSelf: 'flex-end',
-                                                      }}
-                                                    >
-                                                      {completed ? 'Completed' : 'Awaiting'}
-                                                    </span>
-                                                    {signer.completed_at && (
-                                                  <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
-                                                    {formatLocalDateTime(signer.completed_at)}
-                                                  </p>
-                                                )}
-                                                {!completed && signer.magic_link && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={(event) => {
-                                                      event.stopPropagation();
-                                                      copyMagicLink(signer.magic_link);
-                                                    }}
-                                                    style={{
-                                                      border: `1px solid ${palette.border}`,
-                                                      borderRadius: 999,
-                                                      padding: '4px 10px',
-                                                      background: '#fff',
-                                                      color: palette.accent,
-                                                      fontSize: 12,
-                                                      cursor: 'pointer',
-                                                    }}
-                                                  >
-                                                    Copy link
-                                                  </button>
-                                                )}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </section>
-            )}
-          {centerTab === 'signatures' && !selectedProject && (
-            <div
-              style={{
-                padding: 32,
-                border: '1px dashed rgba(148,163,184,0.4)',
-                borderRadius: 16,
-                textAlign: 'center',
-                color: palette.accentMuted,
-              }}
-            >
-              Select a project on the left to review its uploaded PDFs and signed packets.
-            </div>
-          )}
-            {centerTab === 'documents' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                {!selectedProjectId ? (
-                  <div
-                    style={{
-                      padding: isMobile ? 24 : 36,
-                      border: '1px dashed rgba(148,163,184,0.45)',
-                      borderRadius: 20,
-                      textAlign: 'center',
-                      color: palette.accentMuted,
-                      background: '#fff',
-                    }}
-                  >
-                    Select a project to upload documents.
-                  </div>
-                ) : (
-                  <>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: 16,
-                        padding: '8px 4px',
-                      }}
-                    >
-                      <div>
-                        <h3 style={{ margin: 0 }}>Project Documents</h3>
-                        <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>All files and documents related to this project.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowDocumentUpload((prev) => !prev)}
-                        style={primaryPillCTA(true)}
-                      >
-                        <svg
-                          aria-hidden="true"
-                          width={18}
-                          height={18}
-                          style={{
-                            display: 'inline-block',
-                            backgroundColor: '#fff',
-                            maskImage: 'url(/icons/upload.svg)',
-                            WebkitMaskImage: 'url(/icons/upload.svg)',
-                            maskRepeat: 'no-repeat',
-                            WebkitMaskRepeat: 'no-repeat',
-                            maskPosition: 'center',
-                            WebkitMaskPosition: 'center',
-                            maskSize: 'contain',
-                            WebkitMaskSize: 'contain',
-                          }}
-                        />
-                        {showDocumentUpload ? 'Close upload' : 'Upload documents'}
-                      </button>
-                    </div>
-                    {showDocumentUpload && (
-                      <div
-                        style={{
-                          border: '1px dashed rgba(148,163,184,0.45)',
-                          borderRadius: 16,
-                          padding: 16,
-                          background: '#f8fafc',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 12,
-                        }}
-                      >
-                        <input
-                          type="text"
-                          placeholder="Document name"
-                          value={projectFileUploadName}
-                          onChange={(event) => setProjectFileUploadName(event.target.value)}
-                          style={{ padding: 12, borderRadius: 10, border: `1px solid ${palette.border}` }}
-                        />
-                        <label
-                          htmlFor="project-file-upload"
-                          style={{
-                            border: '2px dashed rgba(148,163,184,0.6)',
-                            borderRadius: 12,
-                            padding: '18px 12px',
-                            textAlign: 'center',
-                            color: palette.accentMuted,
-                            cursor: 'pointer',
-                            background: '#fff',
-                          }}
-                        >
-                          Drag & drop files here or click to browse
-                        </label>
-                        <input
-                          id="project-file-upload"
-                          type="file"
-                          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,application/pdf,application/msword,application/vnd.ms-powerpoint,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                          onChange={handleProjectFileSelection}
-                          style={{ display: 'none' }}
-                        />
-                        {projectFileUploadFile && (
-                          <p style={{ margin: 0, fontSize: 13 }}>Selected: {projectFileUploadFile.name}</p>
-                        )}
-                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowDocumentUpload(false);
-                              setProjectFileUploadFile(null);
-                              setProjectFileUploadName('');
-                            }}
-                            style={{ border: 'none', background: 'transparent', color: palette.accentMuted, cursor: 'pointer' }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={uploadProjectFile}
-                            disabled={!projectFileUploadFile || projectFileUploading}
-                            style={{
-                              borderRadius: 10,
-                              border: 'none',
-                              padding: '10px 18px',
-                              background: !projectFileUploadFile || projectFileUploading ? 'rgba(37,99,235,0.35)' : palette.accent,
-                              color: '#fff',
-                              fontWeight: 600,
-                              cursor: !projectFileUploadFile || projectFileUploading ? 'not-allowed' : 'pointer',
-                            }}
-                          >
-                            {projectFileUploading ? 'Uploading…' : 'Upload'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {projectFilesLoading ? (
-                        <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
-                          <div className="admin-loading-spinner" />
-                        </div>
-                      ) : hasProjectFiles ? (
-                        projectFiles.map((file) => {
-                          const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/files/${file.id}/download${tokenParam}`;
-                          const deleting = projectFileDeletingId === file.id;
-                          const hovered = hoveredProjectFileId === file.id;
-                          const ext = (file.display_name || file.stored_filename || '').split('.').pop()?.toUpperCase() || 'FILE';
-                          return (
-                            <div
-                              key={file.id}
-                              style={{
-                                border: hovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
-                                borderRadius: 16,
-                                padding: 16,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 16,
-                                flexWrap: 'wrap',
-                                background: '#fff',
-                                transition: 'border 0.2s ease, background 0.2s ease',
-                              }}
-                              onMouseEnter={() => setHoveredProjectFileId(file.id)}
-                              onMouseLeave={() => setHoveredProjectFileId((prev) => (prev === file.id ? null : prev))}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 220px' }}>
                                 <div
                                   style={{
-                                    width: 48,
-                                    height: 48,
-                                    borderRadius: 12,
-                                    background: '#f1f5f9',
                                     display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'flex-start',
+                                    gap: 12,
+                                    flexWrap: 'wrap',
                                   }}
                                 >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    style={{ color: '#dc2626' }}
-                                  >
-                                    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-                                    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-                                    <path d="M10 9H8" />
-                                    <path d="M16 13H8" />
-                                    <path d="M16 17H8" />
-                                  </svg>
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                  <a
-                                    href={downloadUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="admin-document-link"
-                                    style={documentLinkStyle}
-                                  >
-                                    {file.display_name}
-                                  </a>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: palette.accentMuted }}>
-                                    <span
-                                      style={{
-                                        padding: '2px 8px',
-                                        borderRadius: 999,
-                                        background: '#fee2e2',
-                                        color: '#b91c1c',
-                                        fontSize: 11,
-                                        fontWeight: 600,
-                                      }}
-                                    >
-                                      {ext}
-                                    </span>
-                                    <span>•</span>
-                                    <span>Uploaded {formatLocalDateTime(file.uploaded_at) ?? 'time unavailable'}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 260px' }}>
+                                    {showCheckbox && (
+                                      <input
+                                        type="checkbox"
+                                        checked={selected}
+                                        onChange={toggleSelection}
+                                        onClick={(event) => event.stopPropagation()}
+                                      />
+                                    )}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                                      <div
+                                        style={{
+                                          width: 48,
+                                          height: 48,
+                                          borderRadius: 12,
+                                          background: '#f1f5f9',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}
+                                      >
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="24"
+                                          height="24"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          style={{ color: '#dc2626' }}
+                                        >
+                                          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                                          <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                                          <path d="M10 9H8" />
+                                          <path d="M16 13H8" />
+                                          <path d="M16 17H8" />
+                                        </svg>
+                                      </div>
+                                      <div style={{ flex: 1 }}>
+                                        {documentUrl ? (
+                                          <a
+                                            href={documentUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={documentLinkStyle}
+                                            className="admin-document-link"
+                                          >
+                                            <span style={{ fontSize: 16 }}>{documentLabel}</span>
+                                          </a>
+                                        ) : (
+                                          <span style={{ fontSize: 16 }}>{documentLabel}</span>
+                                        )}
+                                        <div
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 8,
+                                            flexWrap: 'wrap',
+                                            color: palette.accentMuted,
+                                            marginTop: 4,
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              padding: '2px 8px',
+                                              borderRadius: 999,
+                                              background: '#fee2e2',
+                                              color: '#b91c1c',
+                                              fontSize: 11,
+                                              fontWeight: 600,
+                                            }}
+                                          >
+                                            {fileExtLabel}
+                                          </span>
+                                          <span>•</span>
+                                          <span style={{ fontSize: 12 }}>{timelineLabel}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+                                          <span style={chipStyle}>{chipLabel}</span>
+                                          {signerList.length > 0 && (
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                              {signerAvatars.map((signer, idx) => (
+                                                <div
+                                                  key={`${key}-avatar-${signer.id}`}
+                                                  title={`${signer.name || signer.email || 'Signer'} - ${signer.status || 'pending'}`}
+                                                  style={{
+                                                    width: 28,
+                                                    height: 28,
+                                                    borderRadius: '50%',
+                                                    border: '2px solid #fff',
+                                                    background: getSignerColor(signer.status),
+                                                    color: '#fff',
+                                                    fontWeight: 700,
+                                                    fontSize: 12,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    marginLeft: idx === 0 ? 0 : -8,
+                                                    textTransform: 'uppercase',
+                                                    boxShadow: '0 6px 14px rgba(15,23,42,0.18)',
+                                                  }}
+                                                >
+                                                  {(signer.name || signer.email || '?').trim().charAt(0) || '?'}
+                                                </div>
+                                              ))}
+                                              {extraSigners > 0 && (
+                                                <div
+                                                  title={`${extraSigners} more signer${extraSigners > 1 ? 's' : ''}`}
+                                                  style={{
+                                                    width: 28,
+                                                    height: 28,
+                                                    borderRadius: '50%',
+                                                    border: '2px solid #fff',
+                                                    background: '#1e293b',
+                                                    color: '#fff',
+                                                    fontWeight: 700,
+                                                    fontSize: 11,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    marginLeft: signerAvatars.length ? -8 : 0,
+                                                    boxShadow: '0 6px 14px rgba(15,23,42,0.18)',
+                                                  }}
+                                                >
+                                                  +{extraSigners}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+
                                   </div>
                                 </div>
+                                {expanded && (
+                                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${palette.border}` }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                      {(() => {
+                                        const summaryDraft = summaryEdits[envelopeId] ?? envelopeRecord.summary ?? '';
+                                        const saving = summarySaving[envelopeId] ?? false;
+                                        const err = summaryError[envelopeId];
+                                        return (
+                                          <div
+                                            onClick={(event) => event.stopPropagation()}
+                                            onKeyDown={(event) => event.stopPropagation()}
+                                            style={{
+                                              padding: 0,
+                                              background: 'transparent',
+                                              border: 'none',
+                                              boxShadow: 'none',
+                                            }}
+                                          >
+                                            <AISummaryCard label="AI summary">
+                                              <textarea
+                                                value={summaryDraft}
+                                                onChange={(event) =>
+                                                  setSummaryEdits((prev) => ({ ...prev, [envelopeId]: event.target.value }))
+                                                }
+                                                onBlur={() => handleSummaryBlur(envelopeId)}
+                                                rows={3}
+                                                style={{
+                                                  width: '100%',
+                                                  marginTop: 6,
+                                                  border: `1px solid ${palette.border}`,
+                                                  borderRadius: 8,
+                                                  padding: 10,
+                                                  fontSize: 13,
+                                                  fontFamily: 'inherit',
+                                                  resize: 'vertical',
+                                                  background: '#fff',
+                                                }}
+                                                placeholder="Click to edit the summary for signers."
+                                              />
+                                              {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: '6px 0 0' }}>{err}</p>}
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, alignItems: 'center' }}>
+                                                {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: 0 }}>{err}</p>}
+                                                {saving && (
+                                                  <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                                                    Saving…
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </AISummaryCard>
+                                          </div>
+                                        );
+                                      })()}
+                                      {signerList.length > 0 && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                          {signerList.map((signer) => {
+                                            const completed = signer.status === 'completed';
+                                            return (
+                                              <div
+                                                key={`${key}-signer-${signer.id}`}
+                                                style={{
+                                                  display: 'flex',
+                                                  justifyContent: 'space-between',
+                                                  gap: 16,
+                                                  flexWrap: 'wrap',
+                                                  fontSize: 13,
+                                                }}
+                                              >
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                  <strong style={{ fontSize: 13 }}>{signer.name || 'Unnamed signer'}</strong>
+                                                  <span style={{ color: palette.accentMuted }}>{signer.email || 'Email unavailable'}</span>
+                                                </div>
+                                                <div
+                                                  style={{
+                                                    textAlign: 'right',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: 6,
+                                                    alignItems: 'flex-end',
+                                                  }}
+                                                >
+                                                  <span
+                                                    style={{
+                                                      ...(completed ? completedChipStyle : awaitingChipStyle),
+                                                      border: 'none',
+                                                      padding: '2px 10px',
+                                                      alignSelf: 'flex-end',
+                                                    }}
+                                                  >
+                                                    {completed ? 'Completed' : 'Awaiting'}
+                                                  </span>
+                                                  {signer.completed_at && (
+                                                    <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>
+                                                      {formatLocalDateTime(signer.completed_at)}
+                                                    </p>
+                                                  )}
+                                                  {!completed && signer.magic_link && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        copyMagicLink(signer.magic_link);
+                                                      }}
+                                                      style={{
+                                                        border: `1px solid ${palette.border}`,
+                                                        borderRadius: 999,
+                                                        padding: '4px 10px',
+                                                        background: '#fff',
+                                                        color: palette.accent,
+                                                        fontSize: 12,
+                                                        cursor: 'pointer',
+                                                      }}
+                                                    >
+                                                      Copy link
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                              <div style={{ display: 'flex', gap: 10 }}>
-                                <button
-                                  type="button"
-                                  onClick={() => deleteProjectFile(file.id)}
-                                  disabled={deleting}
-                                  style={{
-                                    borderRadius: 8,
-                                    border: '1px solid rgba(220,38,38,0.4)',
-                                    padding: '6px 14px',
-                                    background: deleting ? 'rgba(220,38,38,0.12)' : '#fff',
-                                    color: '#dc2626',
-                                    fontSize: 13,
-                                    cursor: deleting ? 'not-allowed' : 'pointer',
-                                  }}
-                                >
-                                  {deleting ? 'Deleting…' : 'Delete'}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div
-                          style={{
-                            padding: 28,
-                            borderRadius: 16,
-                            border: '1px dashed rgba(148,163,184,0.6)',
-                            textAlign: 'center',
-                            color: palette.accentMuted,
-                          }}
-                        >
-                          No documents uploaded yet.
+                            );
+                          })}
                         </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          {centerTab === 'share' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {selectedProject ? (
-                <>
-                  <div
-                    style={{
-                      borderRadius: 24,
-                      border: `1px solid ${palette.border}`,
-                      padding: 24,
-                      background: '#ffffff',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 16,
-                      boxShadow: '0 18px 32px rgba(15,23,42,0.08)',
-                    }}
-                  >
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Project access token</p>
-                      <div
-                        style={{
-                          marginTop: 8,
-                          padding: '10px 14px',
-                          borderRadius: 10,
-                          background: '#f4f5fb',
-                          fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                          fontSize: 13,
-                          color: palette.text,
-                          wordBreak: 'break-all',
-                        }}
-                      >
-                        {selectedProjectToken || 'Not generated yet'}
                       </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        onClick={() => copyProjectToken(selectedProjectToken)}
-                        disabled={!selectedProjectToken}
-                        style={{
-                          borderRadius: 999,
-                          border: `1px solid ${palette.accent}`,
-                          background: selectedProjectToken ? '#ede9ff' : '#f4f4f5',
-                          color: selectedProjectToken ? palette.accent : palette.accentMuted,
-                          padding: '6px 14px',
-                          fontSize: 13,
-                          cursor: selectedProjectToken ? 'pointer' : 'not-allowed',
-                          fontWeight: 600,
-                        }}
-                      >
-                        Copy token
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => selectedProjectId && regenerateProjectToken(selectedProjectId)}
-                        style={{
-                          borderRadius: 999,
-                          border: '1px solid rgba(248,113,113,0.4)',
-                          background: '#fff4f4',
-                          color: '#e11d48',
-                          padding: '6px 14px',
-                          fontSize: 13,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Regenerate token
-                      </button>
-                    </div>
-                    <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>
-                      Share this token with trusted investors for read-only access. Rotating it immediately revokes older tokens.
-                    </p>
-                  </div>
-                  <div
-                    style={{
-                      borderRadius: 24,
-                      border: `1px solid ${palette.border}`,
-                      padding: 24,
-                      background: '#ffffff',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 16,
-                      boxShadow: '0 18px 32px rgba(15,23,42,0.08)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                      <div>
-                        <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Investor link</p>
-                        <p style={{ margin: '4px 0 0', fontSize: 13 }}>
-                          Anyone with this link can view the project dashboard in read-only mode.
-                        </p>
-                      </div>
-                      {shareLink && (
-                        <button
-                          type="button"
-                          onClick={() => copyProjectToken(shareLink)}
-                          style={{
-                            borderRadius: 999,
-                            border: `1px solid ${palette.accent}`,
-                            background: '#ede9ff',
-                            color: palette.accent,
-                            padding: '6px 12px',
-                            fontSize: 12,
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Copy link
-                        </button>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 4,
-                        padding: '12px 14px',
-                        borderRadius: 14,
-                        background: '#f4f5fb',
-                        fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                        fontSize: 13,
-                        color: palette.text,
-                        wordBreak: 'break-all',
-                      }}
-                    >
-                      {shareLink || 'Select a project with an access token.'}
-                    </div>
-                    {shareLink && (
-                      <a
-                        href={shareLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ color: palette.accent, fontSize: 13 }}
-                      >
-                        Open viewer ↗
-                      </a>
-                    )}
-                  </div>
-                  <div
-                    style={{
-                      borderRadius: 16,
-                      border: `1px solid ${palette.border}`,
-                      padding: 20,
-                      background: '#ffffff',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 12,
-                      boxShadow: '0 15px 30px rgba(15,23,42,0.08)',
-                    }}
-                  >
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>API example</p>
-                      <pre
-                        style={{
-                          marginTop: 8,
-                          padding: 16,
-                          borderRadius: 12,
-                          background: '#f4f5fb',
-                          fontSize: 13,
-                          overflowX: 'auto',
-                        }}
-                      >{`curl -H "X-Access-Token: ${selectedProjectToken || '<token>'}" \\\n  ${baseApi}/api/projects/${selectedProjectId}/documents`}</pre>
-                    </div>
-                    <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>
-                      Investors can use the token to download documents or monitor signing status via the API. Admins should keep
-                      their global token private; only share project tokens with stakeholders who should see this project.
-                    </p>
-                  </div>
-                </>
-              ) : (
+                    </>
+                  )}
+                </section>
+              )}
+              {centerTab === 'signatures' && !selectedProject && (
                 <div
                   style={{
                     padding: 32,
@@ -4009,786 +3571,1220 @@ useEffect(() => {
                     color: palette.accentMuted,
                   }}
                 >
-                  Select a project to view and manage its project access token.
+                  Select a project on the left to review its uploaded PDFs and signed packets.
                 </div>
               )}
-            </div>
-          )}
-          {centerTab === 'investors' && (
-            <div className="investor-panel" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <header>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <div>
-                    <h3 style={{ margin: 0 }}>Project Investors</h3>
-                    <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>Investor info and investment amounts.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!selectedProjectId) return;
-                      setShowInvestorForm((prev) => !prev);
-                    }}
-                    disabled={!selectedProjectId}
-                    style={{ ...primaryPillCTA(Boolean(selectedProjectId)), minWidth: isMobile ? '100%' : 180, justifyContent: 'center' }}
-                  >
-                    <span
-                      aria-hidden="true"
+              {centerTab === 'documents' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {!selectedProjectId ? (
+                    <div
                       style={{
-                        width: 16,
-                        height: 16,
-                        display: 'inline-block',
-                        backgroundColor: selectedProjectId ? '#fff' : palette.accentMuted,
-                        maskImage: 'url(/icons/user-plus.svg)',
-                        WebkitMaskImage: 'url(/icons/user-plus.svg)',
-                        maskRepeat: 'no-repeat',
-                        WebkitMaskRepeat: 'no-repeat',
-                        maskPosition: 'center',
-                        WebkitMaskPosition: 'center',
-                        maskSize: 'contain',
-                        WebkitMaskSize: 'contain',
-                      }}
-                    />
-                    {showInvestorForm ? 'Close form' : 'Add investor'}
-                  </button>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 8,
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    marginTop: 12,
-                    justifyContent: isMobile ? 'flex-start' : 'flex-end',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={exportInvestorsCsv}
-                    disabled={!investors.length}
-                    style={{
-                      border: `1px solid ${palette.border}`,
-                      background: investors.length ? '#fff' : '#f1f5f9',
-                      color: investors.length ? palette.text : palette.accentMuted,
-                      borderRadius: 999,
-                      padding: '4px 12px',
-                      fontSize: 12,
-                      cursor: investors.length ? 'pointer' : 'not-allowed',
-                    }}
-                  >
-                    Export CSV
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleInvestorsManage}
-                    disabled={!selectedProjectId}
-                    data-testid="investor-manage-toggle"
-                    style={{
-                      border: `1px solid ${palette.border}`,
-                      background: manageInvestorsMode ? palette.accent : '#fff',
-                      color: !selectedProjectId ? palette.accentMuted : manageInvestorsMode ? '#fff' : palette.text,
-                      borderRadius: 999,
-                      padding: '4px 10px',
-                      fontSize: 12,
-                      cursor: selectedProjectId ? 'pointer' : 'not-allowed',
-                      opacity: selectedProjectId ? 1 : 0.5,
-                      boxShadow: manageInvestorsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
-                    }}
-                  >
-                    {manageInvestorsMode ? 'Done' : 'Manage'}
-                  </button>
-                  {manageInvestorsMode && selectedProjectId && (
-                    <button
-                      type="button"
-                      onClick={deleteSelectedInvestors}
-                      disabled={!selectedInvestorIds.length || deletingInvestors}
-                      data-testid="investor-remove-button"
-                      style={{
-                        border: '1px solid #dc2626',
-                        color: '#fff',
-                        background: deletingInvestors ? 'rgba(220,38,38,0.6)' : '#dc2626',
-                        borderRadius: 999,
-                        padding: '6px 12px',
-                        fontSize: 12,
-                        cursor: !selectedInvestorIds.length || deletingInvestors ? 'not-allowed' : 'pointer',
-                        opacity: !selectedInvestorIds.length && !deletingInvestors ? 0.5 : 1,
+                        padding: isMobile ? 24 : 36,
+                        border: '1px dashed rgba(148,163,184,0.45)',
+                        borderRadius: 20,
+                        textAlign: 'center',
+                        color: palette.accentMuted,
+                        background: '#fff',
                       }}
                     >
-                      {deletingInvestors ? 'Deleting…' : 'Delete'}
-                    </button>
-                  )}
-                </div>
-                {selectedProjectId && <div style={{ height: 4 }} />}
-                {selectedProjectId && showInvestorForm && (
-                  <div
-                    style={{
-                      border: `1px solid ${palette.border}`,
-                      marginTop: 12,
-                      marginBottom: 16,
-                      padding: 16,
-                      borderRadius: 16,
-                      background: '#fff',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                    }}
-                  >
-                    <label style={{ fontSize: 12, fontWeight: 600 }}>Name (required)</label>
-                    <input
-                      type="text"
-                      placeholder="Name"
-                      value={newInvestorName}
-                      onChange={(event) => {
-                        clearError();
-                        setNewInvestorName(event.target.value);
-                      }}
-                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                    />
-                    <label style={{ fontSize: 12, fontWeight: 600 }}>Email (required)</label>
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      value={newInvestorEmail}
-                      onChange={(event) => {
-                        clearError();
-                        setNewInvestorEmail(event.target.value);
-                      }}
-                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                    />
-                    <label style={{ fontSize: 12, fontWeight: 600 }}>Mailing address</label>
-                    <div style={{ position: 'relative' }}>
-                      <textarea
-                      rows={3}
-                      placeholder="Mailing address"
-                      value={newInvestorMailing}
-                      onChange={(event) => setNewInvestorMailing(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !event.shiftKey && newInvestorAddressSuggestions.length > 0) {
-                          setNewInvestorAddressSuggestions([]);
-                          setNewInvestorAddressLoading(false);
-                          setNewInvestorAddressChosen(true);
-                        }
-                      }}
-                      ref={newInvestorAddressRef}
-                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}`, resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
-                    />
-                    {(newInvestorAddressLoading || newInvestorAddressSuggestions.length > 0) && (
+                      Select a project to upload documents.
+                    </div>
+                  ) : (
+                    <>
                       <div
                         style={{
-                            position: 'absolute',
-                            top: '100%',
-                            left: 0,
-                            right: 0,
-                            marginTop: 6,
-                            background: '#fff',
-                            border: `1px solid ${palette.border}`,
-                            borderRadius: 10,
-                            boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
-                            padding: 6,
-                            zIndex: 5,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 6,
-                            maxHeight: 220,
-                            overflowY: 'auto',
-                          }}
-                          ref={newInvestorSuggestionsRef}
-                        >
-                          {newInvestorAddressLoading && (
-                            <span style={{ fontSize: 12, color: palette.accentMuted }}>Searching addresses…</span>
-                          )}
-                          {newInvestorAddressSuggestions.map((suggestion) => (
-                            <button
-                              key={suggestion}
-                              type="button"
-                              onClick={() => {
-                                setNewInvestorMailing(suggestion);
-                            setNewInvestorAddressSuggestions([]);
-                                setNewInvestorAddressLoading(false);
-                                setNewInvestorAddressChosen(true);
-                                }}
-                              style={{
-                                textAlign: 'left',
-                                border: `1px solid ${palette.border}`,
-                                background: '#fff',
-                                borderRadius: 8,
-                                padding: '8px 10px',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                              }}
-                            >
-                              {suggestion}
-                            </button>
-                          ))}
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: 16,
+                          padding: '8px 4px',
+                        }}
+                      >
+                        <div>
+                          <h3 style={{ margin: 0 }}>Project Documents</h3>
+                          <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>All files and documents related to this project.</p>
                         </div>
-                      )}
-                    </div>
-                    <label style={{ fontSize: 12, fontWeight: 600 }}>Units (required)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Units (e.g. 10000)"
-                      value={newInvestorUnits}
-                      onChange={(event) => setNewInvestorUnits(event.target.value)}
-                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Bank name"
-                      value={newInvestorBankName}
-                      onChange={(event) => setNewInvestorBankName(event.target.value)}
-                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Bank account number"
-                      value={newInvestorBankAccount}
-                      onChange={(event) => setNewInvestorBankAccount(event.target.value)}
-                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Routing number"
-                      value={newInvestorBankRouting}
-                      onChange={(event) => setNewInvestorBankRouting(event.target.value)}
-                      style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                    />
-                    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowInvestorForm(false);
-                          resetInvestorForm();
-                        }}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          color: palette.accentMuted,
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={createInvestor}
-                        disabled={creatingInvestor}
-                        style={primaryButtonStyle(!creatingInvestor)}
-                      >
-                        {creatingInvestor ? 'Adding…' : 'Add investor'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </header>
-              {!selectedProjectId ? (
-                <p style={{ color: palette.accentMuted }}>Choose a project to manage investors.</p>
-              ) : investors.length === 0 ? (
-                <div
-                  style={{
-                    padding: 28,
-                    borderRadius: 16,
-                    border: '1px dashed rgba(148,163,184,0.6)',
-                    textAlign: 'center',
-                    color: palette.accentMuted,
-                    background: '#fff',
-                  }}
-                >
-                  No investors linked yet.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {investors.map((investor, idx) => {
-                    const selected = selectedInvestorIds.includes(investor.id);
-                    const editing = editingInvestorId === investor.id;
-                    const hovered = hoveredInvestorId === investor.id;
-                    const cardBorder = selected || editing || hovered ? palette.accent : palette.border;
-                    const highlightBg = hovered || selected ? '#edf2ff' : '#fff';
-                    const initialsSource = (investor.name || investor.email || '?').trim();
-                    const initials = initialsSource ? initialsSource[0]?.toUpperCase() ?? '?' : '?';
-                    const unitsValue =
-                      typeof investor.units_invested === 'number' ? investor.units_invested : null;
-                    const unitsLabel = unitsValue !== null ? `${unitsValue.toLocaleString()} units` : 'Units pending';
-                    const secondaryLabel =
-                      investor.role?.trim() ||
-                      (investor.mailing_address ? investor.mailing_address : 'Role not specified');
-                    return (
-                      <div
-                      key={`${investor.id ?? investor.email ?? investor.name ?? 'investor'}-${idx}`}
-                        style={{
-                          borderRadius: 18,
-                          border: `1px solid ${cardBorder}`,
-                          padding: 16,
-                          background: highlightBg,
-                          boxShadow: highlightBg !== '#fff' ? '0 10px 24px rgba(37,99,235,0.15)' : '0 8px 18px rgba(15,23,42,0.04)',
-                          transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
-                          cursor: manageInvestorsMode ? 'default' : 'pointer',
-                        }}
-                        onMouseEnter={() => setHoveredInvestorId(investor.id)}
-                        onMouseLeave={() => setHoveredInvestorId((prev) => (prev === investor.id ? null : prev))}
-                        onClick={() => {
-                          if (manageInvestorsMode) return;
-                          if (editingInvestorId === investor.id) {
-                            cancelInvestorEdit();
-                            return;
-                          }
-                          beginInvestorEdit(investor);
-                        }}
-                        role={!manageInvestorsMode ? 'button' : undefined}
-                        tabIndex={!manageInvestorsMode ? 0 : undefined}
-                        onKeyDown={(event) => {
-                          if (manageInvestorsMode) return;
-                          if (editingInvestorId === investor.id) return;
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            beginInvestorEdit(investor);
-                          }
-                        }}
-                      >
+                        <button
+                          type="button"
+                          onClick={() => setShowDocumentUpload((prev) => !prev)}
+                          style={primaryPillCTA(true)}
+                        >
+                          <svg
+                            aria-hidden="true"
+                            width={18}
+                            height={18}
+                            style={{
+                              display: 'inline-block',
+                              backgroundColor: '#fff',
+                              maskImage: 'url(/icons/upload.svg)',
+                              WebkitMaskImage: 'url(/icons/upload.svg)',
+                              maskRepeat: 'no-repeat',
+                              WebkitMaskRepeat: 'no-repeat',
+                              maskPosition: 'center',
+                              WebkitMaskPosition: 'center',
+                              maskSize: 'contain',
+                              WebkitMaskSize: 'contain',
+                            }}
+                          />
+                          {showDocumentUpload ? 'Close upload' : 'Upload documents'}
+                        </button>
+                      </div>
+                      {showDocumentUpload && (
                         <div
                           style={{
+                            border: '1px dashed rgba(148,163,184,0.45)',
+                            borderRadius: 16,
+                            padding: 16,
+                            background: '#f8fafc',
                             display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: 16,
-                            flexWrap: 'wrap',
+                            flexDirection: 'column',
+                            gap: 12,
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 240px' }}>
-                            {manageInvestorsMode && (
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={() => toggleInvestorSelection(investor.id)}
-                                style={{ width: 18, height: 18 }}
-                              />
-                            )}
-                            <div
+                          <input
+                            type="text"
+                            placeholder="Document name"
+                            value={projectFileUploadName}
+                            onChange={(event) => setProjectFileUploadName(event.target.value)}
+                            style={{ padding: 12, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                          />
+                          <label
+                            htmlFor="project-file-upload"
+                            style={{
+                              border: '2px dashed rgba(148,163,184,0.6)',
+                              borderRadius: 12,
+                              padding: '18px 12px',
+                              textAlign: 'center',
+                              color: palette.accentMuted,
+                              cursor: 'pointer',
+                              background: '#fff',
+                            }}
+                          >
+                            Drag & drop files here or click to browse
+                          </label>
+                          <input
+                            id="project-file-upload"
+                            type="file"
+                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,application/pdf,application/msword,application/vnd.ms-powerpoint,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            onChange={handleProjectFileSelection}
+                            style={{ display: 'none' }}
+                          />
+                          {projectFileUploadFile && (
+                            <p style={{ margin: 0, fontSize: 13 }}>Selected: {projectFileUploadFile.name}</p>
+                          )}
+                          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowDocumentUpload(false);
+                                setProjectFileUploadFile(null);
+                                setProjectFileUploadName('');
+                              }}
+                              style={{ border: 'none', background: 'transparent', color: palette.accentMuted, cursor: 'pointer' }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={uploadProjectFile}
+                              disabled={!projectFileUploadFile || projectFileUploading}
                               style={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: '50%',
-                                background: 'linear-gradient(135deg, #3b82f6, #a855f7)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
+                                borderRadius: 10,
+                                border: 'none',
+                                padding: '10px 18px',
+                                background: !projectFileUploadFile || projectFileUploading ? 'rgba(37,99,235,0.35)' : palette.accent,
                                 color: '#fff',
-                                fontWeight: 700,
-                                fontSize: 18,
-                                flexShrink: 0,
+                                fontWeight: 600,
+                                cursor: !projectFileUploadFile || projectFileUploading ? 'not-allowed' : 'pointer',
                               }}
                             >
-                              {initials}
-                            </div>
-                            <div>
-                              <p style={{ margin: 0, fontWeight: 600, fontSize: 15 }}>{investor.name || 'Unnamed investor'}</p>
-                              <p style={{ margin: '4px 0 0', color: palette.accentMuted, fontSize: 13 }}>
-                                {investor.email || 'Email unavailable'}
-                              </p>
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right', minWidth: isMobile ? 'auto' : 180 }}>
-                            <p style={{ margin: 0, fontWeight: 600 }}>{unitsLabel}</p>
-                            <p style={{ margin: '4px 0 0', color: palette.accentMuted, fontSize: 13 }}>{secondaryLabel}</p>
+                              {projectFileUploading ? 'Uploading…' : 'Upload'}
+                            </button>
                           </div>
                         </div>
-                        {!editing && (
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {projectFilesLoading ? (
+                          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+                            <div className="admin-loading-spinner" />
+                          </div>
+                        ) : hasProjectFiles ? (
+                          projectFiles.map((file) => {
+                            const downloadUrl = `${baseApi}/api/projects/${selectedProjectId}/files/${file.id}/download${tokenParam}`;
+                            const deleting = projectFileDeletingId === file.id;
+                            const hovered = hoveredProjectFileId === file.id;
+                            const ext = (file.display_name || file.stored_filename || '').split('.').pop()?.toUpperCase() || 'FILE';
+                            return (
+                              <div
+                                key={file.id}
+                                style={{
+                                  border: hovered ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                                  borderRadius: 16,
+                                  padding: 16,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 16,
+                                  flexWrap: 'wrap',
+                                  background: '#fff',
+                                  transition: 'border 0.2s ease, background 0.2s ease',
+                                }}
+                                onMouseEnter={() => setHoveredProjectFileId(file.id)}
+                                onMouseLeave={() => setHoveredProjectFileId((prev) => (prev === file.id ? null : prev))}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 220px' }}>
+                                  <div
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: 12,
+                                      background: '#f1f5f9',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="24"
+                                      height="24"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      style={{ color: '#dc2626' }}
+                                    >
+                                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                                      <path d="M10 9H8" />
+                                      <path d="M16 13H8" />
+                                      <path d="M16 17H8" />
+                                    </svg>
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <a
+                                      href={downloadUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="admin-document-link"
+                                      style={documentLinkStyle}
+                                    >
+                                      {file.display_name}
+                                    </a>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: palette.accentMuted }}>
+                                      <span
+                                        style={{
+                                          padding: '2px 8px',
+                                          borderRadius: 999,
+                                          background: '#fee2e2',
+                                          color: '#b91c1c',
+                                          fontSize: 11,
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        {ext}
+                                      </span>
+                                      <span>•</span>
+                                      <span>Uploaded {formatLocalDateTime(file.uploaded_at) ?? 'time unavailable'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteProjectFile(file.id)}
+                                    disabled={deleting}
+                                    style={{
+                                      borderRadius: 8,
+                                      border: '1px solid rgba(220,38,38,0.4)',
+                                      padding: '6px 14px',
+                                      background: deleting ? 'rgba(220,38,38,0.12)' : '#fff',
+                                      color: '#dc2626',
+                                      fontSize: 13,
+                                      cursor: deleting ? 'not-allowed' : 'pointer',
+                                    }}
+                                  >
+                                    {deleting ? 'Deleting…' : 'Delete'}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
                           <div
                             style={{
-                              display: 'flex',
-                              gap: 12,
-                              flexWrap: 'wrap',
-                              marginTop: 10,
-                              fontSize: 12,
+                              padding: 28,
+                              borderRadius: 16,
+                              border: '1px dashed rgba(148,163,184,0.6)',
+                              textAlign: 'center',
                               color: palette.accentMuted,
                             }}
                           >
-                            {investor.mailing_address && <span>Mailing: {investor.mailing_address}</span>}
-                            {investor.bank_name && <span>Bank: {investor.bank_name}</span>}
-                            {investor.bank_account_number && <span>Acct #: {investor.bank_account_number}</span>}
-                            {investor.bank_routing_number && <span>Routing #: {investor.bank_routing_number}</span>}
+                            No documents uploaded yet.
                           </div>
                         )}
-                        {editing ? (
-                          <div
-                            style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}
-                            onClick={(event) => event.stopPropagation()}
-                            onKeyDown={(event) => event.stopPropagation()}
-                          >
-                            <label style={{ fontSize: 12, fontWeight: 600 }}>Name (required)</label>
-                            <input
-                              type="text"
-                              value={editingInvestorName}
-                              onChange={(event) => {
-                                clearError();
-                                setEditingInvestorName(event.target.value);
-                              }}
-                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                            />
-                            <label style={{ fontSize: 12, fontWeight: 600 }}>Email (required)</label>
-                            <input
-                              type="email"
-                              value={editingInvestorEmail}
-                              onChange={(event) => {
-                                clearError();
-                                setEditingInvestorEmail(event.target.value);
-                              }}
-                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                            />
-                            <label style={{ fontSize: 12, fontWeight: 600 }}>Units (required)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={editingInvestorUnits}
-                              onChange={(event) => setEditingInvestorUnits(event.target.value)}
-                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                            />
-                            <textarea
-                              rows={3}
-                              placeholder="Mailing address"
-                              value={editingInvestorMailing}
-                              onChange={(event) => {
-                                clearError();
-                                setEditingInvestorMailing(event.target.value);
-                                setEditInvestorAddressDirty(true);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter' && !event.shiftKey && editInvestorAddressSuggestions.length > 0) {
-                                  setEditInvestorAddressSuggestions([]);
-                                  setEditInvestorAddressLoading(false);
-                                  setEditInvestorAddressChosen(true);
-                                }
-                              }}
-                              ref={editInvestorAddressRef}
-                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}`, resize: 'vertical' }}
-                            />
-                            {(editInvestorAddressLoading || editInvestorAddressSuggestions.length > 0) && (
-                              <div
-                                style={{
-                                  position: 'relative',
-                                  width: '100%',
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    top: 6,
-                                    left: 0,
-                                    right: 0,
-                                    background: '#fff',
-                                    border: `1px solid ${palette.border}`,
-                                    borderRadius: 10,
-                                    boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
-                                    padding: 6,
-                                    zIndex: 5,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 6,
-                                    maxHeight: 220,
-                                    overflowY: 'auto',
-                                  }}
-                                  ref={editInvestorSuggestionsRef}
-                                >
-                                  {editInvestorAddressLoading && (
-                                    <span style={{ fontSize: 12, color: palette.accentMuted }}>Searching addresses…</span>
-                                  )}
-                                  {editInvestorAddressSuggestions.map((suggestion) => (
-                                    <button
-                                      key={suggestion}
-                                      type="button"
-                                      onClick={() => {
-                                        setEditingInvestorMailing(suggestion);
-                                        setEditInvestorAddressSuggestions([]);
-                                        setEditInvestorAddressLoading(false);
-                                        setEditInvestorAddressChosen(true);
-                                        setEditInvestorAddressDirty(false);
-                                      }}
-                                      style={{
-                                        textAlign: 'left',
-                                        border: `1px solid ${palette.border}`,
-                                        background: '#fff',
-                                        borderRadius: 8,
-                                        padding: '8px 10px',
-                                        cursor: 'pointer',
-                                        fontSize: 12,
-                                      }}
-                                    >
-                                      {suggestion}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            <input
-                              type="text"
-                              placeholder="Bank name"
-                              value={editingInvestorBankName}
-                              onChange={(event) => setEditingInvestorBankName(event.target.value)}
-                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                            />
-                            <input
-                              type="text"
-                              placeholder="Account number"
-                              value={editingInvestorBankAccount}
-                              onChange={(event) => setEditingInvestorBankAccount(event.target.value)}
-                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                            />
-                            <input
-                              type="text"
-                              placeholder="Routing number"
-                              value={editingInvestorBankRouting}
-                              onChange={(event) => setEditingInvestorBankRouting(event.target.value)}
-                              style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
-                            />
-                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  cancelInvestorEdit();
-                                }}
-                                style={{ border: 'none', background: 'transparent', color: palette.accentMuted, cursor: 'pointer' }}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  saveInvestorEdit();
-                                }}
-                                disabled={editingInvestorSaving}
-                                style={{
-                                  border: 'none',
-                                  background: palette.accent,
-                                  color: '#fff',
-                                  borderRadius: 999,
-                                  padding: '6px 14px',
-                                  cursor: editingInvestorSaving ? 'not-allowed' : 'pointer',
-                                }}
-                              >
-                                {editingInvestorSaving ? 'Saving…' : 'Save'}
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
                       </div>
-                    );
-                  })}
+                    </>
+                  )}
                 </div>
               )}
-            </div>
-          )}
-          {centerTab === 'audit' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-              <div>
-                <h3 style={{ margin: 0 }}>Logs</h3>
-                <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>
-                  Project-scoped events with filters. Logs retained for {auditRetentionDays} day{auditRetentionDays === 1 ? '' : 's'}.
-                </p>
-              </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <input
-                    type="text"
-                    placeholder="Search (resource, actor, summary)"
-                    value={auditFilters.search}
-                    onChange={(e) => {
-                      setAuditPage(1);
-                      setAuditFilters((prev) => ({ ...prev, search: e.target.value }));
-                    }}
-                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}`, minWidth: 220 }}
-                  />
-                  <select
-                    value={auditFilters.action}
-                    onChange={(e) => {
-                      setAuditPage(1);
-                      setAuditFilters((prev) => ({ ...prev, action: e.target.value }));
-                    }}
-                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
-                  >
-                    <option value="">Action</option>
-                    <option value="upload">Upload</option>
-                    <option value="send">Send</option>
-                    <option value="revoke">Revoke</option>
-                    <option value="delete">Delete</option>
-                  </select>
-                  <select
-                    value={auditFilters.resource}
-                    onChange={(e) => {
-                      setAuditPage(1);
-                      setAuditFilters((prev) => ({ ...prev, resource: e.target.value }));
-                    }}
-                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
-                  >
-                    <option value="">Resource</option>
-                    <option value="document">Document</option>
-                    <option value="envelope">Envelope</option>
-                    <option value="investor">Investor</option>
-                    <option value="file">File</option>
-                    <option value="token">Token</option>
-                  </select>
-                  <select
-                    value={auditFilters.actor}
-                    onChange={(e) => {
-                      setAuditPage(1);
-                      setAuditFilters((prev) => ({ ...prev, actor: e.target.value }));
-                    }}
-                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
-                  >
-                    <option value="">Actor</option>
-                    <option value="admin_token">Admin token</option>
-                    <option value="project_token">Project token</option>
-                    <option value="system">System</option>
-                  </select>
-                  <select
-                    value={auditFilters.status}
-                    onChange={(e) => {
-                      setAuditPage(1);
-                      setAuditFilters((prev) => ({ ...prev, status: e.target.value }));
-                    }}
-                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
-                  >
-                    <option value="">Status</option>
-                    <option value="success">Success</option>
-                    <option value="fail">Fail</option>
-                  </select>
-                  <input
-                    type="date"
-                    value={auditDateFrom}
-                    onChange={(e) => {
-                      setAuditPage(1);
-                      setAuditDateFrom(e.target.value);
-                    }}
-                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
-                    placeholder="From"
-                  />
-                  <input
-                    type="date"
-                    value={auditDateTo}
-                    onChange={(e) => {
-                      setAuditPage(1);
-                      setAuditDateTo(e.target.value);
-                    }}
-                    style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
-                    placeholder="To"
-                  />
-                </div>
-              </div>
-              {auditError && (
-                <div style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecdd3', borderRadius: 12, padding: '10px 12px' }}>
-                  {auditError}
-                </div>
-              )}
-              {auditLoading ? (
-                <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${palette.border}`, background: '#fff' }}>Loading audit…</div>
-              ) : auditEvents.length === 0 ? (
-                <div style={{ padding: 24, borderRadius: 12, border: `1px dashed ${palette.border}`, background: '#fff', color: palette.accentMuted }}>
-                  No audit events yet.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {auditEvents.map((event) => (
-                    <details
-                      key={event.id}
-                      style={{
-                        border: `1px solid ${palette.border}`,
-                        borderRadius: 12,
-                        padding: 12,
-                        background: '#fff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 10,
-                      }}
-                    >
-                      <summary style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', cursor: 'pointer' }}>
-                        <div style={{ minWidth: 160, fontSize: 12, color: palette.accentMuted }}>{formatLocalDateTime(event.created_at) || event.created_at}</div>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span style={{ ...awaitingChipStyle, background: '#e2e8f0', color: palette.text }}>Action: {event.action}</span>
-                          {event.resource_type && (
-                            <span style={{ ...awaitingChipStyle, background: '#ede9fe', color: palette.text }}>
-                              {event.resource_type}
-                              {event.resource_id ? ` #${event.resource_id}` : ''}
-                            </span>
-                          )}
-                          <span style={{ ...(event.status === 'success' ? completedChipStyle : awaitingChipStyle) }}>
-                            {event.status === 'success' ? 'Success' : 'Fail'}
-                          </span>
-                          <span style={{ ...awaitingChipStyle, background: '#dbeafe', color: '#1d4ed8' }}>Actor: {event.actor_type}</span>
+              {centerTab === 'share' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                  {selectedProject ? (
+                    <>
+                      <div
+                        style={{
+                          borderRadius: 24,
+                          border: `1px solid ${palette.border}`,
+                          padding: 24,
+                          background: '#ffffff',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 16,
+                          boxShadow: '0 18px 32px rgba(15,23,42,0.08)',
+                        }}
+                      >
+                        <div>
+                          <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Project access token</p>
+                          <div
+                            style={{
+                              marginTop: 8,
+                              padding: '10px 14px',
+                              borderRadius: 10,
+                              background: '#f4f5fb',
+                              fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                              fontSize: 13,
+                              color: palette.text,
+                              wordBreak: 'break-all',
+                            }}
+                          >
+                            {selectedProjectToken || 'Not generated yet'}
+                          </div>
                         </div>
-                        {event.summary && <div style={{ flex: 1, fontSize: 13 }}>{event.summary}</div>}
-                      </summary>
-                      {event.payload_json && (
-                        <pre
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => copyProjectToken(selectedProjectToken)}
+                            disabled={!selectedProjectToken}
+                            style={{
+                              borderRadius: 999,
+                              border: `1px solid ${palette.accent}`,
+                              background: selectedProjectToken ? '#ede9ff' : '#f4f4f5',
+                              color: selectedProjectToken ? palette.accent : palette.accentMuted,
+                              padding: '6px 14px',
+                              fontSize: 13,
+                              cursor: selectedProjectToken ? 'pointer' : 'not-allowed',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Copy token
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => selectedProjectId && regenerateProjectToken(selectedProjectId)}
+                            style={{
+                              borderRadius: 999,
+                              border: '1px solid rgba(248,113,113,0.4)',
+                              background: '#fff4f4',
+                              color: '#e11d48',
+                              padding: '6px 14px',
+                              fontSize: 13,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Regenerate token
+                          </button>
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>
+                          Share this token with trusted investors for read-only access. Rotating it immediately revokes older tokens.
+                        </p>
+                      </div>
+                      <div
+                        style={{
+                          borderRadius: 24,
+                          border: `1px solid ${palette.border}`,
+                          padding: 24,
+                          background: '#ffffff',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 16,
+                          boxShadow: '0 18px 32px rgba(15,23,42,0.08)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                          <div>
+                            <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Investor link</p>
+                            <p style={{ margin: '4px 0 0', fontSize: 13 }}>
+                              Anyone with this link can view the project dashboard in read-only mode.
+                            </p>
+                          </div>
+                          {shareLink && (
+                            <button
+                              type="button"
+                              onClick={() => copyProjectToken(shareLink)}
+                              style={{
+                                borderRadius: 999,
+                                border: `1px solid ${palette.accent}`,
+                                background: '#ede9ff',
+                                color: palette.accent,
+                                padding: '6px 12px',
+                                fontSize: 12,
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Copy link
+                            </button>
+                          )}
+                        </div>
+                        <div
                           style={{
-                            margin: 0,
-                            padding: 12,
-                            borderRadius: 10,
-                            background: '#f8fafc',
-                            border: `1px solid ${palette.border}`,
-                            fontSize: 12,
-                            overflowX: 'auto',
+                            marginTop: 4,
+                            padding: '12px 14px',
+                            borderRadius: 14,
+                            background: '#f4f5fb',
+                            fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                            fontSize: 13,
+                            color: palette.text,
+                            wordBreak: 'break-all',
                           }}
                         >
-                          {JSON.stringify(JSON.parse(event.payload_json), null, 2)}
-                        </pre>
-                      )}
-                    </details>
-                  ))}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: 12,
-                      flexWrap: 'wrap',
-                      marginTop: 4,
-                    }}
-                  >
-                    <span style={{ fontSize: 13, color: palette.accentMuted }}>
-                      {auditTotal
-                        ? `Showing ${auditShowingStart}-${auditShowingEnd} of ${auditTotal} events`
-                        : `Showing ${auditEvents.length} events`}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() => setAuditPage((prev) => Math.max(1, prev - 1))}
-                        disabled={auditPage <= 1}
+                          {shareLink || 'Select a project with an access token.'}
+                        </div>
+                        {shareLink && (
+                          <a
+                            href={shareLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: palette.accent, fontSize: 13 }}
+                          >
+                            Open viewer ↗
+                          </a>
+                        )}
+                      </div>
+                      <div
                         style={{
-                          padding: '6px 12px',
-                          borderRadius: 10,
+                          borderRadius: 16,
                           border: `1px solid ${palette.border}`,
-                          background: '#fff',
-                          cursor: auditPage <= 1 ? 'not-allowed' : 'pointer',
+                          padding: 20,
+                          background: '#ffffff',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 12,
+                          boxShadow: '0 15px 30px rgba(15,23,42,0.08)',
                         }}
                       >
-                        Previous
-                      </button>
-                      <span style={{ fontSize: 13, color: palette.accentMuted }}>
-                        Page {auditPage} of {auditTotalPages}
-                      </span>
+                        <div>
+                          <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>API example</p>
+                          <pre
+                            style={{
+                              marginTop: 8,
+                              padding: 16,
+                              borderRadius: 12,
+                              background: '#f4f5fb',
+                              fontSize: 13,
+                              overflowX: 'auto',
+                            }}
+                          >{`curl -H "X-Access-Token: ${selectedProjectToken || '<token>'}" \\\n  ${baseApi}/api/projects/${selectedProjectId}/documents`}</pre>
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>
+                          Investors can use the token to download documents or monitor signing status via the API. Admins should keep
+                          their global token private; only share project tokens with stakeholders who should see this project.
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        padding: 32,
+                        border: '1px dashed rgba(148,163,184,0.4)',
+                        borderRadius: 16,
+                        textAlign: 'center',
+                        color: palette.accentMuted,
+                      }}
+                    >
+                      Select a project to view and manage its project access token.
+                    </div>
+                  )}
+                </div>
+              )}
+              {centerTab === 'investors' && (
+                <div className="investor-panel" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                  <header>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <div>
+                        <h3 style={{ margin: 0 }}>Project Investors</h3>
+                        <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>Investor info and investment amounts.</p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => setAuditPage((prev) => Math.min(auditTotalPages, prev + 1))}
-                        disabled={auditPage >= auditTotalPages}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: 10,
-                          border: `1px solid ${palette.border}`,
-                          background: '#fff',
-                          cursor: auditPage >= auditTotalPages ? 'not-allowed' : 'pointer',
+                        onClick={() => {
+                          if (!selectedProjectId) return;
+                          setShowInvestorForm((prev) => !prev);
                         }}
+                        disabled={!selectedProjectId}
+                        style={{ ...primaryPillCTA(Boolean(selectedProjectId)), minWidth: isMobile ? '100%' : 180, justifyContent: 'center' }}
                       >
-                        Next
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            width: 16,
+                            height: 16,
+                            display: 'inline-block',
+                            backgroundColor: selectedProjectId ? '#fff' : palette.accentMuted,
+                            maskImage: 'url(/icons/user-plus.svg)',
+                            WebkitMaskImage: 'url(/icons/user-plus.svg)',
+                            maskRepeat: 'no-repeat',
+                            WebkitMaskRepeat: 'no-repeat',
+                            maskPosition: 'center',
+                            WebkitMaskPosition: 'center',
+                            maskSize: 'contain',
+                            WebkitMaskSize: 'contain',
+                          }}
+                        />
+                        {showInvestorForm ? 'Close form' : 'Add investor'}
                       </button>
                     </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: 8,
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        marginTop: 12,
+                        justifyContent: isMobile ? 'flex-start' : 'flex-end',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={exportInvestorsCsv}
+                        disabled={!investors.length}
+                        style={{
+                          border: `1px solid ${palette.border}`,
+                          background: investors.length ? '#fff' : '#f1f5f9',
+                          color: investors.length ? palette.text : palette.accentMuted,
+                          borderRadius: 999,
+                          padding: '4px 12px',
+                          fontSize: 12,
+                          cursor: investors.length ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        Export CSV
+                      </button>
+                      <button
+                        type="button"
+                        onClick={toggleInvestorsManage}
+                        disabled={!selectedProjectId}
+                        data-testid="investor-manage-toggle"
+                        style={{
+                          border: `1px solid ${palette.border}`,
+                          background: manageInvestorsMode ? palette.accent : '#fff',
+                          color: !selectedProjectId ? palette.accentMuted : manageInvestorsMode ? '#fff' : palette.text,
+                          borderRadius: 999,
+                          padding: '4px 10px',
+                          fontSize: 12,
+                          cursor: selectedProjectId ? 'pointer' : 'not-allowed',
+                          opacity: selectedProjectId ? 1 : 0.5,
+                          boxShadow: manageInvestorsMode ? '0 8px 18px rgba(37,99,235,0.25)' : 'none',
+                        }}
+                      >
+                        {manageInvestorsMode ? 'Done' : 'Manage'}
+                      </button>
+                      {manageInvestorsMode && selectedProjectId && (
+                        <button
+                          type="button"
+                          onClick={deleteSelectedInvestors}
+                          disabled={!selectedInvestorIds.length || deletingInvestors}
+                          data-testid="investor-remove-button"
+                          style={{
+                            border: '1px solid #dc2626',
+                            color: '#fff',
+                            background: deletingInvestors ? 'rgba(220,38,38,0.6)' : '#dc2626',
+                            borderRadius: 999,
+                            padding: '6px 12px',
+                            fontSize: 12,
+                            cursor: !selectedInvestorIds.length || deletingInvestors ? 'not-allowed' : 'pointer',
+                            opacity: !selectedInvestorIds.length && !deletingInvestors ? 0.5 : 1,
+                          }}
+                        >
+                          {deletingInvestors ? 'Deleting…' : 'Delete'}
+                        </button>
+                      )}
+                    </div>
+                    {selectedProjectId && <div style={{ height: 4 }} />}
+                    {selectedProjectId && showInvestorForm && (
+                      <div
+                        style={{
+                          border: `1px solid ${palette.border}`,
+                          marginTop: 12,
+                          marginBottom: 16,
+                          padding: 16,
+                          borderRadius: 16,
+                          background: '#fff',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 10,
+                        }}
+                      >
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>Name (required)</label>
+                        <input
+                          type="text"
+                          placeholder="Name"
+                          value={newInvestorName}
+                          onChange={(event) => {
+                            clearError();
+                            setNewInvestorName(event.target.value);
+                          }}
+                          style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                        />
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>Email (required)</label>
+                        <input
+                          type="email"
+                          placeholder="Email"
+                          value={newInvestorEmail}
+                          onChange={(event) => {
+                            clearError();
+                            setNewInvestorEmail(event.target.value);
+                          }}
+                          style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                        />
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>Mailing address</label>
+                        <div style={{ position: 'relative' }}>
+                          <textarea
+                            rows={3}
+                            placeholder="Mailing address"
+                            value={newInvestorMailing}
+                            onChange={(event) => setNewInvestorMailing(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' && !event.shiftKey && newInvestorAddressSuggestions.length > 0) {
+                                setNewInvestorAddressSuggestions([]);
+                                setNewInvestorAddressLoading(false);
+                                setNewInvestorAddressChosen(true);
+                              }
+                            }}
+                            ref={newInvestorAddressRef}
+                            style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}`, resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
+                          />
+                          {(newInvestorAddressLoading || newInvestorAddressSuggestions.length > 0) && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: 0,
+                                marginTop: 6,
+                                background: '#fff',
+                                border: `1px solid ${palette.border}`,
+                                borderRadius: 10,
+                                boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
+                                padding: 6,
+                                zIndex: 5,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 6,
+                                maxHeight: 220,
+                                overflowY: 'auto',
+                              }}
+                              ref={newInvestorSuggestionsRef}
+                            >
+                              {newInvestorAddressLoading && (
+                                <span style={{ fontSize: 12, color: palette.accentMuted }}>Searching addresses…</span>
+                              )}
+                              {newInvestorAddressSuggestions.map((suggestion) => (
+                                <button
+                                  key={suggestion}
+                                  type="button"
+                                  onClick={() => {
+                                    setNewInvestorMailing(suggestion);
+                                    setNewInvestorAddressSuggestions([]);
+                                    setNewInvestorAddressLoading(false);
+                                    setNewInvestorAddressChosen(true);
+                                  }}
+                                  style={{
+                                    textAlign: 'left',
+                                    border: `1px solid ${palette.border}`,
+                                    background: '#fff',
+                                    borderRadius: 8,
+                                    padding: '8px 10px',
+                                    cursor: 'pointer',
+                                    fontSize: 12,
+                                  }}
+                                >
+                                  {suggestion}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>Units (required)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Units (e.g. 10000)"
+                          value={newInvestorUnits}
+                          onChange={(event) => setNewInvestorUnits(event.target.value)}
+                          style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Bank name"
+                          value={newInvestorBankName}
+                          onChange={(event) => setNewInvestorBankName(event.target.value)}
+                          style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Bank account number"
+                          value={newInvestorBankAccount}
+                          onChange={(event) => setNewInvestorBankAccount(event.target.value)}
+                          style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Routing number"
+                          value={newInvestorBankRouting}
+                          onChange={(event) => setNewInvestorBankRouting(event.target.value)}
+                          style={{ padding: 10, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                        />
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowInvestorForm(false);
+                              resetInvestorForm();
+                            }}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: palette.accentMuted,
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={createInvestor}
+                            disabled={creatingInvestor}
+                            style={primaryButtonStyle(!creatingInvestor)}
+                          >
+                            {creatingInvestor ? 'Adding…' : 'Add investor'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </header>
+                  {!selectedProjectId ? (
+                    <p style={{ color: palette.accentMuted }}>Choose a project to manage investors.</p>
+                  ) : investors.length === 0 ? (
+                    <div
+                      style={{
+                        padding: 28,
+                        borderRadius: 16,
+                        border: '1px dashed rgba(148,163,184,0.6)',
+                        textAlign: 'center',
+                        color: palette.accentMuted,
+                        background: '#fff',
+                      }}
+                    >
+                      No investors linked yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {investors.map((investor, idx) => {
+                        const selected = selectedInvestorIds.includes(investor.id);
+                        const editing = editingInvestorId === investor.id;
+                        const hovered = hoveredInvestorId === investor.id;
+                        const cardBorder = selected || editing || hovered ? palette.accent : palette.border;
+                        const highlightBg = hovered || selected ? '#edf2ff' : '#fff';
+                        const initialsSource = (investor.name || investor.email || '?').trim();
+                        const initials = initialsSource ? initialsSource[0]?.toUpperCase() ?? '?' : '?';
+                        const unitsValue =
+                          typeof investor.units_invested === 'number' ? investor.units_invested : null;
+                        const unitsLabel = unitsValue !== null ? `${unitsValue.toLocaleString()} units` : 'Units pending';
+                        const secondaryLabel =
+                          investor.role?.trim() ||
+                          (investor.mailing_address ? investor.mailing_address : 'Role not specified');
+                        return (
+                          <div
+                            key={`${investor.id ?? investor.email ?? investor.name ?? 'investor'}-${idx}`}
+                            style={{
+                              borderRadius: 18,
+                              border: `1px solid ${cardBorder}`,
+                              padding: 16,
+                              background: highlightBg,
+                              boxShadow: highlightBg !== '#fff' ? '0 10px 24px rgba(37,99,235,0.15)' : '0 8px 18px rgba(15,23,42,0.04)',
+                              transition: 'background 0.15s ease, border 0.15s ease, box-shadow 0.15s ease',
+                              cursor: manageInvestorsMode ? 'default' : 'pointer',
+                            }}
+                            onMouseEnter={() => setHoveredInvestorId(investor.id)}
+                            onMouseLeave={() => setHoveredInvestorId((prev) => (prev === investor.id ? null : prev))}
+                            onClick={() => {
+                              if (manageInvestorsMode) return;
+                              if (editingInvestorId === investor.id) {
+                                cancelInvestorEdit();
+                                return;
+                              }
+                              beginInvestorEdit(investor);
+                            }}
+                            role={!manageInvestorsMode ? 'button' : undefined}
+                            tabIndex={!manageInvestorsMode ? 0 : undefined}
+                            onKeyDown={(event) => {
+                              if (manageInvestorsMode) return;
+                              if (editingInvestorId === investor.id) return;
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                beginInvestorEdit(investor);
+                              }
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: 16,
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 240px' }}>
+                                {manageInvestorsMode && (
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    onChange={() => toggleInvestorSelection(investor.id)}
+                                    style={{ width: 18, height: 18 }}
+                                  />
+                                )}
+                                <div
+                                  style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: '50%',
+                                    background: 'linear-gradient(135deg, #3b82f6, #a855f7)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#fff',
+                                    fontWeight: 700,
+                                    fontSize: 18,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {initials}
+                                </div>
+                                <div>
+                                  <p style={{ margin: 0, fontWeight: 600, fontSize: 15 }}>{investor.name || 'Unnamed investor'}</p>
+                                  <p style={{ margin: '4px 0 0', color: palette.accentMuted, fontSize: 13 }}>
+                                    {investor.email || 'Email unavailable'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div style={{ textAlign: 'right', minWidth: isMobile ? 'auto' : 180 }}>
+                                <p style={{ margin: 0, fontWeight: 600 }}>{unitsLabel}</p>
+                                <p style={{ margin: '4px 0 0', color: palette.accentMuted, fontSize: 13 }}>{secondaryLabel}</p>
+                              </div>
+                            </div>
+                            {!editing && (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: 12,
+                                  flexWrap: 'wrap',
+                                  marginTop: 10,
+                                  fontSize: 12,
+                                  color: palette.accentMuted,
+                                }}
+                              >
+                                {investor.mailing_address && <span>Mailing: {investor.mailing_address}</span>}
+                                {investor.bank_name && <span>Bank: {investor.bank_name}</span>}
+                                {investor.bank_account_number && <span>Acct #: {investor.bank_account_number}</span>}
+                                {investor.bank_routing_number && <span>Routing #: {investor.bank_routing_number}</span>}
+                              </div>
+                            )}
+                            {editing ? (
+                              <div
+                                style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}
+                                onClick={(event) => event.stopPropagation()}
+                                onKeyDown={(event) => event.stopPropagation()}
+                              >
+                                <label style={{ fontSize: 12, fontWeight: 600 }}>Name (required)</label>
+                                <input
+                                  type="text"
+                                  value={editingInvestorName}
+                                  onChange={(event) => {
+                                    clearError();
+                                    setEditingInvestorName(event.target.value);
+                                  }}
+                                  style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                                />
+                                <label style={{ fontSize: 12, fontWeight: 600 }}>Email (required)</label>
+                                <input
+                                  type="email"
+                                  value={editingInvestorEmail}
+                                  onChange={(event) => {
+                                    clearError();
+                                    setEditingInvestorEmail(event.target.value);
+                                  }}
+                                  style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                                />
+                                <label style={{ fontSize: 12, fontWeight: 600 }}>Units (required)</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={editingInvestorUnits}
+                                  onChange={(event) => setEditingInvestorUnits(event.target.value)}
+                                  style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                                />
+                                <textarea
+                                  rows={3}
+                                  placeholder="Mailing address"
+                                  value={editingInvestorMailing}
+                                  onChange={(event) => {
+                                    clearError();
+                                    setEditingInvestorMailing(event.target.value);
+                                    setEditInvestorAddressDirty(true);
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' && !event.shiftKey && editInvestorAddressSuggestions.length > 0) {
+                                      setEditInvestorAddressSuggestions([]);
+                                      setEditInvestorAddressLoading(false);
+                                      setEditInvestorAddressChosen(true);
+                                    }
+                                  }}
+                                  ref={editInvestorAddressRef}
+                                  style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}`, resize: 'vertical' }}
+                                />
+                                {(editInvestorAddressLoading || editInvestorAddressSuggestions.length > 0) && (
+                                  <div
+                                    style={{
+                                      position: 'relative',
+                                      width: '100%',
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        top: 6,
+                                        left: 0,
+                                        right: 0,
+                                        background: '#fff',
+                                        border: `1px solid ${palette.border}`,
+                                        borderRadius: 10,
+                                        boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
+                                        padding: 6,
+                                        zIndex: 5,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: 6,
+                                        maxHeight: 220,
+                                        overflowY: 'auto',
+                                      }}
+                                      ref={editInvestorSuggestionsRef}
+                                    >
+                                      {editInvestorAddressLoading && (
+                                        <span style={{ fontSize: 12, color: palette.accentMuted }}>Searching addresses…</span>
+                                      )}
+                                      {editInvestorAddressSuggestions.map((suggestion) => (
+                                        <button
+                                          key={suggestion}
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingInvestorMailing(suggestion);
+                                            setEditInvestorAddressSuggestions([]);
+                                            setEditInvestorAddressLoading(false);
+                                            setEditInvestorAddressChosen(true);
+                                            setEditInvestorAddressDirty(false);
+                                          }}
+                                          style={{
+                                            textAlign: 'left',
+                                            border: `1px solid ${palette.border}`,
+                                            background: '#fff',
+                                            borderRadius: 8,
+                                            padding: '8px 10px',
+                                            cursor: 'pointer',
+                                            fontSize: 12,
+                                          }}
+                                        >
+                                          {suggestion}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                <input
+                                  type="text"
+                                  placeholder="Bank name"
+                                  value={editingInvestorBankName}
+                                  onChange={(event) => setEditingInvestorBankName(event.target.value)}
+                                  style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Account number"
+                                  value={editingInvestorBankAccount}
+                                  onChange={(event) => setEditingInvestorBankAccount(event.target.value)}
+                                  style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Routing number"
+                                  value={editingInvestorBankRouting}
+                                  onChange={(event) => setEditingInvestorBankRouting(event.target.value)}
+                                  style={{ padding: 8, borderRadius: 8, border: `1px solid ${palette.border}` }}
+                                />
+                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      cancelInvestorEdit();
+                                    }}
+                                    style={{ border: 'none', background: 'transparent', color: palette.accentMuted, cursor: 'pointer' }}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      saveInvestorEdit();
+                                    }}
+                                    disabled={editingInvestorSaving}
+                                    style={{
+                                      border: 'none',
+                                      background: palette.accent,
+                                      color: '#fff',
+                                      borderRadius: 999,
+                                      padding: '6px 14px',
+                                      cursor: editingInvestorSaving ? 'not-allowed' : 'pointer',
+                                    }}
+                                  >
+                                    {editingInvestorSaving ? 'Saving…' : 'Save'}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+              {centerTab === 'audit' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                      <h3 style={{ margin: 0 }}>Logs</h3>
+                      <p style={{ margin: '4px 0 0', color: palette.accentMuted }}>
+                        Project-scoped events with filters. Logs retained for {auditRetentionDays} day{auditRetentionDays === 1 ? '' : 's'}.
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        placeholder="Search (resource, actor, summary)"
+                        value={auditFilters.search}
+                        onChange={(e) => {
+                          setAuditPage(1);
+                          setAuditFilters((prev) => ({ ...prev, search: e.target.value }));
+                        }}
+                        style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}`, minWidth: 220 }}
+                      />
+                      <select
+                        value={auditFilters.action}
+                        onChange={(e) => {
+                          setAuditPage(1);
+                          setAuditFilters((prev) => ({ ...prev, action: e.target.value }));
+                        }}
+                        style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                      >
+                        <option value="">Action</option>
+                        <option value="upload">Upload</option>
+                        <option value="send">Send</option>
+                        <option value="revoke">Revoke</option>
+                        <option value="delete">Delete</option>
+                      </select>
+                      <select
+                        value={auditFilters.resource}
+                        onChange={(e) => {
+                          setAuditPage(1);
+                          setAuditFilters((prev) => ({ ...prev, resource: e.target.value }));
+                        }}
+                        style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                      >
+                        <option value="">Resource</option>
+                        <option value="document">Document</option>
+                        <option value="envelope">Envelope</option>
+                        <option value="investor">Investor</option>
+                        <option value="file">File</option>
+                        <option value="token">Token</option>
+                      </select>
+                      <select
+                        value={auditFilters.actor}
+                        onChange={(e) => {
+                          setAuditPage(1);
+                          setAuditFilters((prev) => ({ ...prev, actor: e.target.value }));
+                        }}
+                        style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                      >
+                        <option value="">Actor</option>
+                        <option value="admin_token">Admin token</option>
+                        <option value="project_token">Project token</option>
+                        <option value="system">System</option>
+                      </select>
+                      <select
+                        value={auditFilters.status}
+                        onChange={(e) => {
+                          setAuditPage(1);
+                          setAuditFilters((prev) => ({ ...prev, status: e.target.value }));
+                        }}
+                        style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                      >
+                        <option value="">Status</option>
+                        <option value="success">Success</option>
+                        <option value="fail">Fail</option>
+                      </select>
+                      <input
+                        type="date"
+                        value={auditDateFrom}
+                        onChange={(e) => {
+                          setAuditPage(1);
+                          setAuditDateFrom(e.target.value);
+                        }}
+                        style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                        placeholder="From"
+                      />
+                      <input
+                        type="date"
+                        value={auditDateTo}
+                        onChange={(e) => {
+                          setAuditPage(1);
+                          setAuditDateTo(e.target.value);
+                        }}
+                        style={{ padding: 8, borderRadius: 10, border: `1px solid ${palette.border}` }}
+                        placeholder="To"
+                      />
+                    </div>
                   </div>
+                  {auditError && (
+                    <div style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecdd3', borderRadius: 12, padding: '10px 12px' }}>
+                      {auditError}
+                    </div>
+                  )}
+                  {auditLoading ? (
+                    <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${palette.border}`, background: '#fff' }}>Loading audit…</div>
+                  ) : auditEvents.length === 0 ? (
+                    <div style={{ padding: 24, borderRadius: 12, border: `1px dashed ${palette.border}`, background: '#fff', color: palette.accentMuted }}>
+                      No audit events yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {auditEvents.map((event) => (
+                        <details
+                          key={event.id}
+                          style={{
+                            border: `1px solid ${palette.border}`,
+                            borderRadius: 12,
+                            padding: 12,
+                            background: '#fff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 10,
+                          }}
+                        >
+                          <summary style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', cursor: 'pointer' }}>
+                            <div style={{ minWidth: 160, fontSize: 12, color: palette.accentMuted }}>{formatLocalDateTime(event.created_at) || event.created_at}</div>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span style={{ ...awaitingChipStyle, background: '#e2e8f0', color: palette.text }}>Action: {event.action}</span>
+                              {event.resource_type && (
+                                <span style={{ ...awaitingChipStyle, background: '#ede9fe', color: palette.text }}>
+                                  {event.resource_type}
+                                  {event.resource_id ? ` #${event.resource_id}` : ''}
+                                </span>
+                              )}
+                              <span style={{ ...(event.status === 'success' ? completedChipStyle : awaitingChipStyle) }}>
+                                {event.status === 'success' ? 'Success' : 'Fail'}
+                              </span>
+                              <span style={{ ...awaitingChipStyle, background: '#dbeafe', color: '#1d4ed8' }}>Actor: {event.actor_type}</span>
+                            </div>
+                            {event.summary && <div style={{ flex: 1, fontSize: 13 }}>{event.summary}</div>}
+                          </summary>
+                          {event.payload_json && (
+                            <pre
+                              style={{
+                                margin: 0,
+                                padding: 12,
+                                borderRadius: 10,
+                                background: '#f8fafc',
+                                border: `1px solid ${palette.border}`,
+                                fontSize: 12,
+                                overflowX: 'auto',
+                              }}
+                            >
+                              {JSON.stringify(JSON.parse(event.payload_json), null, 2)}
+                            </pre>
+                          )}
+                        </details>
+                      ))}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: 12,
+                          flexWrap: 'wrap',
+                          marginTop: 4,
+                        }}
+                      >
+                        <span style={{ fontSize: 13, color: palette.accentMuted }}>
+                          {auditTotal
+                            ? `Showing ${auditShowingStart}-${auditShowingEnd} of ${auditTotal} events`
+                            : `Showing ${auditEvents.length} events`}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={() => setAuditPage((prev) => Math.max(1, prev - 1))}
+                            disabled={auditPage <= 1}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: 10,
+                              border: `1px solid ${palette.border}`,
+                              background: '#fff',
+                              cursor: auditPage <= 1 ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            Previous
+                          </button>
+                          <span style={{ fontSize: 13, color: palette.accentMuted }}>
+                            Page {auditPage} of {auditTotalPages}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setAuditPage((prev) => Math.min(auditTotalPages, prev + 1))}
+                            disabled={auditPage >= auditTotalPages}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: 10,
+                              border: `1px solid ${palette.border}`,
+                              background: '#fff',
+                              cursor: auditPage >= auditTotalPages ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
           </div>
         </div>
       </main>

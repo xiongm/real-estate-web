@@ -2177,7 +2177,7 @@ useEffect(() => {
       style={{
         position: 'relative',
         width: '100%',
-        minHeight: isMobile ? 220 : 272,
+        minHeight: isMobile ? 280 : 272,
         backgroundColor: '#0f172a',
         color: '#fff',
         overflow: 'visible',
@@ -2343,13 +2343,15 @@ useEffect(() => {
           position: 'absolute',
           inset: 0,
           display: 'flex',
-          alignItems: 'flex-end',
+          alignItems: isMobile ? 'flex-start' : 'flex-end',
         }}
       >
         <div
           style={{
             width: '100%',
-            padding: isMobile ? '20px 16px' : '32px 56px',
+            padding: isMobile
+              ? 'calc(env(safe-area-inset-top, 0px) + 12px) 16px 20px'
+              : '32px 56px',
           }}
         >
           <div

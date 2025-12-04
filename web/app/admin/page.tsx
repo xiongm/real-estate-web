@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, FormEvent, CSSProperties, KeyboardEvent, ChangeEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
+import { AISummaryCard } from '../sign/AISummaryCard';
 
 type Project = {
   id: number;
@@ -3375,60 +3376,43 @@ useEffect(() => {
                                           onClick={(event) => event.stopPropagation()}
                                           onKeyDown={(event) => event.stopPropagation()}
                                           style={{
-                                            border: `1px solid ${palette.border}`,
-                                            borderRadius: 12,
-                                            padding: 12,
-                                            background: '#f8fafc',
+                                            padding: 0,
+                                            background: 'transparent',
+                                            border: 'none',
+                                            boxShadow: 'none',
                                           }}
                                         >
-                                          <p
-                                            style={{
-                                              margin: 0,
-                                              fontSize: 12,
-                                              color: palette.accentMuted,
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: 6,
-                                            }}
-                                          >
-                                            <img
-                                              src="/ai-technology.png"
-                                              alt="AI"
-                                              width={20}
-                                              height={20}
-                                              style={{ display: 'block' }}
+                                          <AISummaryCard label="AI summary">
+                                            <textarea
+                                              value={summaryDraft}
+                                              onChange={(event) =>
+                                                setSummaryEdits((prev) => ({ ...prev, [envelopeId]: event.target.value }))
+                                              }
+                                              onBlur={() => handleSummaryBlur(envelopeId)}
+                                              rows={3}
+                                              style={{
+                                                width: '100%',
+                                                marginTop: 6,
+                                                border: `1px solid ${palette.border}`,
+                                                borderRadius: 8,
+                                                padding: 10,
+                                                fontSize: 13,
+                                                fontFamily: 'inherit',
+                                                resize: 'vertical',
+                                                background: '#fff',
+                                              }}
+                                              placeholder="Click to edit the summary for signers."
                                             />
-                                            AI summary
-                                          </p>
-                                          <textarea
-                                            value={summaryDraft}
-                                            onChange={(event) =>
-                                              setSummaryEdits((prev) => ({ ...prev, [envelopeId]: event.target.value }))
-                                            }
-                                            onBlur={() => handleSummaryBlur(envelopeId)}
-                                            rows={3}
-                                            style={{
-                                              width: '100%',
-                                              marginTop: 6,
-                                              border: `1px solid ${palette.border}`,
-                                              borderRadius: 8,
-                                              padding: 10,
-                                              fontSize: 13,
-                                              fontFamily: 'inherit',
-                                              resize: 'vertical',
-                                              background: '#fff',
-                                            }}
-                                            placeholder="Click to edit the summary for signers."
-                                          />
-                                          {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: '6px 0 0' }}>{err}</p>}
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, alignItems: 'center' }}>
-                                            {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: 0 }}>{err}</p>}
-                                            {saving && (
-                                              <span style={{ fontSize: 12, color: palette.accentMuted }}>
-                                                Saving…
-                                              </span>
-                                            )}
-                                          </div>
+                                            {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: '6px 0 0' }}>{err}</p>}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, alignItems: 'center' }}>
+                                              {err && <p style={{ color: '#b91c1c', fontSize: 12, margin: 0 }}>{err}</p>}
+                                              {saving && (
+                                                <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                                                  Saving…
+                                                </span>
+                                              )}
+                                            </div>
+                                          </AISummaryCard>
                                         </div>
                                       );
                                     })()}

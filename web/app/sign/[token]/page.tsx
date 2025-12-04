@@ -5,6 +5,7 @@ import type { PointerEvent as ReactPointerEvent, CSSProperties, ChangeEvent, Ref
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
 import { useParams } from 'next/navigation';
 import { theme } from '../../../lib/theme';
+import { AISummaryCard } from '../AISummaryCard';
 import {
   isFieldComplete,
   isRequiredField,
@@ -589,33 +590,18 @@ export default function SignPage() {
     />
   ) : (
       <div className="sign-content">
-        <div className="sign-summary-card" role="status" aria-live="polite">
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: palette.accentMuted,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <img src="/ai-technology.png" alt="AI" width={20} height={20} style={{ display: 'block' }} />
-              AI summary
-            </p>
-          </div>
-        <p
-          style={{
-            margin: '10px 0 0',
-            fontSize: 14,
-            color: summaryText ? palette.text : palette.accentMuted,
-            lineHeight: 1.6,
-          }}
-        >
-          {summaryText || 'A concise summary will appear here once available.'}
-        </p>
-      </div>
+        <AISummaryCard>
+          <p
+            style={{
+              margin: '2px 0 0',
+              fontSize: 14,
+              color: summaryText ? palette.text : palette.accentMuted,
+              lineHeight: 1.6,
+            }}
+          >
+            {summaryText || 'A concise summary will appear here once available.'}
+          </p>
+        </AISummaryCard>
       <div className="sign-columns">
         <section className="sign-doc-section" ref={docScrollRef}>
           <PdfSigningSurface
@@ -904,13 +890,6 @@ export default function SignPage() {
           display: flex;
           flex-direction: column;
           gap: 24px;
-          box-shadow: ${shadows.card};
-        }
-        .sign-summary-card {
-          border: 1px solid ${palette.border};
-          border-radius: 20px;
-          padding: 20px 24px;
-          background: ${palette.card};
           box-shadow: ${shadows.card};
         }
         .sign-sidebar-action {

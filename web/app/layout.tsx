@@ -13,6 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/site.webmanifest" />
       </head>
       <body
+        suppressHydrationWarning={true}
         style={{
           margin: 0,
           minHeight: '100vh',

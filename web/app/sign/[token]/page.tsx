@@ -543,8 +543,8 @@ export default function SignPage() {
   const summaryText = (data?.envelope?.summary || '').trim();
   const showFinalPdf = Boolean(
     (completion && completion.sealed) ||
-      data?.final_artifact?.sha256_final ||
-      data?.signer?.status === 'completed'
+    data?.final_artifact?.sha256_final ||
+    data?.signer?.status === 'completed'
   );
 
   const hasMissingRequired = remainingRequired > 0;
@@ -589,19 +589,19 @@ export default function SignPage() {
       onRetryPdf={() => setCompletion(null)}
     />
   ) : (
-      <div className="sign-content">
-        <AISummaryCard>
-          <p
-            style={{
-              margin: '2px 0 0',
-              fontSize: 14,
-              color: summaryText ? palette.text : palette.accentMuted,
-              lineHeight: 1.6,
-            }}
-          >
-            {summaryText || 'A concise summary will appear here once available.'}
-          </p>
-        </AISummaryCard>
+    <div className="sign-content">
+      <AISummaryCard>
+        <p
+          style={{
+            margin: '2px 0 0',
+            fontSize: 14,
+            color: summaryText ? palette.text : palette.accentMuted,
+            lineHeight: 1.6,
+          }}
+        >
+          {summaryText || 'A concise summary will appear here once available.'}
+        </p>
+      </AISummaryCard>
       <div className="sign-columns">
         <section className="sign-doc-section" ref={docScrollRef}>
           {targetFieldId && (
@@ -638,8 +638,8 @@ export default function SignPage() {
                   anchorIndex >= 0
                     ? anchorIndex
                     : chipIndex >= 0 && chipIndex < orderedIds.length
-                    ? chipIndex
-                    : 0;
+                      ? chipIndex
+                      : 0;
                 let destinationId = String(activeFieldId);
                 if (!stickyAnchor) {
                   const nextIndex = (navIndexRef.current + 1) % orderedIds.length;
@@ -666,8 +666,8 @@ export default function SignPage() {
                       (el?.querySelector?.('canvas, input, textarea, button') as HTMLElement | null) ||
                       (typeof document !== 'undefined'
                         ? (document.querySelector(
-                            `[data-field-id="${destinationId}"] canvas`
-                          ) as HTMLElement | null)
+                          `[data-field-id="${destinationId}"] canvas`
+                        ) as HTMLElement | null)
                         : null);
                     try {
                       (focusable || el)?.focus?.({ preventScroll: true } as any);
@@ -2154,9 +2154,7 @@ function FieldOverlay({
           tabIndex={mode === 'edit' ? -1 : undefined}
           style={{
             ...baseStyle,
-            borderWidth: 2,
-            borderStyle: 'solid',
-            borderColor: '#94a3b8',
+            border: '2px solid #94a3b8',
             borderRadius: 4,
             background: 'rgba(255,255,255,0.9)',
             ...highlightStyle,
@@ -2174,9 +2172,7 @@ function FieldOverlay({
         tabIndex={mode === 'edit' ? -1 : undefined}
         style={{
           ...baseStyle,
-          borderWidth: 2,
-          borderStyle: 'solid',
-          borderColor: '#94a3b8',
+          border: '2px solid #94a3b8',
           borderRadius: 4,
           background: 'rgba(255,255,255,0.9)',
           ...highlightStyle,
@@ -2525,7 +2521,7 @@ function CompletionView({
           error={error}
           fields={fields}
           values={values}
-          onChange={() => {}}
+          onChange={() => { }}
           mode="view"
           renderOverlays={renderOverlays}
         />

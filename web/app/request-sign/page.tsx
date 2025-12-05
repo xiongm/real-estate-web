@@ -422,20 +422,20 @@ export default function RequestSignPage() {
       return next;
     });
   }, [projectInvestors]);
-useEffect(() => {
-  if (!projectInvestors.length) return;
-  setFields((prev) =>
-    prev.map((field) => {
-      if (!field.signerClientId) return field;
-      const exists = projectInvestors.some(
-        (inv) => String(inv.id) === field.signerClientId,
-      );
-      if (exists) return field;
-      const fallback = projectInvestors[0];
-      return { ...field, signerClientId: fallback?.id?.toString() || null };
-    }),
-  );
-}, [projectInvestors.map((inv) => inv.id).join('|')]);
+  useEffect(() => {
+    if (!projectInvestors.length) return;
+    setFields((prev) =>
+      prev.map((field) => {
+        if (!field.signerClientId) return field;
+        const exists = projectInvestors.some(
+          (inv) => String(inv.id) === field.signerClientId,
+        );
+        if (exists) return field;
+        const fallback = projectInvestors[0];
+        return { ...field, signerClientId: fallback?.id?.toString() || null };
+      }),
+    );
+  }, [projectInvestors.map((inv) => inv.id).join('|')]);
 
   const onPointerMove = (event: PointerEvent) => {
     const drag = dragRef.current;
@@ -582,7 +582,7 @@ useEffect(() => {
     }
   };
 
-const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
@@ -686,10 +686,10 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
       setDragPreview((prev) =>
         prev
           ? {
-              ...prev,
-              x: pointerEvent.clientX,
-              y: pointerEvent.clientY,
-            }
+            ...prev,
+            x: pointerEvent.clientX,
+            y: pointerEvent.clientY,
+          }
           : prev,
       );
     };
@@ -708,13 +708,13 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
   const registerPageRef =
     (pageIndex: number) =>
-    (node: HTMLDivElement | null) => {
-      if (!node) {
-        delete pageRefs.current[pageIndex];
-        return;
-      }
-      pageRefs.current[pageIndex] = node;
-    };
+      (node: HTMLDivElement | null) => {
+        if (!node) {
+          delete pageRefs.current[pageIndex];
+          return;
+        }
+        pageRefs.current[pageIndex] = node;
+      };
 
   const toggleInvestorExpansion = (investorId: number) => {
     setExpandedInvestors((prev) => ({
@@ -1203,452 +1203,452 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
               paddingBottom: 32,
             }}
           >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/pdf"
-          onChange={handleFileChange}
-          disabled={!canUploadDocument || uploadingDoc}
-          style={{ display: 'none' }}
-        />
-        {!documentInfo ? (
-          <div
-            style={{
-              marginTop: 24,
-              padding: 32,
-              border: `2px dashed rgba(37,99,235,0.35)`,
-              borderRadius: 20,
-              textAlign: 'center',
-              background: palette.cardSurface,
-              boxShadow: theme.shadows.card,
-            }}
-          >
-            <p style={{ marginBottom: 12, color: palette.accentMuted }}>
-              {projectParamError || 'Upload a PDF to begin placing fields.'}
-            </p>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileChange}
               disabled={!canUploadDocument || uploadingDoc}
-              style={{
-                padding: '10px 22px',
-                borderRadius: 999,
-                border: 'none',
-                background: canUploadDocument ? palette.accent : theme.colors.border,
-                color: canUploadDocument ? '#fff' : palette.accentMuted,
-                fontWeight: 600,
-                cursor: !canUploadDocument || uploadingDoc ? 'not-allowed' : 'pointer',
-                boxShadow: canUploadDocument ? theme.shadows.pill : 'none',
-              }}
-            >
-              {uploadingDoc ? 'Uploading…' : 'Upload PDF'}
-            </button>
-          </div>
-        ) : (
-          <>
-            {!pdfPages.length && (
-              <p style={{ marginTop: 16, color: '#2563eb' }}>
-                {loadingPdf || uploadingDoc ? 'Processing PDF…' : 'PDF ready. Scroll to view pages.'}
-              </p>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 32, marginTop: 24 }}>
-              {pdfPages.map((page) => (
-                <div
-                  key={page.pageIndex}
+              style={{ display: 'none' }}
+            />
+            {!documentInfo ? (
+              <div
+                style={{
+                  marginTop: 24,
+                  padding: 32,
+                  border: `2px dashed rgba(37,99,235,0.35)`,
+                  borderRadius: 20,
+                  textAlign: 'center',
+                  background: palette.cardSurface,
+                  boxShadow: theme.shadows.card,
+                }}
+              >
+                <p style={{ marginBottom: 12, color: palette.accentMuted }}>
+                  {projectParamError || 'Upload a PDF to begin placing fields.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!canUploadDocument || uploadingDoc}
                   style={{
-                    margin: '0 auto',
-                    background: palette.cardSurface,
-                    borderRadius: 18,
-                    boxShadow: '0 35px 80px rgba(15,23,42,0.15)',
-                    border: palette.cardBorder,
-                    padding: 24,
+                    padding: '10px 22px',
+                    borderRadius: 999,
+                    border: 'none',
+                    background: canUploadDocument ? palette.accent : theme.colors.border,
+                    color: canUploadDocument ? '#fff' : palette.accentMuted,
+                    fontWeight: 600,
+                    cursor: !canUploadDocument || uploadingDoc ? 'not-allowed' : 'pointer',
+                    boxShadow: canUploadDocument ? theme.shadows.pill : 'none',
                   }}
-                  onClick={() => setSelectedFieldId(null)}
                 >
-                  <div
-                    ref={registerPageRef(page.pageIndex)}
-                    data-page-container
-                    style={{
-                      position: 'relative',
-                      width: page.width,
-                      margin: '0 auto',
-                    }}
-                  >
-                    <img
-                      src={page.dataUrl}
-                      alt={`Page ${page.pageIndex + 1}`}
-                      style={{ width: '100%', display: 'block', borderRadius: 8 }}
-                    />
-                    {fields
-                      .filter((field) => field.pageIndex === page.pageIndex)
-                      .map((field) => (
-                        <div
-                          key={field.id}
-                          onPointerDown={(event) => startDrag(event, field, 'move')}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedFieldId(field.id);
-                          }}
-                          style={{
-                            position: 'absolute',
-                            left: field.x,
-                            top: field.y,
-                            width: field.width,
-                            height: field.height,
-                            border: field.id === selectedFieldId ? `2px solid ${palette.accent}` : '1px solid rgba(17,24,39,0.6)',
-                            background: 'rgba(56,189,248,0.18)',
-                            color: theme.colors.text,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            letterSpacing: 0.2,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'move',
-                            userSelect: 'none',
-                            borderRadius: 6,
-                            boxShadow: '0 6px 18px rgba(15,23,42,0.15)',
-                          }}
-                        >
-                        {field.type === 'checkbox' ? (
-                          <span
-                            style={{
-                              fontSize: Math.max(12, field.height * 0.6),
-                              color: '#0f172a',
-                              lineHeight: 1,
-                            }}
-                          >
-                            ✕
-                          </span>
-                        ) : (
-                          <span>{field.name || FIELD_LABELS[field.type]}</span>
-                        )}
-                        {['signature', 'text', 'date'].includes(field.type) && (
-                          <span
-                            style={{
-                              position: 'absolute',
-                              top: 6,
-                              left: 6,
-                              fontSize: 16,
-                              lineHeight: 1,
-                              pointerEvents: 'none',
-                            }}
-                            aria-hidden="true"
-                          >
-                            {FIELD_ICONS[field.type as FieldType]}
-                          </span>
-                        )}
-                        {field.type === 'text' && (
-                          <span
-                            style={{
-                              position: 'absolute',
-                              top: -18,
-                              left: 0,
-                              fontSize: 10,
-                              padding: '2px 6px',
-                              borderRadius: 6,
-                              background: 'rgba(15,23,42,0.85)',
-                              border: '1px solid rgba(255,255,255,0.2)',
-                              color: '#fff',
-                              pointerEvents: 'none',
-                            }}
-                          >
-                            {FONT_LABELS[field.fontFamily || DEFAULT_FONT]}
-                          </span>
-                        )}
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setFields((prev) => prev.filter((f) => f.id !== field.id));
-                            }}
-                            style={{
-                              position: 'absolute',
-                              top: -12,
-                              right: -12,
-                              width: 24,
-                              height: 24,
-                              borderRadius: '50%',
-                              border: '1px solid #fff',
-                              background: 'rgba(17,24,39,0.85)',
-                              color: '#fff',
-                              fontSize: 12,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                            }}
-                            aria-label="Remove field"
-                          >
-                            🗑️
-                          </button>
-                        {selectedFieldId === field.id && field.type === 'checkbox' && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: field.height + 6,
-                              left: 0,
-                              padding: '4px 8px',
-                              borderRadius: 6,
-                              background: 'rgba(15,23,42,0.9)',
-                              color: '#fff',
-                              fontSize: 11,
-                              whiteSpace: 'nowrap',
-                              boxShadow: '0 4px 10px rgba(15,23,42,0.25)',
-                            }}
-                          >
-                            {field.name || FIELD_LABELS[field.type]}
-                          </div>
-                        )}
-                        {selectedFieldId === field.id && field.type === 'text' && (
-                            <div
-                              onPointerDown={(event) => event.stopPropagation()}
-                              onClick={(event) => event.stopPropagation()}
-                              style={{
-                                position: 'absolute',
-                                top: -field.height - 20,
-                                left: 0,
-                                background: '#fff',
-                                borderRadius: 12,
-                                border: '1px solid rgba(148,163,184,0.5)',
-                                padding: 10,
-                                boxShadow: '0 12px 25px rgba(15,23,42,0.2)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: 6,
-                                minWidth: 200,
-                                zIndex: 30,
-                              }}
-                            >
-                              <label style={{ fontSize: 11, color: palette.accentMuted }}>Font</label>
-                              <select
-                                value={field.fontFamily || DEFAULT_FONT}
-                                onChange={(event) => updateField(field.id, { fontFamily: event.target.value as FontChoice })}
-                                style={{
-                                  padding: 6,
-                                  borderRadius: 6,
-                                  border: '1px solid rgba(148,163,184,0.6)',
-                                  fontSize: 12,
-                                }}
-                              >
-                                {TEXT_FONT_OPTIONS.map((option) => (
-                                  <option key={option.id} value={option.id}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                          <div
-                            onPointerDown={(event) => {
-                              event.stopPropagation();
-                              startDrag(event, field, 'resize');
-                            }}
-                            style={{
-                              position: 'absolute',
-                              right: -7,
-                              bottom: -7,
-                              width: 14,
-                              height: 14,
-                              background: '#2563eb',
-                              borderRadius: '50%',
-                              cursor: 'nwse-resize',
-                            }}
-                          />
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
-      <section
-        style={{
-          position: 'sticky',
-          top: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 24,
-          minWidth: isMobile ? 'auto' : 360,
-        }}
-      >
-        <div
-          style={{
-            border: palette.cardBorder,
-            borderRadius: 24,
-            padding: 24,
-            background: palette.cardSurface,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
-            boxShadow: palette.cardShadow,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ margin: 0, color: palette.textStrong }}>Investors</h3>
-              <p style={{ fontSize: 12, color: palette.accentMuted, margin: 4 }}>
-                Drag a signer’s field onto the PDF to place it.
-              </p>
-            </div>
-          </div>
-          {!projectInvestors.length ? (
-            <p style={{ fontSize: 13, color: palette.accentMuted }}>Add investors to this project before placing any fields.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {projectInvestors.map((investor) => {
-                const avatarLetter =
-                  investor.email?.trim()?.charAt(0)?.toUpperCase() ||
-                  investor.name?.trim()?.charAt(0)?.toUpperCase() ||
-                  '?';
-                const isSelectedInvestor = selectedSignerId === (investor.id ? String(investor.id) : null);
-                const isExpanded = expandedInvestors[investor.id] ?? true;
-                return (
-                  <div
-                    key={investor.id}
-                    style={{
-                      border: isSelectedInvestor ? `1px solid ${palette.accent}` : `1px solid ${palette.cardBorder}`,
-                      borderRadius: 16,
-                      padding: 16,
-                      background: isSelectedInvestor ? palette.chip || theme.colors.accentSoft : '#fff',
-                      transition: 'border-color 0.2s ease, background 0.2s ease',
-                      boxShadow: isSelectedInvestor ? theme.shadows.card : '0 6px 16px rgba(15,23,42,0.06)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: '50%',
-                            background: palette.chip,
-                            color: palette.accent,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 600,
-                            fontSize: 14,
-                          }}
-                        >
-                          {avatarLetter}
-                        </span>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <strong style={{ fontSize: 14, color: palette.textStrong }}>{investor.name}</strong>
-                          <p style={{ margin: '2px 0 0', fontSize: 12, color: palette.accentMuted }}>
-                            {investor.email}
-                            {typeof investor.units_invested === 'number' && (
-                              <span style={{ marginLeft: 6, fontSize: 12, color: palette.accentMuted }}>
-                                · {investor.units_invested} units
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleInvestorExpansion(investor.id)}
+                  {uploadingDoc ? 'Uploading…' : 'Upload PDF'}
+                </button>
+              </div>
+            ) : (
+              <>
+                {!pdfPages.length && (
+                  <p style={{ marginTop: 16, color: '#2563eb' }}>
+                    {loadingPdf || uploadingDoc ? 'Processing PDF…' : 'PDF ready. Scroll to view pages.'}
+                  </p>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 32, marginTop: 24 }}>
+                  {pdfPages.map((page) => (
+                    <div
+                      key={page.pageIndex}
+                      style={{
+                        margin: '0 auto',
+                        background: palette.cardSurface,
+                        borderRadius: 18,
+                        boxShadow: '0 35px 80px rgba(15,23,42,0.15)',
+                        border: palette.cardBorder,
+                        padding: 24,
+                      }}
+                      onClick={() => setSelectedFieldId(null)}
+                    >
+                      <div
+                        ref={registerPageRef(page.pageIndex)}
+                        data-page-container
                         style={{
-                          border: `1px solid ${palette.cardBorder}`,
-                          background: '#fff',
-                          color: palette.textStrong,
-                          borderRadius: 999,
-                          padding: '4px 12px',
-                          fontSize: 12,
-                          cursor: 'pointer',
+                          position: 'relative',
+                          width: page.width,
+                          margin: '0 auto',
                         }}
                       >
-                        {isExpanded ? 'Hide' : 'Show'}
-                      </button>
-                    </div>
-                    {isExpanded && (
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                        {Object.entries(FIELD_LABELS).map(([value, label]) => {
-                          const isActive =
-                            draggingTool?.investor.id === investor.id && draggingTool?.type === (value as FieldType);
-                          const icon = FIELD_ICONS[value as FieldType];
-                          const fullLabel = `${label} field`;
-                          return (
-                            <button
-                              key={value}
-                              type="button"
-                              onPointerDown={(event) => beginToolDrag(event, value as FieldType, investor)}
+                        <img
+                          src={page.dataUrl}
+                          alt={`Page ${page.pageIndex + 1}`}
+                          style={{ width: '100%', display: 'block', borderRadius: 8 }}
+                        />
+                        {fields
+                          .filter((field) => field.pageIndex === page.pageIndex)
+                          .map((field) => (
+                            <div
+                              key={field.id}
+                              onPointerDown={(event) => startDrag(event, field, 'move')}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedFieldId(field.id);
+                              }}
                               style={{
-                                padding: '8px 14px',
-                                borderRadius: 14,
-                                border: isActive ? `2px solid ${palette.accent}` : '1px solid rgba(148,163,184,0.4)',
-                                background: isActive ? 'rgba(56,189,248,0.15)' : '#fff',
-                                color: palette.textStrong,
-                                cursor: isActive ? 'grabbing' : 'grab',
+                                position: 'absolute',
+                                left: field.x,
+                                top: field.y,
+                                width: field.width,
+                                height: field.height,
+                                border: field.id === selectedFieldId ? `2px solid ${palette.accent}` : '1px solid rgba(17,24,39,0.6)',
+                                background: 'rgba(56,189,248,0.18)',
+                                color: theme.colors.text,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                letterSpacing: 0.2,
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 8,
-                                fontSize: 13,
-                                boxShadow: isActive ? '0 6px 12px rgba(56,189,248,0.25)' : '0 4px 10px rgba(15,23,42,0.08)',
-                                transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
-                              }}
-                              onMouseEnter={(event) => {
-                                if (isActive) return;
-                                event.currentTarget.style.background = 'rgba(148,163,184,0.12)';
-                                event.currentTarget.style.boxShadow = '0 6px 12px rgba(15,23,42,0.15)';
-                                event.currentTarget.style.transform = 'translateY(-1px)';
-                              }}
-                              onMouseLeave={(event) => {
-                                if (isActive) return;
-                                event.currentTarget.style.background = '#fff';
-                                event.currentTarget.style.boxShadow = '0 4px 10px rgba(15,23,42,0.08)';
-                                event.currentTarget.style.transform = 'translateY(0)';
+                                justifyContent: 'center',
+                                cursor: 'move',
+                                userSelect: 'none',
+                                borderRadius: 6,
+                                boxShadow: '0 6px 18px rgba(15,23,42,0.15)',
                               }}
                             >
-                              <span
-                                aria-hidden="true"
+                              {field.type === 'checkbox' ? (
+                                <span
+                                  style={{
+                                    fontSize: Math.max(12, field.height * 0.6),
+                                    color: '#0f172a',
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  ✕
+                                </span>
+                              ) : (
+                                <span>{field.name || FIELD_LABELS[field.type]}</span>
+                              )}
+                              {['signature', 'text', 'date'].includes(field.type) && (
+                                <span
+                                  style={{
+                                    position: 'absolute',
+                                    top: 6,
+                                    left: 6,
+                                    fontSize: 16,
+                                    lineHeight: 1,
+                                    pointerEvents: 'none',
+                                  }}
+                                  aria-hidden="true"
+                                >
+                                  {FIELD_ICONS[field.type as FieldType]}
+                                </span>
+                              )}
+                              {field.type === 'text' && (
+                                <span
+                                  style={{
+                                    position: 'absolute',
+                                    top: -18,
+                                    left: 0,
+                                    fontSize: 10,
+                                    padding: '2px 6px',
+                                    borderRadius: 6,
+                                    background: 'rgba(15,23,42,0.85)',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    color: '#fff',
+                                    pointerEvents: 'none',
+                                  }}
+                                >
+                                  {FONT_LABELS[field.fontFamily || DEFAULT_FONT]}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setFields((prev) => prev.filter((f) => f.id !== field.id));
+                                }}
                                 style={{
+                                  position: 'absolute',
+                                  top: -12,
+                                  right: -12,
                                   width: 24,
                                   height: 24,
                                   borderRadius: '50%',
-                                  background: 'rgba(15,23,42,0.05)',
-                                  display: 'inline-flex',
+                                  border: '1px solid #fff',
+                                  background: 'rgba(17,24,39,0.85)',
+                                  color: '#fff',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                  display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  fontSize: 14,
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                                 }}
+                                aria-label="Remove field"
                               >
-                                {icon}
-                              </span>
-                              {fullLabel}
-                            </button>
-                          );
-                        })}
+                                🗑️
+                              </button>
+                              {selectedFieldId === field.id && field.type === 'checkbox' && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: field.height + 6,
+                                    left: 0,
+                                    padding: '4px 8px',
+                                    borderRadius: 6,
+                                    background: 'rgba(15,23,42,0.9)',
+                                    color: '#fff',
+                                    fontSize: 11,
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 4px 10px rgba(15,23,42,0.25)',
+                                  }}
+                                >
+                                  {field.name || FIELD_LABELS[field.type]}
+                                </div>
+                              )}
+                              {selectedFieldId === field.id && field.type === 'text' && (
+                                <div
+                                  onPointerDown={(event) => event.stopPropagation()}
+                                  onClick={(event) => event.stopPropagation()}
+                                  style={{
+                                    position: 'absolute',
+                                    top: -field.height - 20,
+                                    left: 0,
+                                    background: '#fff',
+                                    borderRadius: 12,
+                                    border: '1px solid rgba(148,163,184,0.5)',
+                                    padding: 10,
+                                    boxShadow: '0 12px 25px rgba(15,23,42,0.2)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 6,
+                                    minWidth: 200,
+                                    zIndex: 30,
+                                  }}
+                                >
+                                  <label style={{ fontSize: 11, color: palette.accentMuted }}>Font</label>
+                                  <select
+                                    value={field.fontFamily || DEFAULT_FONT}
+                                    onChange={(event) => updateField(field.id, { fontFamily: event.target.value as FontChoice })}
+                                    style={{
+                                      padding: 6,
+                                      borderRadius: 6,
+                                      border: '1px solid rgba(148,163,184,0.6)',
+                                      fontSize: 12,
+                                    }}
+                                  >
+                                    {TEXT_FONT_OPTIONS.map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                              <div
+                                onPointerDown={(event) => {
+                                  event.stopPropagation();
+                                  startDrag(event, field, 'resize');
+                                }}
+                                style={{
+                                  position: 'absolute',
+                                  right: -7,
+                                  bottom: -7,
+                                  width: 14,
+                                  height: 14,
+                                  background: '#2563eb',
+                                  borderRadius: '50%',
+                                  cursor: 'nwse-resize',
+                                }}
+                              />
+                            </div>
+                          ))}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        {error && (
-          <div
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+
+          <section
             style={{
-              border: '1px solid rgba(248,113,113,0.5)',
-              borderRadius: 16,
-              padding: 16,
-              background: 'rgba(185,28,28,0.12)',
-              color: '#fecaca',
-              boxShadow: '0 15px 25px rgba(185,28,28,0.25)',
+              position: 'sticky',
+              top: 24,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 24,
+              minWidth: isMobile ? 'auto' : 360,
             }}
           >
-            {error}
-          </div>
-        )}
+            <div
+              style={{
+                border: palette.cardBorder,
+                borderRadius: 24,
+                padding: 24,
+                background: palette.cardSurface,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+                boxShadow: palette.cardShadow,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: palette.textStrong }}>Investors</h3>
+                  <p style={{ fontSize: 12, color: palette.accentMuted, margin: 4 }}>
+                    Drag a signer’s field onto the PDF to place it.
+                  </p>
+                </div>
+              </div>
+              {!projectInvestors.length ? (
+                <p style={{ fontSize: 13, color: palette.accentMuted }}>Add investors to this project before placing any fields.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {projectInvestors.map((investor) => {
+                    const avatarLetter =
+                      investor.email?.trim()?.charAt(0)?.toUpperCase() ||
+                      investor.name?.trim()?.charAt(0)?.toUpperCase() ||
+                      '?';
+                    const isSelectedInvestor = selectedSignerId === (investor.id ? String(investor.id) : null);
+                    const isExpanded = expandedInvestors[investor.id] ?? true;
+                    return (
+                      <div
+                        key={investor.id}
+                        style={{
+                          border: isSelectedInvestor ? `1px solid ${palette.accent}` : `1px solid ${palette.cardBorder}`,
+                          borderRadius: 16,
+                          padding: 16,
+                          background: isSelectedInvestor ? palette.chip || theme.colors.accentSoft : '#fff',
+                          transition: 'border-color 0.2s ease, background 0.2s ease',
+                          boxShadow: isSelectedInvestor ? theme.shadows.card : '0 6px 16px rgba(15,23,42,0.06)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: '50%',
+                                background: palette.chip,
+                                color: palette.accent,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 600,
+                                fontSize: 14,
+                              }}
+                            >
+                              {avatarLetter}
+                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <strong style={{ fontSize: 14, color: palette.textStrong }}>{investor.name}</strong>
+                              <p style={{ margin: '2px 0 0', fontSize: 12, color: palette.accentMuted }}>
+                                {investor.email}
+                                {typeof investor.units_invested === 'number' && (
+                                  <span style={{ marginLeft: 6, fontSize: 12, color: palette.accentMuted }}>
+                                    · {investor.units_invested} units
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleInvestorExpansion(investor.id)}
+                            style={{
+                              border: `1px solid ${palette.cardBorder}`,
+                              background: '#fff',
+                              color: palette.textStrong,
+                              borderRadius: 999,
+                              padding: '4px 12px',
+                              fontSize: 12,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {isExpanded ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
+                        {isExpanded && (
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                            {Object.entries(FIELD_LABELS).map(([value, label]) => {
+                              const isActive =
+                                draggingTool?.investor.id === investor.id && draggingTool?.type === (value as FieldType);
+                              const icon = FIELD_ICONS[value as FieldType];
+                              const fullLabel = `${label} field`;
+                              return (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onPointerDown={(event) => beginToolDrag(event, value as FieldType, investor)}
+                                  style={{
+                                    padding: '8px 14px',
+                                    borderRadius: 14,
+                                    border: isActive ? `2px solid ${palette.accent}` : '1px solid rgba(148,163,184,0.4)',
+                                    background: isActive ? 'rgba(56,189,248,0.15)' : '#fff',
+                                    color: palette.textStrong,
+                                    cursor: isActive ? 'grabbing' : 'grab',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    fontSize: 13,
+                                    boxShadow: isActive ? '0 6px 12px rgba(56,189,248,0.25)' : '0 4px 10px rgba(15,23,42,0.08)',
+                                    transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+                                  }}
+                                  onMouseEnter={(event) => {
+                                    if (isActive) return;
+                                    event.currentTarget.style.background = 'rgba(148,163,184,0.12)';
+                                    event.currentTarget.style.boxShadow = '0 6px 12px rgba(15,23,42,0.15)';
+                                    event.currentTarget.style.transform = 'translateY(-1px)';
+                                  }}
+                                  onMouseLeave={(event) => {
+                                    if (isActive) return;
+                                    event.currentTarget.style.background = '#fff';
+                                    event.currentTarget.style.boxShadow = '0 4px 10px rgba(15,23,42,0.08)';
+                                    event.currentTarget.style.transform = 'translateY(0)';
+                                  }}
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    style={{
+                                      width: 24,
+                                      height: 24,
+                                      borderRadius: '50%',
+                                      background: 'rgba(15,23,42,0.05)',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: 14,
+                                    }}
+                                  >
+                                    {icon}
+                                  </span>
+                                  {fullLabel}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {error && (
+              <div
+                style={{
+                  border: '1px solid rgba(248,113,113,0.5)',
+                  borderRadius: 16,
+                  padding: 16,
+                  background: 'rgba(185,28,28,0.12)',
+                  color: '#fecaca',
+                  boxShadow: '0 15px 25px rgba(185,28,28,0.25)',
+                }}
+              >
+                {error}
+              </div>
+            )}
 
-      </section>
-    </div>
-  </div>
+          </section>
+        </div>
+      </div>
       <div
         style={{
           position: 'fixed',

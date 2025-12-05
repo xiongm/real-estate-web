@@ -3845,17 +3845,103 @@ export default function AdminPage() {
                           background: '#ffffff',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: 16,
+                          gap: 24,
                           boxShadow: '0 18px 32px rgba(15,23,42,0.08)',
                         }}
                       >
-                        <div>
-                          <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Project access token</p>
+                        {/* Project Access Token Section */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                          <div>
+                            <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Project access token</p>
+                            <div
+                              style={{
+                                marginTop: 8,
+                                padding: '10px 14px',
+                                borderRadius: 10,
+                                background: '#f4f5fb',
+                                fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                                fontSize: 13,
+                                color: palette.text,
+                                wordBreak: 'break-all',
+                              }}
+                            >
+                              {selectedProjectToken || 'Not generated yet'}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => copyProjectToken(selectedProjectToken)}
+                              disabled={!selectedProjectToken}
+                              style={{
+                                borderRadius: 999,
+                                border: `1px solid ${palette.accent}`,
+                                background: selectedProjectToken ? '#ede9ff' : '#f4f4f5',
+                                color: selectedProjectToken ? palette.accent : palette.accentMuted,
+                                padding: '6px 14px',
+                                fontSize: 13,
+                                cursor: selectedProjectToken ? 'pointer' : 'not-allowed',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Copy token
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => selectedProjectId && regenerateProjectToken(selectedProjectId)}
+                              style={{
+                                borderRadius: 999,
+                                border: '1px solid rgba(248,113,113,0.4)',
+                                background: '#fff4f4',
+                                color: '#e11d48',
+                                padding: '6px 14px',
+                                fontSize: 13,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Regenerate token
+                            </button>
+                          </div>
+                          <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>
+                            Share this token with trusted investors for read-only access. Rotating it immediately revokes older tokens.
+                          </p>
+                        </div>
+
+                        <div style={{ height: 1, background: palette.border, width: '100%' }} />
+
+                        {/* Investor Link Section */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                            <div>
+                              <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Investor link</p>
+                              <p style={{ margin: '4px 0 0', fontSize: 13 }}>
+                                Anyone with this link can view the project dashboard in read-only mode.
+                              </p>
+                            </div>
+                            {shareLink && (
+                              <button
+                                type="button"
+                                onClick={() => copyProjectToken(shareLink)}
+                                style={{
+                                  borderRadius: 999,
+                                  border: `1px solid ${palette.accent}`,
+                                  background: '#ede9ff',
+                                  color: palette.accent,
+                                  padding: '6px 12px',
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Copy link
+                              </button>
+                            )}
+                          </div>
                           <div
                             style={{
-                              marginTop: 8,
-                              padding: '10px 14px',
-                              borderRadius: 10,
+                              marginTop: 4,
+                              padding: '12px 14px',
+                              borderRadius: 14,
                               background: '#f4f5fb',
                               fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                               fontSize: 13,
@@ -3863,139 +3949,19 @@ export default function AdminPage() {
                               wordBreak: 'break-all',
                             }}
                           >
-                            {selectedProjectToken || 'Not generated yet'}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            onClick={() => copyProjectToken(selectedProjectToken)}
-                            disabled={!selectedProjectToken}
-                            style={{
-                              borderRadius: 999,
-                              border: `1px solid ${palette.accent}`,
-                              background: selectedProjectToken ? '#ede9ff' : '#f4f4f5',
-                              color: selectedProjectToken ? palette.accent : palette.accentMuted,
-                              padding: '6px 14px',
-                              fontSize: 13,
-                              cursor: selectedProjectToken ? 'pointer' : 'not-allowed',
-                              fontWeight: 600,
-                            }}
-                          >
-                            Copy token
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => selectedProjectId && regenerateProjectToken(selectedProjectId)}
-                            style={{
-                              borderRadius: 999,
-                              border: '1px solid rgba(248,113,113,0.4)',
-                              background: '#fff4f4',
-                              color: '#e11d48',
-                              padding: '6px 14px',
-                              fontSize: 13,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Regenerate token
-                          </button>
-                        </div>
-                        <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>
-                          Share this token with trusted investors for read-only access. Rotating it immediately revokes older tokens.
-                        </p>
-                      </div>
-                      <div
-                        style={{
-                          borderRadius: 24,
-                          border: `1px solid ${palette.border}`,
-                          padding: 24,
-                          background: '#ffffff',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 16,
-                          boxShadow: '0 18px 32px rgba(15,23,42,0.08)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                          <div>
-                            <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>Investor link</p>
-                            <p style={{ margin: '4px 0 0', fontSize: 13 }}>
-                              Anyone with this link can view the project dashboard in read-only mode.
-                            </p>
+                            {shareLink || 'Select a project with an access token.'}
                           </div>
                           {shareLink && (
-                            <button
-                              type="button"
-                              onClick={() => copyProjectToken(shareLink)}
-                              style={{
-                                borderRadius: 999,
-                                border: `1px solid ${palette.accent}`,
-                                background: '#ede9ff',
-                                color: palette.accent,
-                                padding: '6px 12px',
-                                fontSize: 12,
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                              }}
+                            <a
+                              href={shareLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: palette.accent, fontSize: 13 }}
                             >
-                              Copy link
-                            </button>
+                              Open viewer ↗
+                            </a>
                           )}
                         </div>
-                        <div
-                          style={{
-                            marginTop: 4,
-                            padding: '12px 14px',
-                            borderRadius: 14,
-                            background: '#f4f5fb',
-                            fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                            fontSize: 13,
-                            color: palette.text,
-                            wordBreak: 'break-all',
-                          }}
-                        >
-                          {shareLink || 'Select a project with an access token.'}
-                        </div>
-                        {shareLink && (
-                          <a
-                            href={shareLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ color: palette.accent, fontSize: 13 }}
-                          >
-                            Open viewer ↗
-                          </a>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          borderRadius: 16,
-                          border: `1px solid ${palette.border}`,
-                          padding: 20,
-                          background: '#ffffff',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 12,
-                          boxShadow: '0 15px 30px rgba(15,23,42,0.08)',
-                        }}
-                      >
-                        <div>
-                          <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>API example</p>
-                          <pre
-                            style={{
-                              marginTop: 8,
-                              padding: 16,
-                              borderRadius: 12,
-                              background: '#f4f5fb',
-                              fontSize: 13,
-                              overflowX: 'auto',
-                            }}
-                          >{`curl -H "X-Access-Token: ${selectedProjectToken || '<token>'}" \\\n  ${baseApi}/api/projects/${selectedProjectId}/documents`}</pre>
-                        </div>
-                        <p style={{ margin: 0, fontSize: 13, color: palette.accentMuted }}>
-                          Investors can use the token to download documents or monitor signing status via the API. Admins should keep
-                          their global token private; only share project tokens with stakeholders who should see this project.
-                        </p>
                       </div>
                     </>
                   ) : (

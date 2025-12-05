@@ -4240,7 +4240,7 @@ export default function AdminPage() {
                             disabled={creatingInvestor}
                             style={primaryButtonStyle(!creatingInvestor)}
                           >
-                            {creatingInvestor ? 'Adding…' : 'Add investor'}
+                            {creatingInvestor ? 'Adding…' : 'Submit'}
                           </button>
                         </div>
                       </div>

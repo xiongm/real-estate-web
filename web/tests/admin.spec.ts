@@ -335,7 +335,7 @@ test.describe('Admin portal', () => {
 
     // Open the add investor form and trigger validation
     await page.getByRole('button', { name: /Add investor/i }).click();
-    const submitButton = page.getByRole('button', { name: /^Add investor$/ });
+    const submitButton = page.getByRole('button', { name: /^Submit$/ });
     await submitButton.click();
 
     const errorBanner = page.getByText('Name, email, and units are required to add an investor.');

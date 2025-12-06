@@ -1,4 +1,4 @@
-import { UploadOptions, UploadProgress, UploadResponse } from './upload-types'; // Assuming types might need to be defined or inferred, but based on previous context, I'll inline interfaces if needed or stick to the implementation. Waiting, the types weren't in the snippet. I should probably include them or make it self-contained. The previous snippet didn't show imports. I'll make it self-contained.
+
 
 export interface UploadOptions {
     url: string;
@@ -15,7 +15,7 @@ export function uploadFile<T = any>({
     file,
     token,
     onProgress,
-    maxSizeMB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE_MB) || 20,
+    maxSizeMB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE_MB) || 10,
     timeoutMs = Number(process.env.NEXT_PUBLIC_UPLOAD_TIMEOUT_MS) || 60000,
     additionalFields,
 }: UploadOptions): Promise<T> {

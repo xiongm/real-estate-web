@@ -615,7 +615,7 @@ export default function AdminPage() {
   }, [selectedProjectId, cancelHeroEdit]);
   useEffect(() => {
     if (!heroMenuOpen) return;
-    const handleKey = (event: KeyboardEvent) => {
+    const handleKey = (event: any) => {
       if (event.key === 'Escape') {
         setHeroMenuOpen(false);
       }
@@ -1017,8 +1017,11 @@ export default function AdminPage() {
         headers: { 'X-Access-Token': adminToken },
       });
       if (!resp.ok) throw new Error(`Failed to delete document (${resp.status})`);
+      const file = projectFiles.find((f) => f.id === fileId);
       setProjectFiles((prev) => prev.filter((file) => file.id !== fileId));
       maybeRefreshAudit();
+      const fileName = file?.display_name || 'Document';
+      showToast(`${fileName} deleted successfully`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete document');
     } finally {
@@ -1411,11 +1414,29 @@ export default function AdminPage() {
       `Delete ${parts.join(' and ')}? This cannot be undone. Awaiting documents will be revoked.`,
     );
     if (!confirmRemove) return;
+    let success = false;
     if (signedCount) {
-      await deleteSelectedFinals({ skipConfirm: true });
+      const res = await deleteSelectedFinals({ skipConfirm: true });
+      if (res) success = true;
     }
     if (awaitingCount) {
-      await revokeSelectedEnvelopes({ skipConfirm: true });
+      const res = await revokeSelectedEnvelopes({ skipConfirm: true });
+      if (res) success = true;
+    }
+    if (success) {
+      if (signedCount + awaitingCount === 1) {
+        let name = '';
+        if (signedCount === 1) {
+          const item = finals.find((f) => f.envelope_id === selectedFinalIds[0]);
+          name = item?.document_name || 'Signed document';
+        } else {
+          const item = envelopes.find((e) => e.id === selectedEnvelopeIds[0]);
+          name = item?.document?.filename || item?.subject || 'Envelope';
+        }
+        showToast(`${name} deleted successfully`);
+      } else {
+        showToast('Selected documents deleted successfully');
+      }
     }
   };
 

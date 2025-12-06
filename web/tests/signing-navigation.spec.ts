@@ -478,6 +478,58 @@ test.describe('signing navigation UI', () => {
     await expect(secondText).toBeFocused();
   });
 
+  test('Start button has sticky positioning', async ({ page }) => {
+    const token = 'sticky-start-test';
+    const fields = [
+      { id: 'sig-1', type: 'signature', required: true, page: 1, x: 120, y: 720, w: 220, h: 60 },
+    ];
+
+    await page.addInitScript(
+      ({ t, sig, init }) => {
+        localStorage.setItem(
+          `sign-adoption:${t}`,
+          JSON.stringify({ signature: sig, initials: init, method: 'draw' })
+        );
+      },
+      { t: token, sig: fakeSignature, init: fakeInitials }
+    );
+
+    await page.route(`**/api/sign/${token}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          signer: { id: 88, name: 'Sticky User', email: 'sticky@example.com', role: 'signer', status: 'pending' },
+          envelope: { subject: 'Sticky Doc' },
+          fields,
+        }),
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/pdf`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        body: pdfBuffer,
+      });
+    });
+
+    await page.route('**/pdf.worker.min.mjs', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/javascript', body: workerScript });
+    });
+
+    await page.goto(`/sign/${token}`);
+    await expect(page.locator('img[alt^="Page"]')).toHaveCount(1);
+
+    const chip = page.getByTestId('action-chip');
+    await expect(chip).toBeVisible();
+    await expect(chip).toHaveText(/START/i);
+
+    // Assert stickiness
+    await expect(chip).toHaveCSS('position', 'sticky');
+    await expect(chip).toHaveCSS('top', '12px');
+  });
+
   test('Chip cycles through signature and datetime fields in order', async ({ page }) => {
     const token = 'sig-datetime-cycle';
     const fields = [

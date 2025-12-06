@@ -61,18 +61,16 @@ export function ActionChip({
       }
 
       // Start state: park near the top-left of the first page.
-      // Start state: dock near the top-left of the document container.
       const firstPage = doc.querySelector('[data-page-container]') as HTMLElement | null;
       const anchorRect = firstPage?.getBoundingClientRect();
-      if (anchorRect) {
-        const top = anchorRect.top - docRect.top + doc.scrollTop - 12;
-        const left = anchorRect.left - docRect.left + doc.scrollLeft + 4;
-        setPos({ top: Math.max(0, top), left: Math.max(0, left) });
-      } else {
-        setPos({ top: Math.max(0, doc.scrollTop), left: Math.max(0, doc.scrollLeft) });
-      }
+      const leftBase = anchorRect
+        ? anchorRect.left - docRect.left + doc.scrollLeft + 4
+        : doc.scrollLeft + 12;
+
+      // Sticky at the top of the viewport
+      setPos({ top: 12, left: Math.max(8, leftBase) });
     },
-    [targetField, docRef, fieldRefs]
+    [targetField, docRef, fieldRefs, showStartLabel]
   );
 
   useLayoutEffect(() => {
@@ -117,7 +115,7 @@ export function ActionChip({
       data-testid="action-chip"
       onClick={onAction}
       style={{
-        position: 'absolute',
+        position: showStartLabel ? 'sticky' : 'absolute',
         top: pos.top,
         left: pos.left,
         transform: 'translate3d(0,0,0)',
@@ -132,7 +130,7 @@ export function ActionChip({
         alignItems: 'center',
         gap: 8,
         cursor: 'pointer',
-        transition: 'top 0.35s cubic-bezier(0.22, 0.61, 0.36, 1), left 0.25s ease',
+        transition: showStartLabel ? 'none' : 'top 0.35s cubic-bezier(0.22, 0.61, 0.36, 1), left 0.25s ease',
         clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%)',
         minHeight: 42,
       }}

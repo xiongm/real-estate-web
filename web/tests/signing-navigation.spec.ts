@@ -19,11 +19,11 @@ const fakeInitials =
   'iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAI0lEQVR42mNkYGD4z0AEYBxVSFUBR6NRgWoGQwAJjgYoGqAeAADqHwPiBM6ZyAAAAABJRU5ErkJggg==';
 
 test.describe('navigation helpers', () => {
-const orderedFields = [
-  { id: 'a', type: 'text', required: true, page: 1, x: 40, y: 700 },
-  { id: 'b', type: 'checkbox', required: true, page: 1, x: 40, y: 600 },
-  { id: 'c', type: 'text', required: false, page: 2, x: 20, y: 500 },
-];
+  const orderedFields = [
+    { id: 'a', type: 'text', required: true, page: 1, x: 40, y: 700 },
+    { id: 'b', type: 'checkbox', required: true, page: 1, x: 40, y: 600 },
+    { id: 'c', type: 'text', required: false, page: 2, x: 20, y: 500 },
+  ];
 
   test('orders and selects next required field correctly', () => {
     const requiredFields = orderedFields.filter(isRequiredField).sort(sortFieldOrder);
@@ -540,6 +540,7 @@ test.describe('signing navigation UI', () => {
 
     for (let i = 0; i < targetSelectors.length; i += 1) {
       await chip.click();
+      await page.waitForTimeout(400); // Allow animation to complete
       const { chipTop, fieldCenter } = await page.evaluate((sel) => {
         const chipEl = document.querySelector('[data-testid="action-chip"]') as HTMLElement | null;
         const fieldEl = document.querySelector(sel) as HTMLElement | null;

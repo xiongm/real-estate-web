@@ -46,7 +46,7 @@ export function ActionChip({
 
       // Active state: anchor to current target field.
       const ref = targetField ? fieldRefs.current[String(targetField.id)] : null;
-      if (ref) {
+      if (ref && !showStartLabel) {
         const rect = ref.getBoundingClientRect();
         const pageElement =
           (ref.closest?.('[data-page-container]') as HTMLElement | null) ||

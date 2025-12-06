@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import InvestorsPage from '../investors/page';
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
 import { theme } from '../../lib/theme';
+import { Toast } from '../../components/Toast';
+import { ProgressBar } from '../../components/ProgressBar';
+import { uploadFile } from '../../lib/upload';
 
 if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -145,6 +148,15 @@ const randomId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
+type SignerForm = {
+  id: string;
+  projectInvestorId: number | null;
+  name: string;
+  email: string;
+  role: string;
+  routing_order: number;
+};
+
 const createSigner = (order: number): SignerForm => ({
   id: randomId(),
   projectInvestorId: null,
@@ -184,6 +196,8 @@ export default function RequestSignPage() {
   const [exportJson, setExportJson] = useState('');
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -209,6 +223,7 @@ export default function RequestSignPage() {
   const [adminTokenLoading, setAdminTokenLoading] = useState(true);
   const [adminTokenError, setAdminTokenError] = useState<string | null>(null);
   const [tokenInput, setTokenInput] = useState('');
+  const [investorForm, setInvestorForm] = useState({ name: '', email: '', units: '' });
   const [verifyingLocally, setVerifyingLocally] = useState(false);
   const readyToReview = Boolean(documentInfo && fields.length > 0);
   const [isMobile, setIsMobile] = useState(false);
@@ -539,22 +554,21 @@ export default function RequestSignPage() {
       throw new Error('Missing admin token');
     }
     setUploadingDoc(true);
+    setUploadProgress(0);
     setError(null);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      const response = await fetch(`${baseApi}/api/projects/${projectNumeric}/documents`, {
-        method: 'POST',
-        headers: { 'X-Access-Token': adminToken ?? '' },
-        body: form,
+      const doc = await uploadFile<{ id?: number; filename?: string } | { id?: number; filename?: string }[]>({
+        url: `${baseApi}/api/projects/${projectNumeric}/documents`,
+        file,
+        token: adminToken,
+        onProgress: setUploadProgress,
       });
-      if (!response.ok) {
-        const detail = await safeParseError(response);
-        throw new Error(detail || `Upload failed (${response.status})`);
-      }
-      const doc = await response.json();
-      let resolvedDoc: { id?: number; filename?: string } | null = doc;
-      if (!doc?.id) {
+
+      // Handle potential array response
+      const docObj = Array.isArray(doc) ? doc[0] : doc;
+
+      let resolvedDoc: { id?: number; filename?: string } | null = docObj;
+      if (!docObj?.id) {
         try {
           const listResp = await fetch(`${baseApi}/api/projects/${projectNumeric}/documents`, {
             headers: { 'X-Access-Token': adminToken ?? '' },
@@ -566,19 +580,22 @@ export default function RequestSignPage() {
             }
           }
         } catch {
-          /* ignore and fallback to original response */
+          /* ignore and fallback */
         }
       }
+
       if (!resolvedDoc?.id) {
         throw new Error('Upload succeeded but document id was not returned. Please retry.');
       }
       setDocumentInfo(resolvedDoc as { id: number; filename: string });
       setSubject(resolvedDoc.filename || 'Please sign');
+      setToastMessage('Document uploaded successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload document');
       throw err;
     } finally {
       setUploadingDoc(false);
+      setUploadProgress(0);
     }
   };
 
@@ -1243,6 +1260,16 @@ export default function RequestSignPage() {
                 >
                   {uploadingDoc ? 'Uploading…' : 'Upload PDF'}
                 </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginTop: 16 }}>
+                  {uploadingDoc && (
+                    <div style={{ width: 100 }}>
+                      <ProgressBar progress={uploadProgress} />
+                    </div>
+                  )}
+                  <span style={{ fontSize: 13, color: '#64748b' }}>
+                    {uploadingDoc ? 'Uploading...' : 'No document loaded'}
+                  </span>
+                </div>
               </div>
             ) : (
               <>
@@ -2093,6 +2120,13 @@ export default function RequestSignPage() {
             )}
           </div>
         </div>
+      )}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setToastMessage(null)}
+          type="success"
+        />
       )}
     </div>
   );

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, FormEvent, CSSProper
 import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
 import { AISummaryCard } from '../sign/AISummaryCard';
+import { Toast } from '../../components/Toast';
+import { ProgressBar } from '../../components/ProgressBar';
+import { uploadFile } from '../../lib/upload';
 
 type Project = {
   id: number;
@@ -228,6 +231,7 @@ export default function AdminPage() {
   const [selectedInvestorIds, setSelectedInvestorIds] = useState<number[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [showInvestorForm, setShowInvestorForm] = useState(false);
   const [newInvestorName, setNewInvestorName] = useState('');
   const [newInvestorEmail, setNewInvestorEmail] = useState('');
@@ -978,26 +982,26 @@ export default function AdminPage() {
       return;
     }
     const label = projectFileUploadName.trim() || projectFileUploadFile.name || 'Project document';
-    const formData = new FormData();
-    formData.append('file', projectFileUploadFile);
-    formData.append('label', label);
     setProjectFileUploading(true);
+    setUploadProgress(0);
     try {
-      const resp = await fetch(`${baseApi}/api/projects/${selectedProjectId}/files`, {
-        method: 'POST',
-        headers: { 'X-Access-Token': adminToken },
-        body: formData,
+      const created = await uploadFile({
+        url: `${baseApi}/api/projects/${selectedProjectId}/files`,
+        file: projectFileUploadFile,
+        token: adminToken,
+        additionalFields: { label },
+        onProgress: setUploadProgress,
       });
-      if (!resp.ok) throw new Error(`Failed to upload document (${resp.status})`);
-      const created = await resp.json();
       setProjectFiles((prev) => [created, ...prev]);
       setProjectFileUploadFile(null);
       setProjectFileUploadName('');
       maybeRefreshAudit();
+      showToast('Document uploaded successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload document');
     } finally {
       setProjectFileUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -3705,6 +3709,11 @@ export default function AdminPage() {
                               {projectFileUploading ? 'Uploading…' : 'Upload'}
                             </button>
                           </div>
+                          {projectFileUploading && (
+                            <div style={{ marginTop: 12 }}>
+                              <ProgressBar progress={uploadProgress} label="Uploading..." />
+                            </div>
+                          )}
                         </div>
                       )}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -4844,6 +4853,13 @@ export default function AdminPage() {
           cursor: pointer;
         }
       `}</style>
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          onClose={() => setToastMessage(null)}
+          type="success"
+        />
+      )}
     </div>
   );
 

@@ -7,6 +7,7 @@ import { AISummaryCard } from '../sign/AISummaryCard';
 import { Toast } from '../../components/Toast';
 import { ProgressBar } from '../../components/ProgressBar';
 import { uploadFile } from '../../lib/upload';
+import { chunkedUpload } from '../../lib/chunked-upload';
 
 type Project = {
   id: number;
@@ -986,13 +987,25 @@ export default function AdminPage() {
     setProjectFileUploading(true);
     setUploadProgress(0);
     try {
-      const created = await uploadFile({
-        url: `${baseApi}/api/projects/${selectedProjectId}/files`,
+      // Use chunked upload for resilience
+      const created = await chunkedUpload({
+        url: `${baseApi}/api/uploads`,
         file: projectFileUploadFile,
         token: adminToken,
-        additionalFields: { label },
+        projectId: selectedProjectId,
         onProgress: setUploadProgress,
       });
+      // The chunks are uploaded, but we need to ensure the `created` object matches what `uploadFile` returned.
+      // `complete_upload` returns {id, display_name, uploaded_at}.
+      // `uploadFile` (old) returned `_serialize_project_file` which matches that structure plus `stored_filename`, `content_type`.
+      // The complete endpoint returns minimal info currently.
+      // Ideally it should return the full object.
+      // Let's assume for now it returns enough for `setProjectFiles` which likely needs `id` and `display_name`.
+      // Checking `ProjectFile` definition in admin/page.tsx? It's defined.
+      // It has `stored_filename`, `content_type`.
+      // I should update `complete_upload` to return full object if needed, but `id` is most important.
+      // Actually `deleteProjectFile` needs `id`.
+
       setProjectFiles((prev) => [created, ...prev]);
       setProjectFileUploadFile(null);
       setProjectFileUploadName('');

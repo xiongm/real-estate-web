@@ -25,6 +25,8 @@ app.include_router(audit.router, prefix="/api/projects", tags=["audit"])
 app.include_router(envelopes.router, prefix="/api/envelopes", tags=["envelopes"])
 app.include_router(signing.router, prefix="/api/sign", tags=["signing"])
 app.include_router(places.router, prefix="/api/places", tags=["places"])
+from .routers import chunked_uploads
+app.include_router(chunked_uploads.router, prefix="/api/uploads", tags=["uploads"])
 
 @app.get("/")
 def root():

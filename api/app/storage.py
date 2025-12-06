@@ -30,3 +30,17 @@ def delete_object(key: str):
         _client.remove_object(MINIO_BUCKET, key)
     except Exception:
         pass
+
+def put_temp_chunk(key: str, data: bytes):
+    ensure_bucket()
+    _client.put_object(MINIO_BUCKET, key, io.BytesIO(data), length=len(data), content_type="application/octet-stream")
+
+def compose_chunks(dest_key: str, source_keys: list[str]):
+    ensure_bucket()
+    from minio.commonconfig import ComposeSource
+    sources = [ComposeSource(MINIO_BUCKET, k) for k in source_keys]
+    _client.compose_object(MINIO_BUCKET, dest_key, sources)
+    # Cleanup
+    for k in source_keys:
+        delete_object(k)
+

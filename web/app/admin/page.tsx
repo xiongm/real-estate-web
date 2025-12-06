@@ -996,7 +996,7 @@ export default function AdminPage() {
       setProjectFileUploadFile(null);
       setProjectFileUploadName('');
       maybeRefreshAudit();
-      showToast('Document uploaded successfully');
+      showToast(`Document "${label}" uploaded successfully`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload document');
     } finally {

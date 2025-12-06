@@ -589,7 +589,7 @@ export default function RequestSignPage() {
       }
       setDocumentInfo(resolvedDoc as { id: number; filename: string });
       setSubject(resolvedDoc.filename || 'Please sign');
-      setToastMessage('Document uploaded successfully');
+      setToastMessage(`Document "${resolvedDoc.filename || 'uploaded document'}" uploaded successfully`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload document');
       throw err;
@@ -1260,15 +1260,14 @@ export default function RequestSignPage() {
                 >
                   {uploadingDoc ? 'Uploading…' : 'Upload PDF'}
                 </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginTop: 16 }}>
-                  {uploadingDoc && (
-                    <div style={{ width: 100 }}>
-                      <ProgressBar progress={uploadProgress} />
+                <div style={{ marginTop: 16 }}>
+                  {uploadingDoc ? (
+                    <ProgressBar progress={uploadProgress} label="Uploading..." />
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <span style={{ fontSize: 13, color: '#64748b' }}>No document loaded</span>
                     </div>
                   )}
-                  <span style={{ fontSize: 13, color: '#64748b' }}>
-                    {uploadingDoc ? 'Uploading...' : 'No document loaded'}
-                  </span>
                 </div>
               </div>
             ) : (

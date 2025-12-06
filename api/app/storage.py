@@ -35,11 +35,51 @@ def put_temp_chunk(key: str, data: bytes):
     ensure_bucket()
     _client.put_object(MINIO_BUCKET, key, io.BytesIO(data), length=len(data), content_type="application/octet-stream")
 
+class MultiObjectReader(io.RawIOBase):
+    def __init__(self, client, bucket, keys):
+        self.client = client
+        self.bucket = bucket
+        self.keys = list(keys)
+        self.current_key_idx = 0
+        self.current_resp = None
+        self.buffer = b""
+
+    def read(self, size=-1):
+        if size == -1:
+            size = 10 * 1024 * 1024 # Read 10MB chunks if unspecified
+        
+        chunk = b""
+        while len(chunk) < size:
+            if self.current_resp is None:
+                if self.current_key_idx >= len(self.keys):
+                    break
+                key = self.keys[self.current_key_idx]
+                self.current_resp = self.client.get_object(self.bucket, key)
+            
+            data = self.current_resp.read(size - len(chunk))
+            if not data:
+                self.current_resp.close()
+                self.current_resp.release_conn()
+                self.current_resp = None
+                self.current_key_idx += 1
+                continue
+            chunk += data
+            
+        return chunk
+
 def compose_chunks(dest_key: str, source_keys: list[str]):
     ensure_bucket()
-    from minio.commonconfig import ComposeSource
-    sources = [ComposeSource(MINIO_BUCKET, k) for k in source_keys]
-    _client.compose_object(MINIO_BUCKET, dest_key, sources)
+    
+    # Calculate total size
+    total_size = 0
+    for k in source_keys:
+        total_size += _client.stat_object(MINIO_BUCKET, k).size
+        
+    reader = MultiObjectReader(_client, MINIO_BUCKET, source_keys)
+    
+    # Upload as a single stream (minio client handles multipart if large)
+    _client.put_object(MINIO_BUCKET, dest_key, reader, length=total_size)
+    
     # Cleanup
     for k in source_keys:
         delete_object(k)

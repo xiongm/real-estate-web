@@ -8,6 +8,7 @@ import { theme } from '../../lib/theme';
 import { Toast } from '../../components/Toast';
 import { ProgressBar } from '../../components/ProgressBar';
 import { uploadFile } from '../../lib/upload';
+import { chunkedUpload } from '../../lib/chunked-upload';
 
 if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -502,7 +503,7 @@ export default function RequestSignPage() {
     window.addEventListener('pointerup', onPointerUp);
   };
 
-  const loadPdfFromArrayBuffer = async (buffer: ArrayBuffer) => {
+  const loadPdfFromArrayBuffer = async (buffer: ArrayBuffer, onProgress?: (percent: number) => void) => {
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf');
     setLoadingPdf(true);
     setError(null);
@@ -511,6 +512,7 @@ export default function RequestSignPage() {
       const pdf = await pdfjs.getDocument({ data: typedArray }).promise;
       const pages: PageRender[] = [];
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        if (onProgress) onProgress(Math.round((pageNumber / pdf.numPages) * 100));
         const page = await pdf.getPage(pageNumber);
         const baseViewport = page.getViewport({ scale: 1 });
         const maxWidth = Math.min(900, window.innerWidth - 80);
@@ -543,7 +545,7 @@ export default function RequestSignPage() {
     }
   };
 
-  const uploadDocumentToProject = async (file: File) => {
+  const uploadDocumentToProject = async (file: File, onProgress?: (percent: number) => void) => {
     const projectNumeric = selectedProjectId;
     if (!projectNumeric) {
       setError('Open Request Sign from Admin so a project is selected before uploading.');
@@ -554,21 +556,27 @@ export default function RequestSignPage() {
       throw new Error('Missing admin token');
     }
     setUploadingDoc(true);
-    setUploadProgress(0);
+    if (!onProgress) setUploadProgress(0); // Only reset if no custom handler
     setError(null);
     try {
-      const doc = await uploadFile<{ id?: number; filename?: string } | { id?: number; filename?: string }[]>({
-        url: `${baseApi}/api/projects/${projectNumeric}/documents`,
+      // Use chunked upload
+      const doc = await chunkedUpload({
+        url: `${baseApi}/api/uploads`,
         file,
         token: adminToken,
-        onProgress: setUploadProgress,
+        projectId: projectNumeric,
+        targetType: 'document',
+        onProgress: (p) => {
+          if (onProgress) onProgress(p);
+          else setUploadProgress(p);
+        },
       });
 
-      // Handle potential array response
-      const docObj = Array.isArray(doc) ? doc[0] : doc;
+      // chunkedUpload returns a single object
+      let resolvedDoc: { id?: number; filename?: string } | null = doc;
 
-      let resolvedDoc: { id?: number; filename?: string } | null = docObj;
-      if (!docObj?.id) {
+      // Fallback verification if ID is missing (shouldn't happen with new backend)
+      if (!resolvedDoc?.id) {
         try {
           const listResp = await fetch(`${baseApi}/api/projects/${projectNumeric}/documents`, {
             headers: { 'X-Access-Token': adminToken ?? '' },
@@ -579,8 +587,8 @@ export default function RequestSignPage() {
               resolvedDoc = list.find((item) => item?.filename === file.name) || list[0] || resolvedDoc;
             }
           }
-        } catch {
-          /* ignore and fallback */
+        } catch (e) {
+          console.warn('Failed to verify document list', e);
         }
       }
 
@@ -595,18 +603,42 @@ export default function RequestSignPage() {
       throw err;
     } finally {
       setUploadingDoc(false);
-      setUploadProgress(0);
+      if (!onProgress) setUploadProgress(0);
     }
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Weighted progress: 30% rendering, 70% uploading (upload usually slower/more critical)
+    // Actually user said rendering takes 5s, upload might be faster or slower. 50/50 is safe.
+    let renderPct = 0;
+    let uploadPct = 0;
+
+    const updateOverall = () => {
+      setUploadProgress(Math.round((renderPct * 0.5) + (uploadPct * 0.5)));
+    };
+
+    setUploadProgress(0);
+    setUploadingDoc(true); // Ensure progress bar is visible during rendering too if it depends on this
+
     try {
-      await loadPdfFromArrayBuffer(await file.arrayBuffer());
-      await uploadDocumentToProject(file);
+      await Promise.all([
+        loadPdfFromArrayBuffer(await file.arrayBuffer(), (p) => {
+          renderPct = p;
+          updateOverall();
+        }),
+        uploadDocumentToProject(file, (p) => {
+          uploadPct = p;
+          updateOverall();
+        })
+      ]);
     } catch {
       /* handled in helpers */
+    } finally {
+      setUploadingDoc(false);
+      setUploadProgress(0);
     }
   };
 

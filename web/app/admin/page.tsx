@@ -3658,36 +3658,122 @@ export default function AdminPage() {
                       {showDocumentUpload && (
                         <div
                           style={{
-                            border: '1px dashed rgba(148,163,184,0.45)',
-                            borderRadius: 16,
-                            padding: 16,
-                            background: '#f8fafc',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 12,
+                            backgroundColor: '#fdfbff',
+                            border: '1px solid #e9d5ff',
+                            borderRadius: '12px',
+                            padding: '24px',
+                            marginTop: '20px',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                           }}
                         >
-                          <input
-                            type="text"
-                            placeholder="Document name"
-                            value={projectFileUploadName}
-                            onChange={(event) => setProjectFileUploadName(event.target.value)}
-                            style={{ padding: 12, borderRadius: 10, border: `1px solid ${palette.border}` }}
-                          />
-                          <label
-                            htmlFor="project-file-upload"
+                          <div style={{ marginBottom: '20px' }}>
+                            <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
+                              Upload New Documents
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
+                              Add documents with custom names and descriptions
+                            </p>
+                          </div>
+
+                          <div style={{ marginBottom: 20 }}>
+                            <input
+                              type="text"
+                              placeholder="Document name (optional)"
+                              value={projectFileUploadName}
+                              onChange={(event) => setProjectFileUploadName(event.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                fontSize: 14,
+                                outline: 'none',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                          </div>
+
+                          <div
                             style={{
-                              border: '2px dashed rgba(148,163,184,0.6)',
-                              borderRadius: 12,
-                              padding: '18px 12px',
+                              backgroundColor: '#ffffff',
+                              border: '2px dashed #cbd5e1',
+                              borderRadius: '8px',
+                              padding: projectFileUploadFile ? '20px' : '40px 20px',
                               textAlign: 'center',
-                              color: palette.accentMuted,
-                              cursor: 'pointer',
-                              background: '#fff',
+                              marginBottom: '20px',
+                              cursor: projectFileUploading ? 'not-allowed' : 'pointer',
+                              transition: 'border-color 0.2s',
+                              position: 'relative',
                             }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              if (!projectFileUploading) e.currentTarget.style.borderColor = '#a78bfa';
+                            }}
+                            onDragLeave={(e) => {
+                              e.preventDefault();
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                              if (projectFileUploading) return;
+                              if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                // We need to trigger handleProjectFileSelection or mock default behavior
+                                // handleProjectFileSelection expects ChangeEvent<HTMLInputElement>
+                                // We can just call setProjectFileUploadFile directly since we are inside the component
+                                // But handleProjectFileSelection might do more validation?
+                                // Let's check handleProjectFileSelection implementation.
+                                // It just: const file = event.target.files?.[0]; if (file) setProjectFileUploadFile(file);
+                                // So we can set it directly.
+                                const file = e.dataTransfer.files[0];
+                                setProjectFileUploadFile(file);
+                                if (!projectFileUploadName) {
+                                  // Auto-populate name if empty
+                                  const name = file.name.replace(/\.[^/.]+$/, "");
+                                  setProjectFileUploadName(name);
+                                }
+                              }
+                            }}
+                            onClick={() => (!projectFileUploading ? document.getElementById('project-file-upload')?.click() : null)}
                           >
-                            Drag & drop files here or click to browse
-                          </label>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                              {projectFileUploadFile ? (
+                                <>
+                                  <div style={{ color: '#7c3aed', marginBottom: '4px' }}>
+                                    {/* File Icon */}
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                                      <polyline points="14 2 14 8 20 8"></polyline>
+                                    </svg>
+                                  </div>
+                                  <p style={{ fontSize: '14px', fontWeight: 600, color: '#111827', margin: 0 }}>
+                                    {projectFileUploadFile.name}
+                                  </p>
+                                  <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>
+                                    Click to change
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <div style={{ color: '#9ca3af', marginBottom: '4px' }}>
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                      <polyline points="17 8 12 3 7 8" />
+                                      <line x1="12" y1="3" x2="12" y2="15" />
+                                    </svg>
+                                  </div>
+                                  <p style={{ fontSize: '14px', color: '#111827', margin: 0 }}>
+                                    Drag and drop files here, or{' '}
+                                    <span style={{ color: '#7c3aed', fontWeight: 500, textDecoration: 'none' }}>browse</span>
+                                  </p>
+                                  <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>
+                                    Supports PDF, Excel, PowerPoint, and other file types
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
                           <input
                             id="project-file-upload"
                             type="file"
@@ -3695,10 +3781,31 @@ export default function AdminPage() {
                             onChange={handleProjectFileSelection}
                             style={{ display: 'none' }}
                           />
-                          {projectFileUploadFile && (
-                            <p style={{ margin: 0, fontSize: 13 }}>Selected: {projectFileUploadFile.name}</p>
-                          )}
-                          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                              type="button"
+                              onClick={uploadProjectFile}
+                              disabled={!projectFileUploadFile || projectFileUploading}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                cursor: !projectFileUploadFile || projectFileUploading ? 'not-allowed' : 'pointer',
+                                border: 'none',
+                                transition: 'all 0.2s',
+                                backgroundColor: '#000000',
+                                color: 'white',
+                                opacity: !projectFileUploadFile || projectFileUploading ? 0.6 : 1,
+                              }}
+                            >
+                              <span style={{ fontSize: '16px', lineHeight: 1 }}>↑</span> {projectFileUploading ? 'Uploading...' : 'Upload'}
+                            </button>
                             <button
                               type="button"
                               onClick={() => {
@@ -3706,29 +3813,28 @@ export default function AdminPage() {
                                 setProjectFileUploadFile(null);
                                 setProjectFileUploadName('');
                               }}
-                              style={{ border: 'none', background: 'transparent', color: palette.accentMuted, cursor: 'pointer' }}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={uploadProjectFile}
-                              disabled={!projectFileUploadFile || projectFileUploading}
                               style={{
-                                borderRadius: 10,
-                                border: 'none',
-                                padding: '10px 18px',
-                                background: !projectFileUploadFile || projectFileUploading ? 'rgba(37,99,235,0.35)' : palette.accent,
-                                color: '#fff',
-                                fontWeight: 600,
-                                cursor: !projectFileUploadFile || projectFileUploading ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                backgroundColor: 'white',
+                                border: '1px solid #e5e7eb',
+                                color: '#374151',
                               }}
                             >
-                              {projectFileUploading ? 'Uploading…' : 'Upload'}
+                              <span style={{ fontSize: '16px', lineHeight: 1 }}>×</span> Cancel
                             </button>
                           </div>
+
                           {projectFileUploading && (
-                            <div style={{ marginTop: 12 }}>
+                            <div style={{ marginTop: 16 }}>
                               <ProgressBar progress={uploadProgress} label="Uploading..." />
                             </div>
                           )}

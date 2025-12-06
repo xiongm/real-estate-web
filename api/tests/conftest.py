@@ -51,15 +51,34 @@ def mock_storage(monkeypatch) -> Dict[str, bytes]:
     def fake_delete_object(key: str):
         store.pop(key, None)
 
-    from app.routers import envelopes, signing  # noqa: E402
+    def fake_put_temp_chunk(key: str, data: bytes):
+        store[key] = bytes(data)
 
-    for target in (storage_module, projects_router, envelopes, signing, summary_module):
+    def fake_compose_chunks(dest_key: str, source_keys: list[str]):
+        # Concatenate content
+        combined = b""
+        for k in source_keys:
+            if k not in store:
+                raise S3Error("NoSuchKey", "missing", f"/{k}", "test", "host")
+            combined += store[k]
+        store[dest_key] = combined
+        # Cleanup
+        for k in source_keys:
+            store.pop(k, None)
+
+    from app.routers import envelopes, signing, chunked_uploads  # noqa: E402
+
+    for target in (storage_module, projects_router, envelopes, signing, summary_module, chunked_uploads):
         if hasattr(target, "put_bytes"):
             monkeypatch.setattr(target, "put_bytes", fake_put_bytes)
         if hasattr(target, "get_bytes"):
             monkeypatch.setattr(target, "get_bytes", fake_get_bytes)
         if hasattr(target, "delete_object"):
             monkeypatch.setattr(target, "delete_object", fake_delete_object)
+        if hasattr(target, "put_temp_chunk"):
+            monkeypatch.setattr(target, "put_temp_chunk", fake_put_temp_chunk)
+        if hasattr(target, "compose_chunks"):
+            monkeypatch.setattr(target, "compose_chunks", fake_compose_chunks)
     return store
 
 

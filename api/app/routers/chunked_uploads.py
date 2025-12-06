@@ -3,14 +3,12 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, R
 from pydantic import BaseModel
 from typing import List
 import uuid
+from datetime import datetime
 from ..auth import require_admin_access, AccessContext
 from ..storage import put_temp_chunk, compose_chunks
 from ..db import get_session
-from ..models import Project, ProjectFile
-from sqlmodel import Session
-from datetime import datetime
-
-router = APIRouter()
+from ..models import Project, ProjectFile, Document
+from ..routers.projects import _serialize_document # Import helper if available or def it
 
 def _serialize_project_file(doc: ProjectFile):
     return {
@@ -21,25 +19,31 @@ def _serialize_project_file(doc: ProjectFile):
         "uploaded_at": doc.uploaded_at,
     }
 
-# In-memory store for active uploads (simplified for this iteration, ideally Redis)
-# Map: upload_id -> { project_id: int, filename: str, total_chunks: int, chunks_received: set }
-# In a real distributed system, use Redis or DB.
-# Since we have Redis available in docker-compose, we could use it, but start simple.
-UPLOAD_SESSIONS = {}
+def _serialize_document_local(doc: Document):
+    return {
+        "id": doc.id,
+        "project_id": doc.project_id,
+        "filename": doc.filename,
+        "created_at": doc.created_at.isoformat() if doc.created_at else None,
+    }
 
-class InitUploadRequest(BaseModel):
-    project_id: int
-    filename: str
-    total_chunks: int
+from sqlmodel import Session
+
+router = APIRouter()
+
+UPLOAD_SESSIONS = {}
 
 class InitUploadResponse(BaseModel):
     upload_id: str
+    chunk_size: int
+
 
 @router.post("/init", response_model=InitUploadResponse)
 async def init_upload(
     project_id: int = Form(...),
     filename: str = Form(...),
     total_chunks: int = Form(...),
+    resource_type: str = Form("project_file"), # 'project_file' or 'document'
     # token: str = Depends(get_admin_token), # Removed
     ctx: AccessContext = Depends(require_admin_access) 
 ):
@@ -48,9 +52,10 @@ async def init_upload(
         "project_id": project_id,
         "filename": filename,
         "total_chunks": total_chunks,
+        "resource_type": resource_type,
         "uploaded_chunks": [] # List of tuples (index, key)
     }
-    return {"upload_id": upload_id}
+    return {"upload_id": upload_id, "chunk_size": 524288}
 
 @router.post("/chunk")
 async def upload_chunk(
@@ -63,18 +68,13 @@ async def upload_chunk(
     session = UPLOAD_SESSIONS.get(upload_id)
     if not session:
         raise HTTPException(status_code=404, detail="Upload session not found")
-    
-    # Validation
-    if chunk_index < 0 or chunk_index >= session["total_chunks"]:
-        raise HTTPException(status_code=400, detail="Invalid chunk index")
         
     content = await file.read()
     key = f"temp/{upload_id}/{chunk_index}"
     put_temp_chunk(key, content)
     
-    # Store success
     session["uploaded_chunks"].append((chunk_index, key))
-    return {"status": "ok"}
+    return {"status": "ok", "chunk_index": chunk_index}
 
 @router.post("/complete")
 async def complete_upload(
@@ -101,42 +101,70 @@ async def complete_upload(
 
     project_id = session["project_id"]
     filename = session["filename"]
+    resource_type = session.get("resource_type", "project_file")
     
-    # Generate final key
-    # Mimic logic from projects.py
+    # Generate final key and DB record based on type
     
-    # db is now injected
+    final_record = None
     
-    # Create DB record placeholder
-    project_file = ProjectFile(
-        project_id=project_id,
-        display_name=filename,
-        stored_filename=filename, # temporary
-        content_type="application/pdf", # Assumption for now
-        file_size=0, # Update later?
-        uploaded_at=datetime.utcnow()
-    )
-    db.add(project_file)
-    db.commit()
-    db.refresh(project_file)
-    
-    final_key = f"projects/{project_id}/uploads/{project_file.id}-{filename}"
-    
-    # Compose
-    source_keys = [x[1] for x in uploaded]
-    compose_chunks(final_key, source_keys)
-    
-    project_file.stored_filename = filename # Just filename as per conventions
-    project_file.s3_key = final_key
-    # Note: s3_key was missing in my previous `ProjectFile` init above, 
-    # but `api/app/models.py` probably defines it.
-    
-    db.add(project_file)
-    db.commit()
-    db.refresh(project_file)
+    if resource_type == "document":
+        # Create Document
+        doc = Document(
+            project_id=project_id,
+            filename=filename,
+            sha256=None, # Skipping SHA for chunked upload for now
+            s3_key="pending"
+        )
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+        
+        final_key = f"projects/{project_id}/uploads/{doc.id}-{filename}"
+        
+        # Compose
+        source_keys = [x[1] for x in uploaded]
+        compose_chunks(final_key, source_keys)
+        
+        doc.s3_key = final_key
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+        final_record = doc
+        
+    else:
+        # Create ProjectFile (default)
+        project_file = ProjectFile(
+            project_id=project_id,
+            display_name=filename,
+            stored_filename=filename, # temporary
+            content_type="application/pdf", # Assumption for now
+            file_size=0, # Update later?
+            uploaded_at=datetime.utcnow(),
+            s3_key="pending"
+        )
+        db.add(project_file)
+        db.commit()
+        db.refresh(project_file)
+        
+        final_key = f"projects/{project_id}/uploads/{project_file.id}-{filename}"
+        
+        # Compose
+        source_keys = [x[1] for x in uploaded]
+        compose_chunks(final_key, source_keys)
+        
+        project_file.stored_filename = filename # Just filename as per conventions
+        project_file.s3_key = final_key
+        
+        db.add(project_file)
+        db.commit()
+        db.refresh(project_file)
+        final_record = project_file
     
     # Clean up session
     del UPLOAD_SESSIONS[upload_id]
     
-    return _serialize_project_file(project_file)
+    if resource_type == "document":
+        return _serialize_document_local(final_record)
+    else:
+        return _serialize_project_file(final_record)
 

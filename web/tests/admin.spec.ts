@@ -526,8 +526,21 @@ test.describe('Admin portal', () => {
     await mockAdminData(page, { investorsByProject: investors });
 
     const pdfFixture = path.join(process.cwd(), 'tests', 'fixtures', 'sample.pdf');
-    await page.route('**/api/projects/201/documents', async (route) => {
+
+    // Mock chunked upload endpoints
+    await page.route('**/api/uploads/init', async (route) => {
+      await route.fulfill(jsonResponse({ upload_id: 'test-upload-id', chunk_size: 524288 }));
+    });
+    await page.route('**/api/uploads/chunk', async (route) => {
+      await route.fulfill(jsonResponse({ status: 'ok', chunk_index: 0 }));
+    });
+    await page.route('**/api/uploads/complete', async (route) => {
       await route.fulfill(jsonResponse({ id: 910, filename: 'Test Packet.pdf' }));
+    });
+
+    // Keep documents endpoint for fallback verification
+    await page.route('**/api/projects/201/documents', async (route) => {
+      await route.fulfill(jsonResponse([{ id: 910, filename: 'Test Packet.pdf' }]));
     });
 
     const createdEnvelopeId = 5555;
@@ -616,16 +629,25 @@ test.describe('Admin portal', () => {
     let createPayload: any = null;
     let sendCalled = 0;
 
+    // Mock chunked upload endpoints
+    await page.route('**/api/uploads/init', async (route) => {
+      await route.fulfill(jsonResponse({ upload_id: 'test-upload-id', chunk_size: 524288 }));
+    });
+    await page.route('**/api/uploads/chunk', async (route) => {
+      await route.fulfill(jsonResponse({ status: 'ok', chunk_index: 0 }));
+    });
+    // Simulate upload complete returning no id (to test fallback)
+    await page.route('**/api/uploads/complete', async (route) => {
+      await route.fulfill(jsonResponse({}));
+    });
+
+    // Documents endpoint for fallback verification
     await page.route('**/api/projects/201/documents', async (route) => {
-      if (route.request().method() === 'POST') {
-        await route.fulfill(jsonResponse({})); // legacy empty response
-      } else {
-        await route.fulfill(
-          jsonResponse([
-            { id: 910, project_id: 201, filename: 'Test Packet.pdf', created_at: new Date().toISOString() },
-          ]),
-        );
-      }
+      await route.fulfill(
+        jsonResponse([
+          { id: 910, project_id: 201, filename: 'Test Packet.pdf', created_at: new Date().toISOString() },
+        ]),
+      );
     });
 
     await page.route('**/api/envelopes', async (route) => {

@@ -7,6 +7,7 @@ export interface ChunkedUploadOptions {
     onProgress?: (percent: number) => void;
     chunkSize?: number; // bytes, default 512KB
     maxRetries?: number;
+    targetType?: 'project_file' | 'document';
 }
 
 export async function chunkedUpload(options: ChunkedUploadOptions): Promise<any> {
@@ -17,7 +18,8 @@ export async function chunkedUpload(options: ChunkedUploadOptions): Promise<any>
         projectId,
         onProgress,
         chunkSize = 512 * 1024,
-        maxRetries = 3
+        maxRetries = 3,
+        targetType = 'project_file'
     } = options;
 
     const totalChunks = Math.ceil(file.size / chunkSize);
@@ -27,6 +29,7 @@ export async function chunkedUpload(options: ChunkedUploadOptions): Promise<any>
     initFormData.append('project_id', projectId.toString());
     initFormData.append('filename', file.name);
     initFormData.append('total_chunks', totalChunks.toString());
+    initFormData.append('resource_type', targetType);
 
     let response = await fetch(`${url}/init`, {
         method: 'POST',

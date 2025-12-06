@@ -265,6 +265,7 @@ export default function AdminPage() {
   const [projectFileUploading, setProjectFileUploading] = useState(false);
   const [projectFileDeletingId, setProjectFileDeletingId] = useState<number | null>(null);
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [hoveredProjectFileId, setHoveredProjectFileId] = useState<number | null>(null);
   const [manageSignedMode, setManageSignedMode] = useState(false);
   const [manageEnvelopesMode, setManageEnvelopesMode] = useState(false);
@@ -2945,6 +2946,8 @@ export default function AdminPage() {
                         type="button"
                         data-testid={`tab-${tab.id}`}
                         onClick={() => setCenterTab(tab.id)}
+                        onMouseEnter={() => setHoveredTab(tab.id)}
+                        onMouseLeave={() => setHoveredTab(null)}
                         style={{
                           borderRadius: 999,
                           border: '1px solid transparent',
@@ -2953,7 +2956,7 @@ export default function AdminPage() {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 8,
-                          background: active ? '#fff' : 'transparent',
+                          background: active ? '#fff' : hoveredTab === tab.id ? 'rgba(255,255,255,0.6)' : 'transparent',
                           color: active ? palette.text : palette.accentMuted,
                           cursor: 'pointer',
                           fontWeight: active ? 600 : 500,

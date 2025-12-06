@@ -1119,8 +1119,9 @@ export default function RequestSignPage() {
             The Request Sign designer is optimized for larger screens. Please continue from a laptop or desktop computer
             to upload documents, place fields, and send envelopes.
           </p>
-          <a
-            href={selectedProjectId ? `/admin?project=${selectedProjectId}` : '/admin'}
+          <button
+            type="button"
+            onClick={() => window.history.back()}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -1131,11 +1132,12 @@ export default function RequestSignPage() {
               background: palette.accent,
               color: '#fff',
               fontWeight: 600,
-              textDecoration: 'none',
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
             Back to Admin
-          </a>
+          </button>
         </div>
       </div>
     );
@@ -1187,21 +1189,22 @@ export default function RequestSignPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <a
-            href={selectedProjectId ? `/admin?project=${selectedProjectId}` : '/admin'}
+          <button
+            type="button"
+            onClick={() => window.history.back()}
             style={{
               borderRadius: 999,
               border: `1px solid ${palette.accent}`,
               color: palette.accent,
               padding: '6px 14px',
-              textDecoration: 'none',
               fontWeight: 600,
               background: 'transparent',
               fontSize: 13,
+              cursor: 'pointer',
             }}
           >
             ← Back to Admin
-          </a>
+          </button>
           <p style={{ margin: 0, fontSize: 12, color: palette.accentMuted }}>Active document</p>
           <strong style={{ fontSize: 18, color: palette.textStrong }}>{documentLabel}</strong>
         </div>

@@ -297,7 +297,15 @@ export default function AdminPage() {
   const editInvestorAddressTimeout = useRef<NodeJS.Timeout | null>(null);
   const newInvestorAddressController = useRef<AbortController | null>(null);
   const editInvestorAddressController = useRef<AbortController | null>(null);
-  const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors' | 'audit'>('documents');
+  const [centerTab, setCenterTab] = useState<'signatures' | 'documents' | 'share' | 'investors' | 'audit'>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = sessionStorage.getItem('adminCenterTab');
+      if (stored && ['signatures', 'documents', 'share', 'investors', 'audit'].includes(stored)) {
+        return stored as 'signatures' | 'documents' | 'share' | 'investors' | 'audit';
+      }
+    }
+    return 'documents';
+  });
   const [deletingInvestors, setDeletingInvestors] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
@@ -860,8 +868,20 @@ export default function AdminPage() {
     loadProjectFiles(selectedProjectId);
   }, [selectedProjectId, adminToken]);
 
+  // Persist centerTab to sessionStorage
   useEffect(() => {
-    setCenterTab('documents');
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('adminCenterTab', centerTab);
+    }
+  }, [centerTab]);
+
+  // Reset tab to documents only when explicitly selecting a NEW project (not on initial load)
+  const prevProjectIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevProjectIdRef.current !== null && selectedProjectId !== prevProjectIdRef.current) {
+      setCenterTab('documents');
+    }
+    prevProjectIdRef.current = selectedProjectId;
   }, [selectedProjectId]);
 
   useEffect(() => {

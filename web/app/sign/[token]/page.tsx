@@ -222,6 +222,7 @@ export default function SignPage() {
     if (!data?.fields) return;
     const signerId = data.signer?.id;
     const signerRole = data.signer?.role;
+    const completedValues = data.completed_values || {};
     const filteredFields = (data.fields || []).filter((field: any) => {
       if (field.signer_id && signerId) {
         return field.signer_id === signerId;
@@ -236,6 +237,16 @@ export default function SignPage() {
       filteredFields.forEach((field: any) => {
         const key = String(field.id);
         if (next[key]) return;
+
+        // Check if there's a completed value for this field (signer already signed)
+        const completed = completedValues[key];
+        if (completed && completed.value !== undefined && completed.value !== null && completed.value !== '') {
+          // Pre-populate from completed values
+          next[key] = { ...field, value: completed.value, committed: true };
+          return;
+        }
+
+        // Otherwise use defaults
         let defaultValue: any = '';
         if (field.type === 'checkbox') defaultValue = false;
         if (field.type === 'date') defaultValue = '';
@@ -246,7 +257,7 @@ export default function SignPage() {
       });
       return next;
     });
-  }, [data?.fields, data?.signer?.role, data?.signer?.id]);
+  }, [data?.fields, data?.signer?.role, data?.signer?.id, data?.completed_values]);
 
   useEffect(() => {
     if (!token) return;
@@ -587,6 +598,7 @@ export default function SignPage() {
       values={fieldValues}
       renderOverlays={!showFinalPdf}
       onRetryPdf={() => setCompletion(null)}
+      completedValues={data?.completed_values}
     />
   ) : (
     <div className="sign-content">
@@ -740,6 +752,7 @@ export default function SignPage() {
             onFocusField={(fid) => focusField(fid)}
             adoption={adoption}
             onInsertAdoption={applyAdoptionToField}
+            completedValues={data?.completed_values}
           />
         </section>
         <aside className="sign-sidebar">
@@ -1750,6 +1763,7 @@ function SignaturePad({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const drawing = useRef(false);
+  const hasInk = useRef(false); // Track if actual strokes were drawn
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
   const ratioRef = useRef(1);
 
@@ -1808,6 +1822,7 @@ function SignaturePad({
     ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
     ctx.lineTo(point.x, point.y);
     ctx.stroke();
+    hasInk.current = true; // Mark that actual ink was drawn
     lastPoint.current = point;
   };
 
@@ -1815,6 +1830,8 @@ function SignaturePad({
     if (!drawing.current) return;
     drawing.current = false;
     lastPoint.current = null;
+    // Only save the signature if actual ink was drawn
+    if (!hasInk.current) return;
     const canvas = canvasRef.current;
     const ratio = ratioRef.current;
     if (!canvas) return;
@@ -1836,6 +1853,7 @@ function SignaturePad({
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(ratio, ratio);
+    hasInk.current = false; // Reset ink tracking
     onChange(null);
   };
 
@@ -1886,6 +1904,7 @@ function PdfSigningSurface({
   onFocusField,
   adoption,
   onInsertAdoption,
+  completedValues,
 }: {
   pages: PageRender[];
   loading: boolean;
@@ -1901,6 +1920,7 @@ function PdfSigningSurface({
   onFocusField?: (id: string) => void;
   adoption?: SignatureAdoption | null;
   onInsertAdoption?: (id: string) => void;
+  completedValues?: Record<string, { type: string; page: number; x: number; y: number; w: number; h: number; value: any; font?: string }>;
 }) {
   if (error) {
     return <div style={{ marginTop: 16, color: 'red' }}>Failed to load PDF: {error}</div>;
@@ -1912,6 +1932,10 @@ function PdfSigningSurface({
     <section style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 32 }}>
       {pages.map((page) => {
         const pageFields = fields.filter((field) => (field.page || 1) === page.pageIndex + 1);
+        // Filter completed values for this page (page is 1-indexed)
+        const pageCompletedEntries = Object.entries(completedValues || {}).filter(
+          ([, v]) => v.page === page.pageIndex + 1
+        );
         return (
           <div
             key={page.pageIndex}
@@ -1928,6 +1952,109 @@ function PdfSigningSurface({
             }}
           >
             <img src={page.dataUrl} alt={`Page ${page.pageIndex + 1}`} style={{ width: '100%', display: 'block' }} />
+            {/* Render completed signatures from other signers (read-only) */}
+            {pageCompletedEntries.map(([fieldId, cv]) => {
+              const screenLeft = cv.x * page.scale;
+              // PDF Y origin is at bottom, screen Y origin is at top - need to transform
+              const screenTop = (page.baseHeight - (cv.y + cv.h)) * page.scale;
+              const screenWidth = cv.w * page.scale;
+              const screenHeight = cv.h * page.scale;
+              const fontFamily = cv.font ? (FONT_STACKS[cv.font] || FONT_STACKS[DEFAULT_FONT]) : FONT_STACKS[DEFAULT_FONT];
+
+              // Note: We no longer skip rendering for own fields. Even if FieldOverlay renders on top,
+              // having the completedValues overlay ensures the signature is always visible.
+              // This fixes the race condition where fieldValues may not be populated yet.
+
+              // Render different types of completed values
+              if (cv.type === 'signature' || cv.type === 'initials') {
+                return (
+                  <div
+                    key={`completed-${fieldId}`}
+                    style={{
+                      position: 'absolute',
+                      left: screenLeft,
+                      top: screenTop,
+                      width: screenWidth,
+                      height: screenHeight,
+                      pointerEvents: 'none',
+                      opacity: 0.95,
+                    }}
+                  >
+                    {cv.value && (
+                      <img
+                        src={cv.value.startsWith('data:') ? cv.value : `data:image/png;base64,${cv.value}`}
+                        alt={cv.type}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    )}
+                  </div>
+                );
+              }
+              if (cv.type === 'text' || cv.type === 'textarea') {
+                return (
+                  <div
+                    key={`completed-${fieldId}`}
+                    style={{
+                      position: 'absolute',
+                      left: screenLeft,
+                      top: screenTop,
+                      width: screenWidth,
+                      height: screenHeight,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      padding: '0 6px',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: '#0f172a', fontFamily }}>{cv.value || ''}</span>
+                  </div>
+                );
+              }
+              if (cv.type === 'date' || cv.type === 'datetime') {
+                return (
+                  <div
+                    key={`completed-${fieldId}`}
+                    style={{
+                      position: 'absolute',
+                      left: screenLeft,
+                      top: screenTop,
+                      width: screenWidth,
+                      height: screenHeight,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      padding: '0 6px',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: '#0f172a', fontFamily }}>{cv.value || ''}</span>
+                  </div>
+                );
+              }
+              if (cv.type === 'checkbox') {
+                return (
+                  <div
+                    key={`completed-${fieldId}`}
+                    style={{
+                      position: 'absolute',
+                      left: screenLeft,
+                      top: screenTop,
+                      width: screenWidth,
+                      height: screenHeight,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {cv.value && <span style={{ fontSize: Math.min(screenWidth, screenHeight) * 0.8, color: '#0f172a' }}>✓</span>}
+                  </div>
+                );
+              }
+              return null;
+            })}
+            {/* Render editable field overlays */}
             {renderOverlays &&
               pageFields.map((field) => (
                 <FieldOverlay
@@ -2339,6 +2466,7 @@ function SignatureFieldCanvas({
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const ratioRef = useRef(1);
   const drawing = useRef(false);
+  const hasInk = useRef(false); // Track if actual strokes were drawn
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
   const shouldHighlight = Boolean(active || highlighted);
 
@@ -2400,6 +2528,7 @@ function SignatureFieldCanvas({
     ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
     ctx.lineTo(point.x, point.y);
     ctx.stroke();
+    hasInk.current = true; // Mark that actual ink was drawn
     lastPoint.current = point;
   };
 
@@ -2407,6 +2536,8 @@ function SignatureFieldCanvas({
     if (!drawing.current) return;
     drawing.current = false;
     lastPoint.current = null;
+    // Only save the signature if actual ink was drawn
+    if (!hasInk.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dataUrl = canvas.toDataURL('image/png');
@@ -2422,6 +2553,7 @@ function SignatureFieldCanvas({
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(ratio, ratio);
+    hasInk.current = false; // Reset ink tracking
     onChange(null);
   };
 
@@ -2485,6 +2617,7 @@ function CompletionView({
   values,
   renderOverlays = true,
   onRetryPdf,
+  completedValues,
 }: {
   info: CompletionResult;
   pages: PageRender[];
@@ -2494,6 +2627,7 @@ function CompletionView({
   values: Record<string, any>;
   renderOverlays?: boolean;
   onRetryPdf?: () => void;
+  completedValues?: Record<string, { type: string; page: number; x: number; y: number; w: number; h: number; value: any; font?: string }>;
 }) {
   return (
     <div className="completion-wrapper">
@@ -2524,6 +2658,7 @@ function CompletionView({
           onChange={() => { }}
           mode="view"
           renderOverlays={renderOverlays}
+          completedValues={completedValues}
         />
       </section>
     </div>

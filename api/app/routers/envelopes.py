@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session, select
 from ..db import get_session
 from ..models import Envelope, Signer, Field, Document, Event, ProjectInvestor, AuditEvent
-from ..schemas import EnvelopeCreate, EnvelopeSend, EnvelopeSummaryUpdate
+from ..schemas import EnvelopeCreate, EnvelopeSend, EnvelopeSummaryUpdate, SignerUpdate
 from ..email import send_email, format_sender_name
 from ..utils import canonical_json, sha256_bytes, make_token
 from ..summary import kickoff_envelope_summary, generate_envelope_summary
@@ -334,3 +334,148 @@ def dev_magic_links(
             "link": _sign_link(token)
         })
     return {"envelope_id": envelope_id, "links": links}
+
+
+@router.patch("/{envelope_id}/signers/{signer_id}")
+def update_signer(
+    envelope_id: int,
+    signer_id: int,
+    payload: SignerUpdate,
+    session: Session = Depends(get_session),
+    request: Request = None,
+    ctx=Depends(require_admin_access),
+):
+    """Update a signer's email or name. Only allowed for pending signers on sent envelopes."""
+    env = session.get(Envelope, envelope_id)
+    if not env:
+        raise HTTPException(404, "envelope not found")
+    if env.status != "sent":
+        raise HTTPException(400, "can only update signers on sent envelopes")
+    
+    signer = session.get(Signer, signer_id)
+    if not signer or signer.envelope_id != envelope_id:
+        raise HTTPException(404, "signer not found")
+    if signer.status == "completed":
+        raise HTTPException(400, "cannot update a completed signer")
+    
+    old_email = signer.email
+    old_name = signer.name
+    
+    if payload.email is not None:
+        signer.email = payload.email.strip()
+    if payload.name is not None:
+        signer.name = payload.name.strip()
+    
+    session.add(signer)
+    session.commit()
+    session.refresh(signer)
+    
+    _record_audit(
+        session,
+        project_id=env.project_id,
+        action="update_signer",
+        resource_type="signer",
+        resource_id=str(signer.id),
+        actor_type=ctx.role,
+        summary=f"Updated signer {signer.name} ({old_email} → {signer.email})" if old_email != signer.email else f"Updated signer {signer.name}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+        payload={"old_email": old_email, "new_email": signer.email, "old_name": old_name, "new_name": signer.name},
+    )
+    
+    return {"id": signer.id, "name": signer.name, "email": signer.email, "status": signer.status}
+
+
+@router.post("/{envelope_id}/signers/{signer_id}/resend")
+def resend_signer_link(
+    envelope_id: int,
+    signer_id: int,
+    session: Session = Depends(get_session),
+    request: Request = None,
+    ctx=Depends(require_admin_access),
+):
+    """Resend the signing link email to a specific signer. Only for pending signers."""
+    env = session.get(Envelope, envelope_id)
+    if not env:
+        raise HTTPException(404, "envelope not found")
+    if env.status != "sent":
+        raise HTTPException(400, "envelope must be sent to resend links")
+    
+    signer = session.get(Signer, signer_id)
+    if not signer or signer.envelope_id != envelope_id:
+        raise HTTPException(404, "signer not found")
+    if signer.status == "completed":
+        raise HTTPException(400, "signer has already completed signing")
+    
+    doc = session.get(Document, env.document_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+    
+    # Build and send email (same logic as send_envelope)
+    filename = doc.filename or "Document"
+    requester_given_name = (env.requester_name or "").strip() or None
+    requester_name = requester_given_name or "Your contact"
+    requester_email = (env.requester_email or "").strip() or None
+    intro = env.message or f"{requester_name} invited you to review and sign this document."
+    
+    token = make_token({"signer_id": signer.id, "envelope_id": envelope_id})
+    link = _sign_link(token)
+    custom_subject = env.subject.strip() if env.subject else None
+    subject_core = custom_subject or filename
+    subject = f"Reminder: Signature Requested - {subject_core}"
+    
+    text_body = f"""{requester_name} sent you a document to review and sign.
+Document: "{filename}"
+
+{intro}
+
+Open document: {link}
+"""
+    intro_html = escape(intro)
+    link_html = escape(link)
+    requester_html = escape(requester_name)
+    requester_contact = f"{requester_html}{f' · {escape(requester_email)}' if requester_email else ''}"
+    html_body = f"""
+<html>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6f8; padding: 24px;">
+    <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 10px 25px rgba(15,23,42,0.08);">
+      <h2 style="margin-top: 0; font-size: 20px; color: #0f172a;">Reminder: Signature requested</h2>
+      <p style="font-size: 13px; color: #475569; margin-bottom: 6px;">{requester_contact}</p>
+      <p style="font-size: 14px; color: #1e293b; line-height: 1.5;">
+        {requester_html} sent you a document to review and sign.
+      </p>
+      <p style="font-size: 14px; color: #1e293b; line-height: 1.5;">{intro_html}</p>
+      <div style="margin: 24px 0;">
+        <a href="{link_html}" style="display: inline-block; background: #2563eb; color: #fff; padding: 12px 24px; border-radius: 999px; text-decoration: none; font-weight: 600;">
+          Review &amp; Sign
+        </a>
+      </div>
+      <p style="font-size: 12px; color: #64748b;">If the button doesn&apos;t work, copy this link into your browser:<br /><a href="{link_html}">{link_html}</a></p>
+    </div>
+  </body>
+</html>
+"""
+    send_email(
+        signer.email,
+        subject,
+        text_body,
+        html_body=html_body,
+        sender_name=format_sender_name(requester_given_name),
+        reply_to=requester_email,
+    )
+    
+    _append_event(session, env.id, "system", "resent", {"signer_id": signer.id, "email": signer.email})
+    _record_audit(
+        session,
+        project_id=env.project_id,
+        action="resend",
+        resource_type="signer",
+        resource_id=str(signer.id),
+        actor_type=ctx.role,
+        summary=f"Resent signing link to {signer.name} ({signer.email})",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+        payload={"signer_email": signer.email},
+    )
+    
+    return {"ok": True, "email": signer.email}

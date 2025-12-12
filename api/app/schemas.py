@@ -79,3 +79,8 @@ class ProjectUpdate(BaseModel):
     status: Optional[str] = None
     address: Optional[str] = None
     description: Optional[str] = None
+
+
+class SignerUpdate(BaseModel):
+    email: Optional[str] = None
+    name: Optional[str] = None

@@ -276,6 +276,10 @@ export default function AdminPage() {
   const [hoveredProjectId, setHoveredProjectId] = useState<number | null>(null);
   const [hoveredSignerKey, setHoveredSignerKey] = useState<string | null>(null);
   const [revokingEnvelopes, setRevokingEnvelopes] = useState(false);
+  const [editingSignerId, setEditingSignerId] = useState<number | null>(null);
+  const [editSignerName, setEditSignerName] = useState('');
+  const [editSignerEmail, setEditSignerEmail] = useState('');
+  const [signerActionLoading, setSignerActionLoading] = useState<number | null>(null);
   const [newProjectName, setNewProjectName] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
@@ -3529,6 +3533,7 @@ export default function AdminPage() {
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                           {signerList.map((signer) => {
                                             const completed = signer.status === 'completed';
+                                            const editingThis = editingSignerId === signer.id;
                                             return (
                                               <div
                                                 key={`${key}-signer-${signer.id}`}
@@ -3540,9 +3545,45 @@ export default function AdminPage() {
                                                   fontSize: 13,
                                                 }}
                                               >
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                  <strong style={{ fontSize: 13 }}>{signer.name || 'Unnamed signer'}</strong>
-                                                  <span style={{ color: palette.accentMuted }}>{signer.email || 'Email unavailable'}</span>
+                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 180 }}>
+                                                  {editingThis ? (
+                                                    <>
+                                                      <input
+                                                        type="text"
+                                                        value={editSignerName}
+                                                        onChange={(e) => setEditSignerName(e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        placeholder="Name"
+                                                        style={{
+                                                          fontSize: 13,
+                                                          fontWeight: 600,
+                                                          padding: '4px 8px',
+                                                          border: `1px solid ${palette.border}`,
+                                                          borderRadius: 6,
+                                                          marginBottom: 4,
+                                                        }}
+                                                      />
+                                                      <input
+                                                        type="email"
+                                                        value={editSignerEmail}
+                                                        onChange={(e) => setEditSignerEmail(e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        placeholder="Email"
+                                                        style={{
+                                                          fontSize: 13,
+                                                          padding: '4px 8px',
+                                                          border: `1px solid ${palette.border}`,
+                                                          borderRadius: 6,
+                                                          color: palette.accentMuted,
+                                                        }}
+                                                      />
+                                                    </>
+                                                  ) : (
+                                                    <>
+                                                      <strong style={{ fontSize: 13 }}>{signer.name || 'Unnamed signer'}</strong>
+                                                      <span style={{ color: palette.accentMuted }}>{signer.email || 'Email unavailable'}</span>
+                                                    </>
+                                                  )}
                                                 </div>
                                                 <div
                                                   style={{
@@ -3568,25 +3609,158 @@ export default function AdminPage() {
                                                       {formatLocalDateTime(signer.completed_at)}
                                                     </p>
                                                   )}
-                                                  {!completed && signer.magic_link && (
-                                                    <button
-                                                      type="button"
-                                                      onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        copyMagicLink(signer.magic_link);
-                                                      }}
-                                                      style={{
-                                                        border: `1px solid ${palette.border}`,
-                                                        borderRadius: 999,
-                                                        padding: '4px 10px',
-                                                        background: '#fff',
-                                                        color: palette.accent,
-                                                        fontSize: 12,
-                                                        cursor: 'pointer',
-                                                      }}
-                                                    >
-                                                      Copy link
-                                                    </button>
+                                                  {!completed && (
+                                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                                      {editingThis ? (
+                                                        <>
+                                                          <button
+                                                            type="button"
+                                                            onClick={async (event) => {
+                                                              event.stopPropagation();
+                                                              setSignerActionLoading(signer.id);
+                                                              try {
+                                                                const res = await fetch(
+                                                                  `${baseApi}/api/envelopes/${envelopeId}/signers/${signer.id}${tokenParam}`,
+                                                                  {
+                                                                    method: 'PATCH',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({ name: editSignerName, email: editSignerEmail }),
+                                                                  }
+                                                                );
+                                                                if (!res.ok) throw new Error('Failed to update signer');
+                                                                // Update local state instead of full page reload
+                                                                setEnvelopes((prev) =>
+                                                                  prev.map((env) =>
+                                                                    env.id === envelopeId
+                                                                      ? {
+                                                                        ...env,
+                                                                        signers: env.signers.map((s) =>
+                                                                          s.id === signer.id
+                                                                            ? { ...s, name: editSignerName, email: editSignerEmail }
+                                                                            : s
+                                                                        ),
+                                                                      }
+                                                                      : env
+                                                                  )
+                                                                );
+                                                                showToast('Signer updated successfully');
+                                                                setEditingSignerId(null);
+                                                              } catch (err) {
+                                                                showToast('Failed to update signer');
+                                                              } finally {
+                                                                setSignerActionLoading(null);
+                                                              }
+                                                            }}
+                                                            disabled={signerActionLoading === signer.id}
+                                                            style={{
+                                                              border: `1px solid ${palette.accent}`,
+                                                              borderRadius: 999,
+                                                              padding: '4px 10px',
+                                                              background: palette.accent,
+                                                              color: '#fff',
+                                                              fontSize: 12,
+                                                              cursor: signerActionLoading === signer.id ? 'not-allowed' : 'pointer',
+                                                            }}
+                                                          >
+                                                            {signerActionLoading === signer.id ? 'Saving…' : 'Save'}
+                                                          </button>
+                                                          <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                              event.stopPropagation();
+                                                              setEditingSignerId(null);
+                                                            }}
+                                                            style={{
+                                                              border: `1px solid ${palette.border}`,
+                                                              borderRadius: 999,
+                                                              padding: '4px 10px',
+                                                              background: '#fff',
+                                                              color: palette.accentMuted,
+                                                              fontSize: 12,
+                                                              cursor: 'pointer',
+                                                            }}
+                                                          >
+                                                            Cancel
+                                                          </button>
+                                                        </>
+                                                      ) : (
+                                                        <>
+                                                          <button
+                                                            type="button"
+                                                            title="Edit signer"
+                                                            onClick={(event) => {
+                                                              event.stopPropagation();
+                                                              setEditingSignerId(signer.id);
+                                                              setEditSignerName(signer.name || '');
+                                                              setEditSignerEmail(signer.email || '');
+                                                            }}
+                                                            style={{
+                                                              border: `1px solid ${palette.border}`,
+                                                              borderRadius: 999,
+                                                              padding: '4px 10px',
+                                                              background: '#fff',
+                                                              color: palette.accent,
+                                                              fontSize: 12,
+                                                              cursor: 'pointer',
+                                                            }}
+                                                          >
+                                                            Edit
+                                                          </button>
+                                                          <button
+                                                            type="button"
+                                                            title="Resend signing link"
+                                                            onClick={async (event) => {
+                                                              event.stopPropagation();
+                                                              setSignerActionLoading(signer.id);
+                                                              try {
+                                                                const res = await fetch(
+                                                                  `${baseApi}/api/envelopes/${envelopeId}/signers/${signer.id}/resend${tokenParam}`,
+                                                                  { method: 'POST' }
+                                                                );
+                                                                if (!res.ok) throw new Error('Failed to resend');
+                                                                showToast(`Signing link resent to ${signer.email}`);
+                                                              } catch (err) {
+                                                                showToast('Failed to resend link');
+                                                              } finally {
+                                                                setSignerActionLoading(null);
+                                                              }
+                                                            }}
+                                                            disabled={signerActionLoading === signer.id}
+                                                            style={{
+                                                              border: `1px solid ${palette.border}`,
+                                                              borderRadius: 999,
+                                                              padding: '4px 10px',
+                                                              background: '#fff',
+                                                              color: palette.accent,
+                                                              fontSize: 12,
+                                                              cursor: signerActionLoading === signer.id ? 'not-allowed' : 'pointer',
+                                                            }}
+                                                          >
+                                                            {signerActionLoading === signer.id ? 'Sending…' : 'Resend'}
+                                                          </button>
+                                                          {signer.magic_link && (
+                                                            <button
+                                                              type="button"
+                                                              onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                copyMagicLink(signer.magic_link);
+                                                              }}
+                                                              style={{
+                                                                border: `1px solid ${palette.border}`,
+                                                                borderRadius: 999,
+                                                                padding: '4px 10px',
+                                                                background: '#fff',
+                                                                color: palette.accent,
+                                                                fontSize: 12,
+                                                                cursor: 'pointer',
+                                                              }}
+                                                            >
+                                                              Copy link
+                                                            </button>
+                                                          )}
+                                                        </>
+                                                      )}
+                                                    </div>
                                                   )}
                                                 </div>
                                               </div>
@@ -3596,7 +3770,8 @@ export default function AdminPage() {
                                       )}
                                     </div>
                                   </div>
-                                )}
+                                )
+                                }
                               </div>
                             );
                           })}
@@ -4909,7 +5084,7 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-      </main>
+      </main >
       <style jsx>{`
         .project-scroll {
           display: flex;
@@ -4997,14 +5172,16 @@ export default function AdminPage() {
           cursor: pointer;
         }
       `}</style>
-      {toastMessage && (
-        <Toast
-          message={toastMessage}
-          onClose={() => setToastMessage(null)}
-          type="success"
-        />
-      )}
-    </div>
+      {
+        toastMessage && (
+          <Toast
+            message={toastMessage}
+            onClose={() => setToastMessage(null)}
+            type="success"
+          />
+        )
+      }
+    </div >
   );
 
 }

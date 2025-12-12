@@ -103,7 +103,9 @@ def _persist_field_values(session: Session, signer: Signer, values: dict):
 def _collect_envelope_values(session: Session, envelope_id: int):
     fields = session.exec(select(Field).where(Field.envelope_id == envelope_id)).all()
     field_map = {f.id: f for f in fields}
-    signer_ids = session.exec(select(Signer.id).where(Signer.envelope_id == envelope_id)).all()
+    # Get signer IDs - extract scalar values properly
+    signers = session.exec(select(Signer).where(Signer.envelope_id == envelope_id)).all()
+    signer_ids = [s.id for s in signers]
     if not signer_ids:
         return {}
     rows = session.exec(
@@ -175,12 +177,17 @@ def load_signing_session(token: str, request: Request, session: Session = Depend
         ip=ip,
         user_agent=ua,
     )
+    
+    # Collect completed field values from all signers for overlay
+    completed_values = _collect_envelope_values(session, env.id)
+    
     return {
         "envelope": sa_to_dict(env),
         "signer": sa_to_dict(signer),
         "waiting_on": waiting_on,
         "final_artifact": sa_to_dict(final_artifact) if final_artifact else None,
         "fields": [sa_to_dict(f) for f in filtered_fields],
+        "completed_values": completed_values,
     }
 
 @router.get("/{token}/pdf")

@@ -100,6 +100,18 @@ Services (when `docker compose` is running):
   ```
 - Check their status anytime with `./scripts/dev-services.sh status`.
 
+## Healthcheck Email Alerts (Cron)
+
+Use `scripts/healthcheck.py` to send an email when the web healthcheck fails.
+
+1) Ensure `.env` contains `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASSWORD`, and `EMAIL_SENDER`.
+2) Add a cron entry (runs every 5 minutes):
+   ```bash
+   */5 * * * * /usr/bin/env python3 /path/to/repo/scripts/healthcheck.py >> /var/log/real-estate-healthcheck.log 2>&1
+   ```
+
+The script reads from `.env` and uses the `EMAIL_*` settings. You can override recipients with `SMTP_TO` or `EMAIL_TO`.
+
 ## Workflow
 1. **Manage projects:** Use the Admin sidebar inside the web app (you'll be prompted for the admin access token) to create projects. Investor management now lives exclusively in Admin; the request-sign builder is read-only and simply reflects the investors tied to the currently selected project. Each project automatically gets its own access token, visible inside the **Share** tab in the center pane—share that token with investors when you want to grant read-only API access.
 2. **Upload documents:** Call `POST /api/projects/{id}/documents` (or use whatever admin UI you build) to upload PDFs into MinIO for that project.

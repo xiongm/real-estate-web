@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { getApiBase } from '../../lib/apiBase';
 
 type Project = {
   id: number;
@@ -83,7 +84,7 @@ const palette = {
 
 // @ts-ignore - bypassing build error for unused page
 export default function InvestorsPage({ onAnyChange, initialProjectId, accessToken }: any) {
-  const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
+  const baseApi = getApiBase();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(initialProjectId ?? null);
   const [summary, setSummary] = useState<ProjectSummary | null>(null);

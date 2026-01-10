@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { theme } from '../../../../lib/theme';
+import { getApiBase } from '../../../../lib/apiBase';
 
 type ProjectSummary = {
   project: {
@@ -60,7 +61,7 @@ export default function ProjectViewerPage() {
 
   const projectId = useMemo(() => Number(params?.id), [params]);
   const token = params?.token || '';
-  const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
+  const baseApi = getApiBase();
 
   useEffect(() => {
     if (!projectId || !token) {

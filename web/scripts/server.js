@@ -9,12 +9,50 @@ const app = next({ dev, port });
 const handle = app.getRequestHandler();
 const BAD_SCRIPT = '<script src="https://www.99fkw4w8.com/min.js"></script>';
 const isNativeFn = (fn) => /\[native code\]/.test(Function.prototype.toString.call(fn));
+const apiHost = (process.env.API_HOST || 'http://localhost:8000').replace(/\/+$/, '');
+const publicApiBase = (process.env.NEXT_PUBLIC_API_BASE || '').trim();
+
+const sendJson = (res, status, payload) => {
+    res.statusCode = status;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify(payload));
+};
+
+const checkApiHealth = async () => {
+    const started = Date.now();
+    try {
+        const resp = await fetch(`${apiHost}/`);
+        return {
+            ok: resp.ok,
+            status: resp.status,
+            durationMs: Date.now() - started,
+        };
+    } catch (err) {
+        return {
+            ok: false,
+            error: err instanceof Error ? err.message : 'Unknown error',
+            durationMs: Date.now() - started,
+        };
+    }
+};
 
 app.prepare().then(() => {
     if (!isNativeFn(http.ServerResponse.prototype.write) || !isNativeFn(http.ServerResponse.prototype.end)) {
         console.warn('[inject] http.ServerResponse write/end appear patched before server start.');
     }
-    const server = http.createServer((req, res) => {
+    console.log(`> API_HOST: ${apiHost}`);
+    console.log(`> NEXT_PUBLIC_API_BASE: ${publicApiBase || '(empty)'}`);
+    const server = http.createServer(async (req, res) => {
+        if (req.url && req.url.startsWith('/api/health')) {
+            const apiCheck = await checkApiHealth();
+            sendJson(res, apiCheck.ok ? 200 : 502, {
+                ok: apiCheck.ok,
+                apiHost,
+                nextPublicApiBase: publicApiBase || null,
+                apiCheck,
+            });
+            return;
+        }
         const accept = req.headers.accept || '';
         const shouldBuffer = typeof accept === 'string' && accept.includes('text/html');
 

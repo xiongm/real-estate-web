@@ -5,6 +5,7 @@ import type { PointerEvent as ReactPointerEvent, CSSProperties, ChangeEvent, Ref
 import { GlobalWorkerOptions } from 'pdfjs-dist';
 import { useParams } from 'next/navigation';
 import { theme } from '../../../lib/theme';
+import { getApiBase } from '../../../lib/apiBase';
 import { AISummaryCard } from '../AISummaryCard';
 import {
   isFieldComplete,
@@ -97,7 +98,7 @@ export default function SignPage() {
   const [hasStarted, setHasStarted] = useState(false);
   const [chipIndex, setChipIndex] = useState(0);
   const consentRef = useRef<HTMLInputElement | null>(null);
-  const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
+  const base = getApiBase();
   const enableDraftSave = process.env.NEXT_PUBLIC_SIGN_DRAFT_SAVE === 'true';
 
   useEffect(() => {
@@ -1056,7 +1057,7 @@ function Consent({
   onToggle: (value: boolean) => void;
   inputRef?: RefObject<HTMLInputElement | null>;
 }) {
-  const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
+  const base = getApiBase();
   const onChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
     if (!checked) {
@@ -1190,7 +1191,7 @@ function Complete({
   onSuccess: (info: CompletionResult) => void;
   onError: (msg: string) => void;
 }) {
-  const base = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
+  const base = getApiBase();
   const [sending, setSending] = useState(false);
   const onComplete = async () => {
     const missingRequired = Object.values(values).some((meta: any) => {

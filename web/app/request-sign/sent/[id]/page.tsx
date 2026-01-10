@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AISummaryCard } from '../../../sign/AISummaryCard';
+import { getApiBase } from '../../../../lib/apiBase';
 
 type EnvelopeSummary = {
   id: number;
@@ -16,7 +17,7 @@ export default function EnvelopeSentPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const envelopeId = params?.id;
-  const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
+  const baseApi = getApiBase();
   const [summary, setSummary] = useState<EnvelopeSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import InvestorsPage from '../investors/page';
 import { GlobalWorkerOptions } from 'pdfjs-dist';
 import { theme } from '../../lib/theme';
+import { getApiBase } from '../../lib/apiBase';
 import { Toast } from '../../components/Toast';
 import { ProgressBar } from '../../components/ProgressBar';
 import { uploadFile } from '../../lib/upload';
@@ -178,7 +179,7 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit = {}
 };
 
 function RequestSignPageContent() {
-  const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
+  const baseApi = getApiBase();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, FormEvent, CSSProperties, KeyboardEvent, ChangeEvent, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
+import { getApiBase } from '../../lib/apiBase';
 import { AISummaryCard } from '../sign/AISummaryCard';
 import { Toast } from '../../components/Toast';
 import { ProgressBar } from '../../components/ProgressBar';
@@ -214,7 +215,7 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit = {}
 };
 
 function AdminPageContent() {
-  const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
+  const baseApi = getApiBase();
   const appVersion = (process.env.APP_VERSION ?? '').trim() || 'unknown';
   const [adminToken, setAdminToken] = useState('');
   const [adminVerified, setAdminVerified] = useState(false);
@@ -5104,6 +5105,22 @@ function AdminPageContent() {
               )}
             </div>
           </div>
+        </div>
+        <div
+          style={{
+            marginTop: 24,
+            padding: isMobile ? '12px 12px 24px' : '12px 24px 24px',
+            color: palette.accentMuted,
+            fontSize: 12,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>Version {appVersion}</span>
+          <span>API {baseApi || 'same-origin (/api)'}</span>
         </div>
       </main >
       <style jsx>{`

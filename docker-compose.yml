@@ -79,7 +79,11 @@ services:
       - redis
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        API_HOST: http://api:8000
+        APP_VERSION: ${APP_VERSION}
     environment:
       - NEXT_PUBLIC_API_BASE=
       - API_HOST=http://api:8000

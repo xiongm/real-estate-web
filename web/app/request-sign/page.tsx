@@ -167,6 +167,16 @@ const createSigner = (order: number): SignerForm => ({
   routing_order: order,
 });
 
+const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 8000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 export default function RequestSignPage() {
   const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const router = useRouter();
@@ -284,7 +294,7 @@ export default function RequestSignPage() {
       setAdminTokenLoading(true);
       setAdminTokenError(null);
       try {
-        const resp = await fetch(`${baseApi}/api/projects`, {
+        const resp = await fetchWithTimeout(`${baseApi}/api/projects`, {
           headers: { 'X-Access-Token': candidate },
         });
         if (!resp.ok) throw new Error('Invalid token');
@@ -299,7 +309,13 @@ export default function RequestSignPage() {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('adminAccessToken');
         }
-        setAdminTokenError(err instanceof Error ? err.message : 'Invalid token');
+        const message =
+          err instanceof Error && err.name === 'AbortError'
+            ? 'Verification timed out. Check that the API server is running.'
+            : err instanceof Error
+              ? err.message
+              : 'Invalid token';
+        setAdminTokenError(message);
       } finally {
         setAdminTokenLoading(false);
       }

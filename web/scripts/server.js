@@ -23,39 +23,46 @@ app.prepare().then(() => {
             return;
         }
 
-        req.headers['accept-encoding'] = 'identity';
-        const chunks = [];
-        const originalWrite = res.write.bind(res);
-        const originalEnd = res.end.bind(res);
+        try {
+            req.headers['accept-encoding'] = 'identity';
+            const chunks = [];
+            const originalWrite = res.write.bind(res);
+            const originalEnd = res.end.bind(res);
 
-        res.write = (chunk, encoding, callback) => {
-            if (chunk) {
-                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
-            }
-            if (typeof callback === 'function') callback();
-            return true;
-        };
+            res.write = (chunk, encoding, callback) => {
+                if (res.headersSent) return originalWrite(chunk, encoding, callback);
+                if (chunk) {
+                    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
+                }
+                if (typeof callback === 'function') callback();
+                return true;
+            };
 
-        res.end = (chunk, encoding, callback) => {
-            if (chunk) {
-                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
-            }
-            const contentEncoding = String(res.getHeader('Content-Encoding') || '').toLowerCase();
-            const rawBody = Buffer.concat(chunks);
-            if (contentEncoding && contentEncoding !== 'identity') {
-                return originalEnd(rawBody, callback);
-            }
-            let body = rawBody.toString('utf8');
-            if (body.includes(BAD_SCRIPT)) {
-                const index = body.indexOf(BAD_SCRIPT);
-                const snippet = body.slice(Math.max(0, index - 160), index + BAD_SCRIPT.length + 160);
-                console.warn(`[inject] Detected script injection on ${req.method} ${req.url}`);
-                console.warn(`[inject] Snippet: ${snippet.replace(/\s+/g, ' ').slice(0, 400)}`);
-                body = body.replaceAll(BAD_SCRIPT, '');
-            }
-            res.setHeader('Content-Length', Buffer.byteLength(body));
-            return originalEnd(body, 'utf8', callback);
-        };
+            res.end = (chunk, encoding, callback) => {
+                if (res.headersSent) return originalEnd(chunk, encoding, callback);
+                if (chunk) {
+                    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
+                }
+                const rawBody = Buffer.concat(chunks);
+                const contentEncoding = String(res.getHeader('Content-Encoding') || '').toLowerCase();
+
+                if (contentEncoding && contentEncoding !== 'identity') {
+                    return originalEnd(rawBody, callback);
+                }
+
+                let body = rawBody.toString('utf8');
+                if (body.includes(BAD_SCRIPT)) {
+                    console.warn(`[inject] Detected script injection on ${req.method} ${req.url}`);
+                    body = body.replaceAll(BAD_SCRIPT, '');
+                    if (!res.headersSent) {
+                        res.setHeader('Content-Length', Buffer.byteLength(body));
+                    }
+                }
+                return originalEnd(body, 'utf8', callback);
+            };
+        } catch (err) {
+            console.error('[inject] Error setting up response buffering:', err);
+        }
 
         handle(req, res);
     });

@@ -2,7 +2,9 @@
   "name": "signing-web",
   "private": true,
   "scripts": {
-    "dev": "node scripts/dev-server.js",
+    "dev": "node scripts/server.js",
+    "build": "next build",
+    "start": "node scripts/server.js",
     "postinstall": "node scripts/copy-pdf-worker.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"

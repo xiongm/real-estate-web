@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, PointerEvent as ReactPointerEvent, FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, PointerEvent as ReactPointerEvent, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import InvestorsPage from '../investors/page';
-import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
+import { GlobalWorkerOptions } from 'pdfjs-dist';
 import { theme } from '../../lib/theme';
 import { Toast } from '../../components/Toast';
 import { ProgressBar } from '../../components/ProgressBar';
@@ -177,7 +177,7 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit = {}
   }
 };
 
-export default function RequestSignPage() {
+function RequestSignPageContent() {
   const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -520,7 +520,7 @@ export default function RequestSignPage() {
   };
 
   const loadPdfFromArrayBuffer = async (buffer: ArrayBuffer, onProgress?: (percent: number) => void) => {
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf');
+    const pdfjs = await import('pdfjs-dist');
     setLoadingPdf(true);
     setError(null);
     try {
@@ -689,7 +689,7 @@ export default function RequestSignPage() {
         const detail = await safeParseError(resp);
         throw new Error(detail || 'Failed to create investor');
       }
-      setInvestorForm({ name: '', email: '', units: 0 });
+      setInvestorForm({ name: '', email: '', units: '' });
       await refreshInvestors(selectedProjectId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create investor');
@@ -812,7 +812,7 @@ export default function RequestSignPage() {
           signer_key: field.signerClientId || undefined,
         };
       })
-      .filter((value): value is EnvelopeFieldPayload => Boolean(value));
+      .filter((value) => value !== null) as EnvelopeFieldPayload[];
   };
 
   const exportFields = () => {
@@ -2226,5 +2226,13 @@ function Spinner() {
         }
       `}</style>
     </>
+  );
+}
+
+export default function RequestSignPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <RequestSignPageContent />
+    </Suspense>
   );
 }

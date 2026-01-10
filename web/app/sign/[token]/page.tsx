@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, CSSProperties, ChangeEvent, RefObject } from 'react';
-import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
+import { GlobalWorkerOptions } from 'pdfjs-dist';
 import { useParams } from 'next/navigation';
 import { theme } from '../../../lib/theme';
 import { AISummaryCard } from '../AISummaryCard';
@@ -2095,7 +2095,7 @@ function FieldOverlay({
   field: any;
   pageMeta: PageRender;
   value: any;
-  onChange: (field: any, value: any) => void;
+  onChange: (field: any, value: any, options?: any) => void;
   mode: 'edit' | 'view';
   registerFieldRef?: (id: string, el: HTMLElement | null) => void;
   active?: boolean;
@@ -2110,20 +2110,20 @@ function FieldOverlay({
   const screenY = (pageMeta.baseHeight - (field.y + field.h)) * pageMeta.scale;
   const fieldId = String(field.id);
   const shouldHighlight = mode === 'edit' && (active || highlighted);
-  const baseStyle = {
-    position: 'absolute' as const,
+  const baseStyle: CSSProperties = {
+    position: 'absolute',
     left: screenX,
     top: screenY,
     width: screenWidth,
     height: screenHeight,
-    boxSizing: 'border-box' as const,
-    pointerEvents: mode === 'view' ? 'none' : ('auto' as const),
+    boxSizing: 'border-box',
+    pointerEvents: mode === 'view' ? 'none' : 'auto',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease',
   };
-  const highlightStyle = shouldHighlight
+  const highlightStyle: CSSProperties = shouldHighlight
     ? { boxShadow: '0 0 0 3px rgba(37,99,235,0.32)', borderColor: palette.accent }
     : {};
   const handleFocus = () => {
@@ -2139,7 +2139,7 @@ function FieldOverlay({
           ref={(el) => registerFieldRef?.(fieldId, el)}
           onClick={handleFocus}
           data-field-id={fieldId}
-          tabIndex={mode === 'edit' ? -1 : undefined}
+          tabIndex={undefined}
           style={{
             ...baseStyle,
             display: 'flex',
@@ -2216,7 +2216,7 @@ function FieldOverlay({
           ref={(el) => registerFieldRef?.(fieldId, el)}
           onClick={handleFocus}
           data-field-id={fieldId}
-          tabIndex={mode === 'edit' ? -1 : undefined}
+          tabIndex={undefined}
           style={{
             ...baseStyle,
             display: 'flex',
@@ -2278,7 +2278,7 @@ function FieldOverlay({
         <div
           ref={(el) => registerFieldRef?.(fieldId, el)}
           onClick={handleFocus}
-          tabIndex={mode === 'edit' ? -1 : undefined}
+          tabIndex={undefined}
           style={{
             ...baseStyle,
             border: '2px solid #94a3b8',
@@ -2327,7 +2327,7 @@ function FieldOverlay({
           ref={(el) => registerFieldRef?.(fieldId, el)}
           onClick={handleFocus}
           data-field-id={fieldId}
-          tabIndex={mode === 'edit' ? -1 : undefined}
+          tabIndex={undefined}
           style={{
             ...baseStyle,
             borderWidth: 2,
@@ -2666,7 +2666,7 @@ function CompletionView({
 }
 
 async function renderPdfPages(buffer: ArrayBuffer): Promise<PageRender[]> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf');
+  const pdfjs = await import('pdfjs-dist');
   const typedArray = new Uint8Array(buffer);
   const pdf = await pdfjs.getDocument({ data: typedArray }).promise;
   const pages: PageRender[] = [];

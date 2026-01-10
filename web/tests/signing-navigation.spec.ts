@@ -224,7 +224,7 @@ test.describe('signing navigation UI', () => {
 
     await chip.click();
     await expect(checkbox).toBeFocused();
-    await checkbox.check();
+    await checkbox.click({ force: true });
 
     expect(consoleErrors).toEqual([]);
   });

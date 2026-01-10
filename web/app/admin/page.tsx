@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, FormEvent, CSSProperties, KeyboardEvent, ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, FormEvent, CSSProperties, KeyboardEvent, ChangeEvent, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { theme } from '../../lib/theme';
 import { AISummaryCard } from '../sign/AISummaryCard';
@@ -213,7 +213,7 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit = {}
   }
 };
 
-export default function AdminPage() {
+function AdminPageContent() {
   const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const appVersion = (process.env.APP_VERSION ?? '').trim() || 'unknown';
   const [adminToken, setAdminToken] = useState('');
@@ -5205,4 +5205,12 @@ export default function AdminPage() {
     </div >
   );
 
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AdminPageContent />
+    </Suspense>
+  );
 }

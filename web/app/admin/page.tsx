@@ -3272,8 +3272,8 @@ function AdminPageContent() {
                               ? (docNameForExt.split('.').pop() ?? '').toUpperCase() || 'PDF'
                               : 'PDF';
                             const documentUrl = isAwaiting
-                              ? selectedProjectId && envelopeRecord.document?.id
-                                ? `${baseApi}/api/projects/${selectedProjectId}/documents/${envelopeRecord.document.id}/pdf${tokenParam}`
+                              ? selectedProjectId && envelopeRecord.id
+                                ? `${baseApi}/api/projects/${selectedProjectId}/envelopes/${envelopeRecord.id}/snapshot${tokenParam}`
                                 : null
                               : `${baseApi}/api/projects/${selectedProjectId}/final-artifacts/${finalId}/pdf${tokenParam}`;
                             const showCheckbox = isAwaiting ? manageEnvelopesMode : manageSignedMode;

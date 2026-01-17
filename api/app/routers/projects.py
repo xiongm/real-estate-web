@@ -53,6 +53,43 @@ def _serialize_project_file(doc: ProjectFile):
         "uploaded_at": doc.uploaded_at,
     }
 
+
+def _collect_envelope_values(session: Session, envelope_id: int):
+    fields = session.exec(select(FieldModel).where(FieldModel.envelope_id == envelope_id)).all()
+    field_map = {f.id: f for f in fields}
+    signers = session.exec(select(Signer).where(Signer.envelope_id == envelope_id)).all()
+    signer_ids = [s.id for s in signers]
+    if not signer_ids:
+        return {}
+    rows = session.exec(
+        select(SignerFieldValue).where(SignerFieldValue.signer_id.in_(signer_ids))
+    ).all()
+    combined = {}
+    for row in rows:
+        field = field_map.get(row.field_id)
+        if not field:
+            continue
+        try:
+            data = json.loads(row.value_json or "{}")
+        except json.JSONDecodeError:
+            data = {}
+        value = data.get("value")
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        combined[str(field.id)] = {
+            "type": field.type,
+            "page": field.page,
+            "x": field.x,
+            "y": field.y,
+            "w": field.w,
+            "h": field.h,
+            "value": value,
+            "font": data.get("font") or field.font_family or "sans",
+        }
+    return combined
+
 router = APIRouter()
 
 
@@ -523,6 +560,54 @@ def download_final_pdf(
     )
     return Response(
         content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": _content_disposition(filename)},
+    )
+
+@router.get("/{project_id}/envelopes/{envelope_id}/snapshot")
+def download_envelope_snapshot(
+    project_id: int,
+    envelope_id: int,
+    session: Session = Depends(get_session),
+    request: Request = None,
+    ctx=Depends(require_project_or_admin),
+):
+    env = session.get(Envelope, envelope_id)
+    if not env or env.project_id != project_id:
+        raise HTTPException(404, "envelope not found")
+    
+    doc = session.get(Document, env.document_id)
+    if not doc:
+        raise HTTPException(404, "document not found")
+        
+    # Collect current field values
+    aggregate_values = _collect_envelope_values(session, env.id)
+    original_pdf = get_bytes(doc.s3_key)
+    
+    from ..worker_stub import seal_pdf
+    # Use seal_pdf to generate a "snapshot" PDF with current signatures
+    final_pdf, audit_json, sha_final = seal_pdf(original_pdf, env.id, aggregate_values)
+    
+    filename_base = doc.filename if doc.filename else f"envelope-{envelope_id}"
+    if filename_base.lower().endswith(".pdf"):
+        filename_base = filename_base[:-4]
+    
+    filename = f"{filename_base} - SNAPSHOT.pdf"
+    
+    _record_audit(
+        session,
+        project_id=project_id,
+        action="snapshot",
+        resource_type="envelope",
+        resource_id=str(envelope_id),
+        actor_type=ctx.role,
+        summary=f"Downloaded snapshot PDF {filename}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+    
+    return Response(
+        content=final_pdf,
         media_type="application/pdf",
         headers={"Content-Disposition": _content_disposition(filename)},
     )

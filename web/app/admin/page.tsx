@@ -31,6 +31,8 @@ type EnvelopeSummary = {
   subject: string;
   status: string;
   created_at: string;
+  updated_at?: string;
+  revision?: number;
   summary?: string | null;
   document?: { id: number | null; filename: string | null };
   total_signers: number;
@@ -283,6 +285,8 @@ function AdminPageContent() {
   const [manageDocumentsMode, setManageDocumentsMode] = useState(false);
   const [hoveredFinalId, setHoveredFinalId] = useState<number | null>(null);
   const [hoveredEnvelopeId, setHoveredEnvelopeId] = useState<number | null>(null);
+  const [hoveredDraftId, setHoveredDraftId] = useState<number | null>(null);
+  const [focusedDraftId, setFocusedDraftId] = useState<number | null>(null);
   const [hoveredProjectId, setHoveredProjectId] = useState<number | null>(null);
   const [hoveredSignerKey, setHoveredSignerKey] = useState<string | null>(null);
   const [revokingEnvelopes, setRevokingEnvelopes] = useState(false);
@@ -1246,7 +1250,11 @@ function AdminPageContent() {
   );
   const heroNameDisplayId = selectedProject ? `hero-name-display-${selectedProject.id}` : 'hero-name-display';
   const selectedProjectToken = selectedProject?.access_token ?? null;
-  const outstandingEnvelopes = useMemo(() => envelopes.filter((env) => env.status !== 'completed'), [envelopes]);
+  const draftEnvelopes = useMemo(() => envelopes.filter((env) => env.status === 'draft'), [envelopes]);
+  const outstandingEnvelopes = useMemo(
+    () => envelopes.filter((env) => env.status !== 'completed' && env.status !== 'draft'),
+    [envelopes],
+  );
   const envelopeMap = useMemo(() => {
     const map: Record<number, EnvelopeSummary> = {};
     envelopes.forEach((env) => {
@@ -1271,7 +1279,7 @@ function AdminPageContent() {
     ],
     [outstandingEnvelopes, finals],
   );
-  const hasSignaturesAvailable = documentEntries.length > 0;
+  const hasSignaturesAvailable = documentEntries.length > 0 || draftEnvelopes.length > 0;
   const hasProjectFiles = projectFiles.length > 0;
   const canRequestSignatures = Boolean(selectedProjectId && hasInvestors);
   const totalInvestorUnits = useMemo(
@@ -1377,7 +1385,7 @@ function AdminPageContent() {
     let proceed = true;
     if (!options?.skipConfirm) {
       proceed = window.confirm(
-        `Revoke ${envelopeIds.length} envelope${envelopeIds.length > 1 ? 's' : ''}? Pending signees will lose access immediately.`,
+        `Delete ${envelopeIds.length} signature request${envelopeIds.length > 1 ? 's' : ''}? Sent requests will stop working immediately.`,
       );
     }
     if (!proceed) return false;
@@ -3191,6 +3199,182 @@ function AdminPageContent() {
                       </button>
                     )}
                   </div>
+                  {draftEnvelopes.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {draftEnvelopes.map((draft) => (
+                        <div
+                          key={draft.id}
+                          data-testid={`envelope-draft-${draft.id}`}
+                          role="link"
+                          tabIndex={0}
+                          onClick={() => {
+                            window.location.href = `/request-sign?project=${selectedProjectId}&draft=${draft.id}`;
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              window.location.href = `/request-sign?project=${selectedProjectId}&draft=${draft.id}`;
+                            }
+                          }}
+                          onMouseEnter={() => setHoveredDraftId(draft.id)}
+                          onMouseLeave={() => setHoveredDraftId((current) => (current === draft.id ? null : current))}
+                          onFocus={() => setFocusedDraftId(draft.id)}
+                          onBlur={() => setFocusedDraftId((current) => (current === draft.id ? null : current))}
+                          style={{
+                            padding: 16,
+                            border: selectedEnvelopeIds.includes(draft.id)
+                              || hoveredDraftId === draft.id
+                              || focusedDraftId === draft.id
+                              ? `1px solid ${palette.accent}`
+                              : `1px solid ${palette.border}`,
+                            borderRadius: 14,
+                            background: '#fff',
+                            cursor: 'pointer',
+                            boxShadow: selectedEnvelopeIds.includes(draft.id)
+                              || hoveredDraftId === draft.id
+                              || focusedDraftId === draft.id
+                              ? '0 10px 22px rgba(37,99,235,0.12)'
+                              : '0 6px 16px rgba(15,23,42,0.08)',
+                            transition: 'border 0.2s ease, box-shadow 0.2s ease',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              gap: 12,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 260px' }}>
+                              {manageEnvelopesMode && (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedEnvelopeIds.includes(draft.id)}
+                                  aria-label={`Select draft ${draft.document?.filename || draft.subject || draft.id}`}
+                                  onChange={() => toggleEnvelopeSelection(draft.id)}
+                                  onClick={(event) => event.stopPropagation()}
+                                />
+                              )}
+                              <div
+                                style={{
+                                  width: 48,
+                                  height: 48,
+                                  borderRadius: 12,
+                                  background: '#f1f5f9',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="24"
+                                  height="24"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  style={{ color: '#dc2626' }}
+                                >
+                                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                                  <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                                  <path d="M10 9H8" />
+                                  <path d="M16 13H8" />
+                                  <path d="M16 17H8" />
+                                </svg>
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ fontSize: 16, fontWeight: 600, color: palette.text }}>
+                                  {draft.document?.filename || draft.subject || 'Signature request draft'}
+                                </span>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    flexWrap: 'wrap',
+                                    color: palette.accentMuted,
+                                    marginTop: 4,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      padding: '2px 8px',
+                                      borderRadius: 999,
+                                      background: '#fee2e2',
+                                      color: '#b91c1c',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    PDF
+                                  </span>
+                                  <span>•</span>
+                                  <span style={{ fontSize: 12 }}>
+                                    Saved {formatLocalDateTime(draft.updated_at || draft.created_at) || 'recently'}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      borderRadius: 999,
+                                      background: '#eef2ff',
+                                      color: '#4338ca',
+                                      padding: '2px 8px',
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Draft
+                                  </span>
+                                  {draft.signers?.length > 0 && (
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                      {draft.signers.slice(0, 10).map((signer, index) => (
+                                        <div
+                                          key={`draft-${draft.id}-signer-${signer.id}`}
+                                          title={signer.name || signer.email}
+                                          style={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: '50%',
+                                            border: '2px solid #fff',
+                                            background: '#94a3b8',
+                                            color: '#fff',
+                                            fontWeight: 700,
+                                            fontSize: 12,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            marginLeft: index === 0 ? 0 : -8,
+                                            textTransform: 'uppercase',
+                                            boxShadow: '0 6px 14px rgba(15,23,42,0.18)',
+                                          }}
+                                        >
+                                          {(signer.name || signer.email || '?').trim().charAt(0) || '?'}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <span style={{ fontSize: 12, color: palette.accentMuted }}>
+                                    {draft.total_signers
+                                      ? `${draft.total_signers} signer${draft.total_signers === 1 ? '' : 's'} assigned`
+                                      : 'Setup in progress'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {!hasSignaturesAvailable ? (
                     <div
                       style={{

@@ -680,6 +680,8 @@ def list_project_envelopes(
     envelopes = session.exec(
         select(Envelope).where(Envelope.project_id == project_id).order_by(Envelope.created_at.desc())
     ).all()
+    if ctx.role != "admin":
+        envelopes = [envelope for envelope in envelopes if envelope.status != "draft"]
     doc_map = {}
     link_base = os.getenv("WEB_BASE_URL") or os.getenv("NEXT_PUBLIC_WEB_BASE") or "http://localhost:3000"
     results = []
@@ -695,6 +697,8 @@ def list_project_envelopes(
                 "subject": env.subject,
                 "status": env.status,
                 "created_at": env.created_at,
+                "updated_at": env.updated_at,
+                "revision": env.revision,
                 "document": {"id": doc.id if doc else None, "filename": doc.filename if doc else None},
                 "total_signers": len(signers),
                 "completed_signers": completed,
@@ -756,16 +760,17 @@ def revoke_envelope(
     envelope = session.get(Envelope, envelope_id)
     if not envelope or envelope.project_id != project_id:
         raise HTTPException(404, "envelope not found")
+    is_draft = envelope.status == "draft"
     _delete_envelope(session, envelope)
     session.commit()
     _record_audit(
         session,
         project_id=project_id,
-        action="revoke",
+        action="draft_discard" if is_draft else "revoke",
         resource_type="envelope",
         resource_id=str(envelope_id),
         actor_type=ctx.role,
-        summary=f"Revoked envelope {envelope_id}",
+        summary=f"{'Discarded draft' if is_draft else 'Revoked envelope'} {envelope_id}",
         ip=getattr(request, "client", None).host if request and request.client else None,
         user_agent=request.headers.get("user-agent") if request else None,
     )

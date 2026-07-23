@@ -32,6 +32,10 @@ class EnvelopeCreate(BaseModel):
     signers: List[SignerCreate]
     fields: List[FieldCreate]
 
+
+class EnvelopeDraftUpdate(EnvelopeCreate):
+    revision: Optional[int] = None
+
 class EnvelopeSend(BaseModel):
     subject: Optional[str] = None
     message: Optional[str] = None

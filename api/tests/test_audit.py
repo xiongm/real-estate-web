@@ -126,8 +126,26 @@ def test_signature_actions_are_audited(client, mock_storage):
         "document_id": doc_id,
         "subject": "Please sign",
         "message": "",
-        "signers": [{"name": "Sig One", "email": "sig1@example.com", "role": "Investor", "routing_order": 1}],
-        "fields": [],
+        "signers": [
+            {
+                "client_id": "sig-one",
+                "name": "Sig One",
+                "email": "sig1@example.com",
+                "role": "Investor",
+                "routing_order": 1,
+            }
+        ],
+        "fields": [
+            {
+                "page": 1,
+                "x": 20,
+                "y": 20,
+                "w": 120,
+                "h": 30,
+                "type": "signature",
+                "signer_key": "sig-one",
+            }
+        ],
     }
     env_resp = client.post("/api/envelopes", json=envelope_payload, headers=ADMIN_HEADERS)
     assert env_resp.status_code == 200

@@ -46,6 +46,8 @@ class Envelope(SQLModel, table=True):
     requester_email: Optional[str] = None
     summary: Optional[str] = None
     created_at: datetime = ORMField(default_factory=datetime.utcnow)
+    updated_at: datetime = ORMField(default_factory=datetime.utcnow)
+    revision: int = 1
 
 class Signer(SQLModel, table=True):
     id: Optional[int] = ORMField(default=None, primary_key=True)
@@ -56,6 +58,7 @@ class Signer(SQLModel, table=True):
     routing_order: int = 1
     status: str = "pending"
     completed_at: Optional[datetime] = None
+    project_investor_id: Optional[int] = None
 
 class Field(SQLModel, table=True):
     id: Optional[int] = ORMField(default=None, primary_key=True)

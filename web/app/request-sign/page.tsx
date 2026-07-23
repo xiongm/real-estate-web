@@ -110,6 +110,16 @@ type EnvelopeCreatePayload = {
   fields: EnvelopeFieldPayload[];
 };
 
+type EnvelopeDraftResponse = Omit<EnvelopeCreatePayload, 'signers' | 'fields'> & {
+  id: number;
+  status: string;
+  revision: number;
+  updated_at?: string;
+  document?: { id: number; filename: string };
+  signers: Array<EnvelopeSignerPayload & { id: number; project_investor_id?: number | null }>;
+  fields: Array<EnvelopeFieldPayload & { id: number; project_investor_id?: number | null }>;
+};
+
 const FIELD_DEFAULTS: Record<FieldType, { width: number; height: number }> = {
   signature: { width: 240, height: 90 },
   initials: { width: 120, height: 40 },
@@ -184,6 +194,7 @@ function RequestSignPageContent() {
   const baseApi = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8000';
   const router = useRouter();
   const searchParams = useSearchParams();
+  const draftParam = searchParams.get('draft');
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [projectParamError, setProjectParamError] = useState<string | null>(null);
@@ -206,7 +217,7 @@ function RequestSignPageContent() {
   const [showProjectsModal, setShowProjectsModal] = useState(false);
   const [projectsDirty, setProjectsDirty] = useState(false);
   const [subject, setSubject] = useState('Please sign');
-  const [message] = useState('Kindly review and sign this packet.');
+  const [message, setMessage] = useState('Kindly review and sign this packet.');
   const [exportJson, setExportJson] = useState('');
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -223,6 +234,16 @@ function RequestSignPageContent() {
   const [pendingEnvelopePayload, setPendingEnvelopePayload] = useState<EnvelopeCreatePayload | null>(null);
   const [enableAiSummary, setEnableAiSummary] = useState(true);
   const [summaryDraft, setSummaryDraft] = useState('');
+  const [draftId, setDraftId] = useState<number | null>(() => {
+    const value = Number(draftParam);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  });
+  const [draftRevision, setDraftRevision] = useState<number | null>(null);
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>(
+    draftId ? 'loading' : 'idle',
+  );
+  const [draftHydrated, setDraftHydrated] = useState(!draftId);
+  const lastSavedPayloadRef = useRef('');
   const selectedField = useMemo(
     () => fields.find((field) => field.id === selectedFieldId) || null,
     [fields, selectedFieldId],
@@ -556,6 +577,7 @@ function RequestSignPageContent() {
       setPdfPages(pages);
       setFields([]);
       setSelectedFieldId(null);
+      return pages;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse PDF');
       throw err;
@@ -563,6 +585,94 @@ function RequestSignPageContent() {
       setLoadingPdf(false);
     }
   };
+
+  useEffect(() => {
+    if (!draftId || !adminVerified || !adminToken || draftHydrated) return;
+    let cancelled = false;
+    const hydrateDraft = async () => {
+      setDraftStatus('loading');
+      try {
+        const response = await fetch(`${baseApi}/api/envelopes/${draftId}`, {
+          headers: { 'X-Access-Token': adminToken },
+        });
+        if (!response.ok) throw new Error(await safeParseError(response));
+        const draft = (await response.json()) as EnvelopeDraftResponse;
+        if (draft.status !== 'draft') throw new Error('Only draft envelopes can be edited.');
+        const pdfResponse = await fetch(
+          `${baseApi}/api/projects/${draft.project_id}/documents/${draft.document_id}/pdf`,
+          { headers: { 'X-Access-Token': adminToken } },
+        );
+        if (!pdfResponse.ok) throw new Error('Failed to load draft document.');
+        const renderedPages = await loadPdfFromArrayBuffer(await pdfResponse.arrayBuffer());
+        if (cancelled) return;
+        setSelectedProjectId(draft.project_id);
+        setDocumentInfo(draft.document || { id: draft.document_id, filename: 'Draft document' });
+        setSubject(draft.subject ?? 'Please sign');
+        setMessage(draft.message ?? 'Kindly review and sign this packet.');
+        setDraftRevision(draft.revision);
+        setFields(
+          draft.fields.map((field) => {
+            const page = renderedPages.find((item) => item.pageIndex === field.page - 1);
+            const scale = page?.scale || 1;
+            const baseHeight = page?.baseHeight || 0;
+            return {
+              id: `draft-field-${field.id}`,
+              pageIndex: field.page - 1,
+              type: field.type,
+              name: field.name || '',
+              role: field.role,
+              required: field.required,
+              x: field.x * scale,
+              y: (baseHeight - (field.y + field.h)) * scale,
+              width: field.w * scale,
+              height: field.h * scale,
+              signerClientId: field.project_investor_id ? String(field.project_investor_id) : null,
+              fontFamily: (field.font_family || DEFAULT_FONT) as FontChoice,
+            };
+          }),
+        );
+        lastSavedPayloadRef.current = JSON.stringify({
+          project_id: draft.project_id,
+          document_id: draft.document_id,
+          subject: draft.subject,
+          message: draft.message,
+          signers: draft.signers.map((signer) => ({
+            client_id: `investor-${signer.project_investor_id}`,
+            project_investor_id: signer.project_investor_id,
+            name: signer.name,
+            email: signer.email,
+            role: signer.role,
+            routing_order: signer.routing_order,
+          })),
+          fields: draft.fields.map((field) => ({
+            page: field.page,
+            x: field.x,
+            y: field.y,
+            w: field.w,
+            h: field.h,
+            type: field.type,
+            required: field.required,
+            role: field.role,
+            name: field.name || undefined,
+            font_family: field.font_family || DEFAULT_FONT,
+            signer_key: field.project_investor_id ? String(field.project_investor_id) : undefined,
+          })),
+        });
+        setDraftStatus('saved');
+      } catch (err) {
+        if (!cancelled) {
+          setDraftStatus('error');
+          setError(err instanceof Error ? err.message : 'Failed to load draft');
+        }
+      } finally {
+        if (!cancelled) setDraftHydrated(true);
+      }
+    };
+    hydrateDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminToken, adminVerified, baseApi, draftHydrated, draftId]);
 
   const uploadDocumentToProject = async (file: File, onProgress?: (percent: number) => void) => {
     const projectNumeric = selectedProjectId;
@@ -818,6 +928,102 @@ function RequestSignPageContent() {
       .filter((value) => value !== null) as EnvelopeFieldPayload[];
   };
 
+  const buildEnvelopePayload = (): EnvelopeCreatePayload | null => {
+    if (!selectedProjectId || !documentInfo?.id) return null;
+    const investorIds = Array.from(
+      new Set(fields.map((field) => field.signerClientId).filter((key): key is string => Boolean(key))),
+    );
+    const signers = investorIds
+      .map((id, index) => {
+        const investor = projectInvestors.find((item) => String(item.id) === id);
+        if (!investor) return null;
+        return {
+          client_id: `investor-${investor.id}`,
+          project_investor_id: investor.id,
+          name: investor.name,
+          email: investor.email,
+          role: investor.role,
+          routing_order: index + 1,
+        };
+      })
+      .filter((value): value is EnvelopeSignerPayload => Boolean(value));
+    return {
+      project_id: selectedProjectId,
+      document_id: documentInfo.id,
+      subject,
+      message,
+      signers,
+      fields: buildFieldPayload(),
+    };
+  };
+
+  const persistDraft = async (payload: EnvelopeCreatePayload, explicit = false) => {
+    if (!adminToken) throw new Error('Admin token required to save draft.');
+    setDraftStatus('saving');
+    const currentDraftId = draftId;
+    const response = await fetch(
+      currentDraftId ? `${baseApi}/api/envelopes/${currentDraftId}/draft` : `${baseApi}/api/envelopes/drafts`,
+      {
+        method: currentDraftId ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Token': adminToken,
+        },
+        body: JSON.stringify(currentDraftId ? { ...payload, revision: draftRevision } : payload),
+      },
+    );
+    if (!response.ok) {
+      const detail = await safeParseError(response);
+      setDraftStatus('error');
+      throw new Error(detail || `Draft save failed (${response.status})`);
+    }
+    const saved = (await response.json()) as EnvelopeDraftResponse;
+    setDraftId(saved.id);
+    setDraftRevision(saved.revision);
+    setDraftStatus('saved');
+    lastSavedPayloadRef.current = JSON.stringify(payload);
+    if (!currentDraftId) {
+      router.replace(`/request-sign?project=${payload.project_id}&draft=${saved.id}`);
+    }
+    if (explicit) setToastMessage('Draft saved');
+    return saved;
+  };
+
+  const saveDraft = async () => {
+    const payload = buildEnvelopePayload();
+    if (!payload) {
+      setError('Upload a document before saving a draft.');
+      return;
+    }
+    setError(null);
+    try {
+      await persistDraft(payload, true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save draft');
+    }
+  };
+
+  useEffect(() => {
+    if (
+      !draftId ||
+      !draftHydrated ||
+      !adminToken ||
+      draftStatus === 'loading' ||
+      draftStatus === 'saving' ||
+      !projectInvestors.length
+    ) return;
+    const payload = buildEnvelopePayload();
+    if (!payload) return;
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastSavedPayloadRef.current) return;
+    const timeout = window.setTimeout(() => {
+      persistDraft(payload).catch((err) => {
+        setError(err instanceof Error ? err.message : 'Draft autosave failed');
+      });
+    }, 1500);
+    return () => window.clearTimeout(timeout);
+  }, [adminToken, documentInfo, draftHydrated, draftId, draftStatus, fields, projectInvestors, subject]);
+
   const exportFields = () => {
     const payload = buildFieldPayload();
     setExportJson(payload.length ? JSON.stringify(payload, null, 2) : '');
@@ -865,13 +1071,16 @@ function RequestSignPageContent() {
         subject,
         message: confirmMessage,
       };
-      const createResp = await fetch(`${baseApi}/api/envelopes`, {
-        method: 'POST',
+      const currentDraftId = draftId;
+      const createResp = await fetch(
+        currentDraftId ? `${baseApi}/api/envelopes/${currentDraftId}/draft` : `${baseApi}/api/envelopes/drafts`,
+        {
+        method: currentDraftId ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Access-Token': adminToken,
         },
-        body: JSON.stringify(createPayload),
+        body: JSON.stringify(currentDraftId ? { ...createPayload, revision: draftRevision } : createPayload),
       });
       if (!createResp.ok) {
         const detail = await safeParseError(createResp);
@@ -879,6 +1088,8 @@ function RequestSignPageContent() {
       }
       const created = await createResp.json();
       const envelopeId = created.id;
+      setDraftId(envelopeId);
+      setDraftRevision(created.revision);
       setConfirmSendStage(enableAiSummary ? 'summary' : 'sending');
       const trimmedSummary = summaryDraft.trim();
       const sendResp = await fetch(`${baseApi}/api/envelopes/${envelopeId}/send`, {
@@ -1162,6 +1373,10 @@ function RequestSignPageContent() {
     );
   }
 
+  if (draftId && !draftHydrated) {
+    return <DraftEditorSkeleton />;
+  }
+
   const documentLabel = documentInfo ? documentInfo.filename : 'No document uploaded yet';
   const selectedSignerId =
     (selectedFieldId && fields.find((field) => field.id === selectedFieldId)?.signerClientId) || null;
@@ -1284,7 +1499,7 @@ function RequestSignPageContent() {
               disabled={!canUploadDocument || uploadingDoc}
               style={{ display: 'none' }}
             />
-            {!documentInfo ? (
+            {draftHydrated && !documentInfo ? (
               <div
                 style={{
                   marginTop: 24,
@@ -1747,6 +1962,34 @@ function RequestSignPageContent() {
           backdropFilter: 'blur(4px)',
         }}
       >
+        <span
+          role="status"
+          aria-live="polite"
+          style={{ marginRight: 'auto', fontSize: 13, color: draftStatus === 'error' ? '#b91c1c' : '#64748b' }}
+        >
+          {draftStatus === 'loading' && 'Loading draft…'}
+          {draftStatus === 'saving' && 'Saving draft…'}
+          {draftStatus === 'saved' && 'Draft saved'}
+          {draftStatus === 'error' && 'Draft save failed'}
+        </span>
+        <button
+          type="button"
+          onClick={saveDraft}
+          disabled={!documentInfo || draftStatus === 'saving' || draftStatus === 'loading'}
+          style={{
+            background: '#fff',
+            color: '#1d4ed8',
+            border: '1px solid #93c5fd',
+            borderRadius: 999,
+            padding: '14px 24px',
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: !documentInfo || draftStatus === 'saving' || draftStatus === 'loading' ? 'not-allowed' : 'pointer',
+            opacity: !documentInfo ? 0.6 : 1,
+          }}
+        >
+          {draftStatus === 'saving' ? 'Saving…' : 'Save draft'}
+        </button>
         <button
           type="button"
           onClick={submitEnvelope}
@@ -2206,6 +2449,143 @@ async function safeParseError(response: Response) {
     // ignore
   }
   return null;
+}
+
+function DraftEditorSkeleton() {
+  const block = {
+    background: 'linear-gradient(90deg, #e2e8f0 25%, #f8fafc 50%, #e2e8f0 75%)',
+    backgroundSize: '200% 100%',
+    animation: 'draftSkeletonShimmer 1.4s ease-in-out infinite',
+    borderRadius: 10,
+  } as const;
+
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading saved draft"
+      style={{
+        minHeight: '100vh',
+        background: palette.pageBackground,
+        padding: '32px 24px 120px',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        style={{
+          height: 92,
+          borderRadius: 28,
+          background: palette.headerBackground,
+          border: palette.headerBorder,
+          boxShadow: theme.shadows.card,
+          padding: '20px 32px',
+          boxSizing: 'border-box',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div>
+          <div style={{ ...block, width: 220, height: 20 }} />
+          <div style={{ ...block, width: 150, height: 12, marginTop: 10 }} />
+        </div>
+        <div style={{ ...block, width: 120, height: 38, borderRadius: 999 }} />
+      </div>
+
+      <div
+        className="draft-skeleton-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) 320px',
+          gap: 24,
+          marginTop: 24,
+          alignItems: 'start',
+        }}
+      >
+        <div
+          style={{
+            minHeight: 720,
+            borderRadius: 20,
+            border: `1px solid ${palette.cardBorder}`,
+            background: '#e2e8f0',
+            padding: 28,
+            display: 'flex',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: 'min(720px, 88%)',
+              minHeight: 660,
+              borderRadius: 8,
+              background: '#fff',
+              boxShadow: '0 12px 30px rgba(15,23,42,0.12)',
+              padding: 28,
+              boxSizing: 'border-box',
+            }}
+          >
+            <div style={{ ...block, width: '42%', height: 14 }} />
+            <div style={{ ...block, width: '76%', height: 10, marginTop: 18 }} />
+            <div style={{ ...block, width: '68%', height: 10, marginTop: 10 }} />
+            <div style={{ ...block, width: '72%', height: 10, marginTop: 10 }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {[3, 1].map((rows, section) => (
+            <div
+              key={section}
+              style={{ padding: 20, borderRadius: 18, background: '#fff', border: `1px solid ${palette.cardBorder}` }}
+            >
+              <div style={{ ...block, width: section ? 170 : 130, height: 16 }} />
+              {Array.from({ length: rows }).map((_, row) => (
+                <div key={row} style={{ ...block, height: section ? 52 : 42, marginTop: 14 }} />
+              ))}
+            </div>
+          ))}
+          <p style={{ margin: '4px 0 0', textAlign: 'center', color: palette.accentMuted, fontSize: 14 }}>
+            Loading saved draft…
+          </p>
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 76,
+          borderTop: `1px solid ${palette.cardBorder}`,
+          background: 'rgba(248,250,252,0.96)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 12,
+          padding: '0 32px',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div style={{ ...block, width: 130, height: 44, borderRadius: 999 }} />
+        <div style={{ ...block, width: 160, height: 44, borderRadius: 999 }} />
+      </div>
+      <style>{`
+        @keyframes draftSkeletonShimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        @media (max-width: 760px) {
+          .draft-skeleton-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [aria-label="Loading saved draft"] * {
+            animation: none !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
 }
 
 function Spinner() {

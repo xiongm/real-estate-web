@@ -13,6 +13,8 @@ def init_db():
     _ensure_project_name_unique_index()
     _ensure_investor_contact_columns()
     _ensure_envelope_summary_column()
+    _ensure_envelope_draft_columns()
+    _ensure_signer_investor_column()
     _prune_audit_events(AUDIT_RETENTION_DAYS)
 
 def get_session():
@@ -84,6 +86,33 @@ def _ensure_envelope_summary_column():
         return
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE envelope ADD COLUMN summary TEXT"))
+
+
+def _ensure_envelope_draft_columns():
+    inspector = inspect(engine)
+    try:
+        columns = [col["name"] for col in inspector.get_columns("envelope")]
+    except Exception:
+        return
+    with engine.begin() as conn:
+        if "updated_at" not in columns:
+            conn.execute(text("ALTER TABLE envelope ADD COLUMN updated_at TIMESTAMP"))
+            conn.execute(text("UPDATE envelope SET updated_at = created_at WHERE updated_at IS NULL"))
+        if "revision" not in columns:
+            conn.execute(text("ALTER TABLE envelope ADD COLUMN revision INTEGER DEFAULT 1"))
+            conn.execute(text("UPDATE envelope SET revision = 1 WHERE revision IS NULL"))
+
+
+def _ensure_signer_investor_column():
+    inspector = inspect(engine)
+    try:
+        columns = [col["name"] for col in inspector.get_columns("signer")]
+    except Exception:
+        return
+    if "project_investor_id" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE signer ADD COLUMN project_investor_id INTEGER"))
 
 
 def _prune_audit_events(retention_days: int):

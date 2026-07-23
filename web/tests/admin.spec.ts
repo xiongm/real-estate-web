@@ -547,10 +547,10 @@ test.describe('Admin portal', () => {
     let createCalls = 0;
     let sendCalls = 0;
 
-    await page.route('**/api/envelopes', async (route) => {
+    await page.route('**/api/envelopes/drafts', async (route) => {
       if (route.request().method() === 'POST') {
         createCalls += 1;
-        await route.fulfill(jsonResponse({ id: createdEnvelopeId }));
+        await route.fulfill(jsonResponse({ id: createdEnvelopeId, status: 'draft', revision: 1 }));
       } else {
         await route.continue();
       }
@@ -650,10 +650,10 @@ test.describe('Admin portal', () => {
       );
     });
 
-    await page.route('**/api/envelopes', async (route) => {
+    await page.route('**/api/envelopes/drafts', async (route) => {
       if (route.request().method() === 'POST') {
         createPayload = route.request().postDataJSON();
-        await route.fulfill(jsonResponse({ id: createdEnvelopeId, status: 'draft' }));
+        await route.fulfill(jsonResponse({ id: createdEnvelopeId, status: 'draft', revision: 1 }));
       } else {
         await route.continue();
       }

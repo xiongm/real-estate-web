@@ -324,4 +324,98 @@ def test_envelope_send_and_sign_flow(client, test_engine, mock_storage, sent_ema
         final_artifact = session.exec(select(FinalArtifact).where(FinalArtifact.envelope_id == envelope_id)).first()
         assert final_artifact is not None
         assert mock_storage[final_artifact.s3_key_pdf]
-        assert mock_storage[final_artifact.s3_key_audit_json]
+    assert mock_storage[final_artifact.s3_key_audit_json]
+
+
+def test_envelope_draft_save_resume_and_revision_conflict(client):
+    project_id, project_token = create_project(client, "Draft Project")
+    investor_response = client.post(
+        f"/api/projects/{project_id}/investors",
+        json={"name": "Draft Investor", "email": "draft@example.com", "units_invested": 100},
+        headers=ADMIN_HEADERS,
+    )
+    investor_id = investor_response.json()["id"]
+    document = upload_document(client, project_id, filename="draft.pdf", content=SIMPLE_PDF)
+    payload = {
+        "project_id": project_id,
+        "document_id": document["id"],
+        "subject": "Draft request",
+        "message": "Review later",
+        "signers": [
+            {
+                "client_id": f"investor-{investor_id}",
+                "project_investor_id": investor_id,
+                "name": "Draft Investor",
+                "email": "draft@example.com",
+            }
+        ],
+        "fields": [
+            {
+                "page": 1,
+                "x": 40,
+                "y": 50,
+                "w": 120,
+                "h": 30,
+                "type": "initials",
+                "signer_key": str(investor_id),
+            }
+        ],
+    }
+
+    create_response = client.post("/api/envelopes/drafts", json=payload, headers=ADMIN_HEADERS)
+    assert create_response.status_code == 200
+    created = create_response.json()
+    assert created["status"] == "draft"
+    assert created["revision"] == 1
+    assert created["fields"][0]["project_investor_id"] == investor_id
+
+    update_payload = {**payload, "revision": 1, "subject": "Updated draft request"}
+    update_response = client.put(
+        f"/api/envelopes/{created['id']}/draft",
+        json=update_payload,
+        headers=ADMIN_HEADERS,
+    )
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["revision"] == 2
+    assert updated["subject"] == "Updated draft request"
+
+    stale_response = client.put(
+        f"/api/envelopes/{created['id']}/draft",
+        json=update_payload,
+        headers=ADMIN_HEADERS,
+    )
+    assert stale_response.status_code == 409
+
+    resume_response = client.get(f"/api/envelopes/{created['id']}", headers=ADMIN_HEADERS)
+    assert resume_response.status_code == 200
+    assert resume_response.json()["fields"][0]["type"] == "initials"
+
+    project_listing = client.get(
+        f"/api/projects/{project_id}/envelopes",
+        headers={"X-Access-Token": project_token},
+    )
+    assert project_listing.status_code == 200
+    assert project_listing.json() == []
+
+    incomplete_payload = {
+        **payload,
+        "subject": "Incomplete draft",
+        "signers": [],
+        "fields": [],
+    }
+    incomplete_response = client.post("/api/envelopes/drafts", json=incomplete_payload, headers=ADMIN_HEADERS)
+    assert incomplete_response.status_code == 200
+    incomplete_id = incomplete_response.json()["id"]
+
+    failed_send = client.post(
+        f"/api/envelopes/{incomplete_id}/send",
+        json={"subject": "Should not persist", "message": "Should not persist"},
+        headers=ADMIN_HEADERS,
+    )
+    assert failed_send.status_code == 400
+
+    preserved_response = client.get(f"/api/envelopes/{incomplete_id}", headers=ADMIN_HEADERS)
+    assert preserved_response.status_code == 200
+    assert preserved_response.json()["subject"] == "Incomplete draft"
+    assert preserved_response.json()["message"] == "Review later"

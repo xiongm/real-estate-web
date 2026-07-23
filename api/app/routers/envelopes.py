@@ -1,19 +1,150 @@
 import os
 from html import escape
 import json
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session, select
 from ..db import get_session
 from ..models import Envelope, Signer, Field, Document, Event, ProjectInvestor, AuditEvent
-from ..schemas import EnvelopeCreate, EnvelopeSend, EnvelopeSummaryUpdate, SignerUpdate
+from ..schemas import EnvelopeCreate, EnvelopeDraftUpdate, EnvelopeSend, EnvelopeSummaryUpdate, SignerUpdate
 from ..email import send_email, format_sender_name
 from ..utils import canonical_json, sha256_bytes, make_token
-from ..summary import kickoff_envelope_summary, generate_envelope_summary
+from ..summary import generate_envelope_summary
 from ..config import DOC_SUMMARY_CHAR_LIMIT
 from ..auth import require_admin_access
 
 router = APIRouter()
 WEB_BASE_URL = os.getenv("WEB_BASE_URL") or os.getenv("NEXT_PUBLIC_WEB_BASE") or "http://localhost:3000"
+
+
+def _replace_draft_contents(session: Session, env: Envelope, data: EnvelopeCreate):
+    doc = session.get(Document, data.document_id)
+    if not doc or doc.project_id != data.project_id:
+        raise HTTPException(400, "document mismatch")
+
+    resolved_signers = []
+    for idx, signer_data in enumerate(data.signers):
+        project_investor = None
+        if signer_data.project_investor_id:
+            project_investor = session.get(ProjectInvestor, signer_data.project_investor_id)
+            if not project_investor or project_investor.project_id != data.project_id:
+                raise HTTPException(400, f"project investor {signer_data.project_investor_id} invalid")
+        resolved_name = signer_data.name or (project_investor.name if project_investor else None)
+        resolved_email = signer_data.email or (project_investor.email if project_investor else None)
+        if not resolved_name or not resolved_email:
+            raise HTTPException(400, "Signer name/email required (supply or link to investor with values)")
+        resolved_signers.append((idx, signer_data, project_investor, resolved_name, resolved_email))
+
+    old_fields = session.exec(select(Field).where(Field.envelope_id == env.id)).all()
+    for field in old_fields:
+        session.delete(field)
+    old_signers = session.exec(select(Signer).where(Signer.envelope_id == env.id)).all()
+    for signer in old_signers:
+        session.delete(signer)
+    session.flush()
+
+    env.project_id = data.project_id
+    env.document_id = data.document_id
+    env.subject = data.subject
+    env.message = data.message
+    env.updated_at = datetime.utcnow()
+    session.add(env)
+
+    signer_key_map = {}
+    signer_role_map = {}
+    for idx, signer_data, project_investor, resolved_name, resolved_email in resolved_signers:
+        signer = Signer(
+            envelope_id=env.id,
+            name=resolved_name,
+            email=resolved_email,
+            role=signer_data.role or (project_investor.role if project_investor else "Investor"),
+            routing_order=signer_data.routing_order or (project_investor.routing_order if project_investor else idx + 1),
+            project_investor_id=project_investor.id if project_investor else None,
+        )
+        session.add(signer)
+        session.flush()
+        key = signer_data.client_id or signer_data.email or f"signer-{idx}"
+        signer_key_map[key] = signer.id
+        if project_investor:
+            signer_key_map[str(project_investor.id)] = signer.id
+            signer_key_map[f"investor-{project_investor.id}"] = signer.id
+        signer_role_map[signer.id] = signer.role
+
+    for field_data in data.fields:
+        target_signer_id = signer_key_map.get(field_data.signer_key) if field_data.signer_key else None
+        if field_data.signer_key and not target_signer_id:
+            raise HTTPException(400, f"field signer {field_data.signer_key} invalid")
+        assigned_role = field_data.role or (signer_role_map.get(target_signer_id) if target_signer_id else None)
+        session.add(Field(
+            envelope_id=env.id,
+            page=field_data.page,
+            x=field_data.x,
+            y=field_data.y,
+            w=field_data.w,
+            h=field_data.h,
+            type=field_data.type,
+            required=field_data.required,
+            role=assigned_role or "Signer",
+            name=field_data.name,
+            signer_id=target_signer_id,
+            font_family=field_data.font_family or "sans",
+        ))
+    session.flush()
+
+
+def _envelope_response(session: Session, env: Envelope):
+    doc = session.get(Document, env.document_id)
+    signers = session.exec(
+        select(Signer).where(Signer.envelope_id == env.id).order_by(Signer.routing_order)
+    ).all()
+    fields = session.exec(select(Field).where(Field.envelope_id == env.id).order_by(Field.id)).all()
+    signer_map = {signer.id: signer for signer in signers}
+    return {
+        "id": env.id,
+        "project_id": env.project_id,
+        "document_id": env.document_id,
+        "subject": env.subject,
+        "message": env.message,
+        "requester_name": env.requester_name,
+        "requester_email": env.requester_email,
+        "summary": env.summary,
+        "status": env.status,
+        "revision": env.revision,
+        "created_at": env.created_at,
+        "updated_at": env.updated_at,
+        "document": {"id": doc.id, "filename": doc.filename} if doc else None,
+        "signers": [
+            {
+                "id": signer.id,
+                "project_investor_id": signer.project_investor_id,
+                "name": signer.name,
+                "email": signer.email,
+                "role": signer.role,
+                "routing_order": signer.routing_order,
+            }
+            for signer in signers
+        ],
+        "fields": [
+            {
+                "id": field.id,
+                "page": field.page,
+                "x": field.x,
+                "y": field.y,
+                "w": field.w,
+                "h": field.h,
+                "type": field.type,
+                "required": field.required,
+                "role": field.role,
+                "name": field.name,
+                "font_family": field.font_family,
+                "signer_id": field.signer_id,
+                "project_investor_id": signer_map.get(field.signer_id).project_investor_id
+                if signer_map.get(field.signer_id)
+                else None,
+            }
+            for field in fields
+        ],
+    }
 
 def _sign_link(token: str) -> str:
     base = WEB_BASE_URL.rstrip('/')
@@ -80,9 +211,6 @@ def create_envelope(
     request: Request = None,
     ctx=Depends(require_admin_access),
 ):
-    doc = session.get(Document, data.document_id)
-    if not doc or doc.project_id != data.project_id:
-        raise HTTPException(400, "document mismatch")
     env = Envelope(
         project_id=data.project_id,
         document_id=data.document_id,
@@ -90,54 +218,11 @@ def create_envelope(
         message=data.message,
         status="draft",
     )
-    session.add(env); session.commit(); session.refresh(env)
-
-    signer_key_map = {}
-    signer_role_map = {}
-    for idx, s in enumerate(data.signers):
-        project_investor = None
-        if s.project_investor_id:
-            project_investor = session.get(ProjectInvestor, s.project_investor_id)
-            if not project_investor or project_investor.project_id != data.project_id:
-                raise HTTPException(400, f"project investor {s.project_investor_id} invalid")
-        resolved_name = s.name or (project_investor.name if project_investor else None)
-        resolved_email = s.email or (project_investor.email if project_investor else None)
-        if not resolved_name or not resolved_email:
-            raise HTTPException(400, "Signer name/email required (supply or link to investor with values)")
-        signer = Signer(
-            envelope_id=env.id,
-            name=resolved_name,
-            email=resolved_email,
-            role=s.role or (project_investor.role if project_investor else "Investor"),
-            routing_order=s.routing_order or (project_investor.routing_order if project_investor else idx + 1),
-        )
-        session.add(signer)
-        session.flush()
-        key = s.client_id or s.email or f"signer-{idx}"
-        signer_key_map[key] = signer.id
-        if project_investor:
-            signer_key_map[str(project_investor.id)] = signer.id
-        signer_role_map[signer.id] = signer.role
-    for f in data.fields:
-        target_signer_id = None
-        if f.signer_key:
-            target_signer_id = signer_key_map.get(f.signer_key)
-        assigned_role = f.role or (signer_role_map.get(target_signer_id) if target_signer_id else None)
-        session.add(Field(
-            envelope_id=env.id,
-            page=f.page,
-            x=f.x,
-            y=f.y,
-            w=f.w,
-            h=f.h,
-            type=f.type,
-            required=f.required,
-            role=assigned_role or "Signer",
-            name=f.name,
-            signer_id=target_signer_id,
-            font_family=f.font_family or "sans",
-        ))
+    session.add(env)
+    session.flush()
+    _replace_draft_contents(session, env, data)
     session.commit()
+    session.refresh(env)
     _append_event(session, env.id, "system", "created", {"envelope_id": env.id})
     _record_audit(
         session,
@@ -150,10 +235,62 @@ def create_envelope(
         ip=getattr(request, "client", None).host if request and request.client else None,
         user_agent=request.headers.get("user-agent") if request else None,
     )
-    kickoff_envelope_summary(env.id)
-
-    # Return a small, explicit body so curl shows it
     return {"id": env.id, "status": env.status}
+
+
+@router.post("/drafts")
+def create_draft(
+    data: EnvelopeCreate,
+    session: Session = Depends(get_session),
+    request: Request = None,
+    ctx=Depends(require_admin_access),
+):
+    env = Envelope(
+        project_id=data.project_id,
+        document_id=data.document_id,
+        subject=data.subject,
+        message=data.message,
+        status="draft",
+    )
+    session.add(env)
+    session.flush()
+    _replace_draft_contents(session, env, data)
+    session.commit()
+    session.refresh(env)
+    _record_audit(
+        session,
+        project_id=data.project_id,
+        action="draft_create",
+        resource_type="envelope",
+        resource_id=str(env.id),
+        actor_type=ctx.role,
+        summary=f"Created draft envelope {env.id}",
+        ip=getattr(request, "client", None).host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+    return _envelope_response(session, env)
+
+
+@router.put("/{envelope_id}/draft")
+def update_draft(
+    envelope_id: int,
+    data: EnvelopeDraftUpdate,
+    session: Session = Depends(get_session),
+    request: Request = None,
+    ctx=Depends(require_admin_access),
+):
+    env = session.get(Envelope, envelope_id)
+    if not env:
+        raise HTTPException(404, "envelope not found")
+    if env.status != "draft":
+        raise HTTPException(409, "only draft envelopes can be edited")
+    if data.revision is not None and data.revision != env.revision:
+        raise HTTPException(409, "draft was updated elsewhere")
+    env.revision = (env.revision or 1) + 1
+    _replace_draft_contents(session, env, data)
+    session.commit()
+    session.refresh(env)
+    return _envelope_response(session, env)
 
 @router.post("/{envelope_id}/send")
 def send_envelope(
@@ -166,6 +303,18 @@ def send_envelope(
     env = session.get(Envelope, envelope_id)
     if not env:
         raise HTTPException(404, "envelope not found")
+    if env.status != "draft":
+        raise HTTPException(409, "envelope has already been sent")
+    signers = session.exec(
+        select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
+    ).all()
+    fields = session.exec(select(Field).where(Field.envelope_id == envelope_id)).all()
+    if not signers:
+        raise HTTPException(400, "at least one signer is required")
+    if not fields:
+        raise HTTPException(400, "at least one field is required")
+    if any(field.signer_id is None for field in fields):
+        raise HTTPException(400, "every field must be assigned to a signer")
     if payload:
         if payload.message is not None:
             env.message = payload.message
@@ -191,10 +340,6 @@ def send_envelope(
             import logging
             logging.getLogger(__name__).warning("Summary generation failed before send: %s", exc)
     session.add(env); session.commit()
-
-    signers = session.exec(
-        select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
-    ).all()
     filename = doc.filename or "Document"
     requester_given_name = (env.requester_name or "").strip() or None
     requester_name = requester_given_name or "Your contact"
@@ -273,31 +418,7 @@ def get_envelope(
     env = session.get(Envelope, envelope_id)
     if not env:
         raise HTTPException(404, "envelope not found")
-    doc = session.get(Document, env.document_id)
-    signers = session.exec(
-        select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
-    ).all()
-    return {
-        "id": env.id,
-        "project_id": env.project_id,
-        "subject": env.subject,
-        "message": env.message,
-        "requester_name": env.requester_name,
-        "requester_email": env.requester_email,
-        "summary": env.summary,
-        "status": env.status,
-        "document": {"id": doc.id, "filename": doc.filename} if doc else None,
-        "signers": [
-            {
-                "id": s.id,
-                "name": s.name,
-                "email": s.email,
-                "role": s.role,
-                "routing_order": s.routing_order,
-            }
-            for s in signers
-        ],
-    }
+    return _envelope_response(session, env)
 
 @router.patch("/{envelope_id}/summary")
 def update_envelope_summary(

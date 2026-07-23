@@ -100,6 +100,28 @@ Services (when `docker compose` is running):
   ```
 - Check their status anytime with `./scripts/dev-services.sh status`.
 
+## Host API workaround
+The default `docker compose` workflow runs the API in Docker. Use this override only on
+hosts where Docker container egress is unreliable and the API must run directly on the host.
+
+1. Create the host Python environment and install API dependencies:
+   ```bash
+   python3 -m venv .venv
+   .venv/bin/pip install -r api/requirements.txt
+   ```
+2. Start the host API:
+   ```bash
+   .venv/bin/python scripts/run-host-api.py
+   ```
+3. In another terminal, start the Docker-managed services with the override:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.host-api.yml up -d --build
+   ```
+
+The override routes the web container to `host.docker.internal:8000`, prevents the Docker
+API from starting, and keeps PostgreSQL, Redis, MinIO, the worker, and web in Docker.
+Stop this mode with the same file arguments followed by `down`.
+
 ## Workflow
 1. **Manage projects:** Use the Admin sidebar inside the web app (you'll be prompted for the admin access token) to create projects. Investor management now lives exclusively in Admin; the request-sign builder is read-only and simply reflects the investors tied to the currently selected project. Each project automatically gets its own access token, visible inside the **Share** tab in the center pane—share that token with investors when you want to grant read-only API access.
 2. **Upload documents:** Call `POST /api/projects/{id}/documents` (or use whatever admin UI you build) to upload PDFs into MinIO for that project.

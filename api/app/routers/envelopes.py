@@ -190,7 +190,7 @@ def send_envelope(
             # Do not block sending if summarization fails.
             import logging
             logging.getLogger(__name__).warning("Summary generation failed before send: %s", exc)
-    env.status = "sent"; session.add(env); session.commit()
+    session.add(env); session.commit()
 
     signers = session.exec(
         select(Signer).where(Signer.envelope_id == envelope_id).order_by(Signer.routing_order)
@@ -246,6 +246,9 @@ Open document: {link}
             reply_to=requester_email,
         )
 
+    env.status = "sent"
+    session.add(env)
+    session.commit()
     _append_event(session, env.id, "system", "sent", {})
     _record_audit(
         session,

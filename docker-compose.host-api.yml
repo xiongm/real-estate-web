@@ -1,0 +1,25 @@
+services:
+  api:
+    profiles:
+      - docker-api
+
+  worker:
+    depends_on: !reset
+      - db
+      - minio
+      - redis
+
+  web:
+    build:
+      args:
+        API_HOST: http://host.docker.internal:8000
+    environment:
+      API_HOST: http://host.docker.internal:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on: !reset []
+
+  api-tests:
+    profiles:
+      - docker-api
+    depends_on: !reset []

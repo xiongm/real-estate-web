@@ -990,4 +990,63 @@ test.describe('signing navigation UI', () => {
     await expect(page.locator('[data-field-id="s1"] [data-filled="true"]')).toBeVisible();
     await expect(page.locator('[data-field-id="s2"] [data-filled="true"]')).toBeVisible();
   });
+
+  test('Initials fields require a separate uploaded initials image', async ({ page }) => {
+    const token = 'required-upload-initials';
+    const fields = [
+      { id: 's1', type: 'signature', required: true, page: 1, x: 120, y: 620, w: 220, h: 40 },
+      { id: 'i1', type: 'initials', required: true, page: 1, x: 120, y: 560, w: 120, h: 32 },
+    ];
+
+    await page.route(`**/api/sign/${token}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          signer: { id: 78, name: 'Initial User', email: 'initial@example.com', role: 'signer', status: 'pending' },
+          envelope: { subject: 'Initials Required' },
+          fields,
+        }),
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/pdf`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        body: pdfBuffer,
+      });
+    });
+
+    await page.route(`**/api/sign/${token}/final-pdf`, async (route) => {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'not ready' }),
+      });
+    });
+
+    await page.route('**/pdf.worker.min.mjs', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: workerScript,
+      });
+    });
+
+    await page.goto(`/sign/${token}`);
+    await expect(page.getByText('Adopt signature')).toBeVisible();
+    await page.getByRole('button', { name: 'Upload' }).click();
+
+    const uploadInputs = page.locator('input[type="file"]');
+    await uploadInputs.nth(0).setInputFiles({
+      name: 'signature.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(fakeSignature, 'base64'),
+    });
+    await page.getByRole('button', { name: 'Save and continue' }).click();
+
+    await expect(page.getByText('Upload an initials image to continue.')).toBeVisible();
+    await expect(page.getByText('Initials image (required)')).toBeVisible();
+  });
 });

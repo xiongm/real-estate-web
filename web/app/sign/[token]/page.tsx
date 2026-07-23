@@ -405,10 +405,24 @@ export default function SignPage() {
     const hasSignatureFields = fields.some(
       (field: any) => field.type === 'signature' || field.type === 'initials'
     );
+    const hasInitialsFields = fields.some((field: any) => field.type === 'initials');
+    const hasValidInitials =
+      !hasInitialsFields ||
+      !adoption ||
+      adoption.method === 'type' ||
+      Boolean(adoption.initials && adoption.initials !== adoption.signature);
+    if (adoption && !hasValidInitials) {
+      setAdoption(null);
+      setAdoptionDismissed(false);
+      if (typeof window !== 'undefined' && token) {
+        window.localStorage.removeItem(`${ADOPTION_STORAGE_PREFIX}:${token}`);
+      }
+      return;
+    }
     if (hasSignatureFields && !adoption && !adoptionDismissed) {
       setAdoptionDialogOpen(true);
     }
-  }, [adoptionLoaded, adoption, adoptionDismissed, fields]);
+  }, [adoptionLoaded, adoption, adoptionDismissed, fields, token]);
 
   useEffect(() => {
     if (!data?.signer?.status) return;
@@ -1039,6 +1053,7 @@ export default function SignPage() {
             setAdoptionDialogOpen(false);
           }}
           defaultName={data?.signer?.name || ''}
+          initialsRequired={fields.some((field: any) => field.type === 'initials')}
         />
       )}
     </div>
@@ -1290,11 +1305,13 @@ function SignatureAdoptionDialog({
   onClose,
   onSave,
   defaultName,
+  initialsRequired,
 }: {
   open: boolean;
   onClose: () => void;
   onSave: (adoption: SignatureAdoption) => void;
   defaultName: string;
+  initialsRequired: boolean;
 }) {
   const [tab, setTab] = useState<'draw' | 'type' | 'upload'>('draw');
   const [drawSignature, setDrawSignature] = useState<string | null>(null);
@@ -1343,9 +1360,13 @@ function SignatureAdoptionDialog({
         setError('Please draw a signature.');
         return;
       }
+      if (initialsRequired && !drawInitials) {
+        setError('Please draw your initials.');
+        return;
+      }
       payload = {
         signature: drawSignature,
-        initials: drawInitials || drawSignature,
+        initials: drawInitials,
         method: 'draw',
         signerName: typedName,
         initialsText: typedInitials,
@@ -1370,9 +1391,13 @@ function SignatureAdoptionDialog({
         setError('Upload a signature image to continue.');
         return;
       }
+      if (initialsRequired && !uploadInitials) {
+        setError('Upload an initials image to continue.');
+        return;
+      }
       payload = {
         signature: uploadSignature,
-        initials: uploadInitials || uploadSignature,
+        initials: uploadInitials,
         method: 'upload',
         signerName: typedName,
         initialsText: typedInitials,
@@ -1487,7 +1512,9 @@ function SignatureAdoptionDialog({
               <SignaturePad width={420} height={160} value={drawSignature} onChange={setDrawSignature} />
             </div>
             <div>
-              <p style={{ margin: '0 0 8px', fontSize: 13, color: '#475569' }}>Initials (optional)</p>
+              <p style={{ margin: '0 0 8px', fontSize: 13, color: '#475569' }}>
+                Initials {initialsRequired ? '(required)' : '(optional)'}
+              </p>
               <SignaturePad width={220} height={120} value={drawInitials} onChange={setDrawInitials} />
             </div>
           </section>
@@ -1625,7 +1652,7 @@ function SignatureAdoptionDialog({
               accept="image/*"
             />
             <UploadBox
-              label="Initials image (optional)"
+              label={`Initials image (${initialsRequired ? 'required' : 'optional'})`}
               value={uploadInitials}
               onChange={(e) => uploadHandler(e, setUploadInitials)}
               accept="image/*"

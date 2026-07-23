@@ -676,6 +676,8 @@ test.describe('Admin portal', () => {
     const signatureButton = page.getByRole('button', { name: /Signature field/i }).first();
     await signatureButton.scrollIntoViewIfNeeded();
     await signatureButton.dragTo(pdfContainer, { targetPosition: { x: 80, y: 120 } });
+    const initialsButton = page.getByRole('button', { name: /Initials field/i }).first();
+    await initialsButton.dragTo(pdfContainer, { targetPosition: { x: 320, y: 120 } });
 
     await page.getByRole('button', { name: /Review & Send/i }).click();
     await page.getByPlaceholder('e.g. Alex Chen').fill('Admin Example');
@@ -686,6 +688,7 @@ test.describe('Admin portal', () => {
 
     expect(createPayload?.document_id).toBe(910);
     expect(Array.isArray(createPayload?.fields)).toBe(true);
+    expect(createPayload?.fields.some((field: { type?: string }) => field.type === 'initials')).toBe(true);
     expect(createPayload?.signers?.[0]?.project_investor_id).toBe(1);
     expect(sendCalled).toBe(1);
   });

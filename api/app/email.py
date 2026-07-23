@@ -1,5 +1,7 @@
 import os
 import smtplib
+import socket
+import time
 from email.message import EmailMessage
 from email.utils import formataddr
 
@@ -9,6 +11,32 @@ SMTP_USER = os.getenv("EMAIL_USER")
 SMTP_PASSWORD = os.getenv("EMAIL_PASSWORD")
 DEFAULT_SENDER = os.getenv("EMAIL_SENDER", SMTP_USER or "noreply@example.com")
 DEFAULT_SENDER_NAME = os.getenv("EMAIL_SENDER_NAME", "Real Estate Signing")
+SMTP_TIMEOUT = float(os.getenv("EMAIL_TIMEOUT", "10"))
+SMTP_RETRIES = int(os.getenv("EMAIL_RETRIES", "3"))
+
+
+def _smtp_connection():
+    last_error = None
+    for attempt in range(SMTP_RETRIES):
+        try:
+            addresses = socket.getaddrinfo(
+                SMTP_HOST,
+                SMTP_PORT,
+                family=socket.AF_INET,
+                type=socket.SOCK_STREAM,
+            )
+            if not addresses:
+                raise OSError(f"No IPv4 addresses found for {SMTP_HOST}")
+            address = addresses[attempt % len(addresses)][4][0]
+            smtp = smtplib.SMTP(timeout=SMTP_TIMEOUT)
+            smtp._host = SMTP_HOST
+            smtp.connect(address, SMTP_PORT)
+            return smtp
+        except (OSError, smtplib.SMTPException) as exc:
+            last_error = exc
+            if attempt + 1 < SMTP_RETRIES:
+                time.sleep(attempt + 1)
+    raise last_error or OSError(f"Unable to connect to {SMTP_HOST}:{SMTP_PORT}")
 
 def format_sender_name(requester_name: str | None = None) -> str:
     base_label = (DEFAULT_SENDER_NAME or "Real Estate Signing").strip() or "Real Estate Signing"
@@ -50,7 +78,7 @@ def send_email(
             if content is None:
                 continue
             msg.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
+        with _smtp_connection() as smtp:
             smtp.starttls()
             smtp.login(SMTP_USER, SMTP_PASSWORD)
             smtp.send_message(msg)

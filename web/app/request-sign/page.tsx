@@ -14,7 +14,7 @@ if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
-type FieldType = 'signature' | 'text' | 'date' | 'checkbox';
+type FieldType = 'signature' | 'initials' | 'text' | 'date' | 'checkbox';
 
 type FontChoice = 'sans' | 'serif' | 'times' | 'mono' | 'script';
 const TEXT_FONT_OPTIONS: Array<{ id: FontChoice; label: string }> = [
@@ -112,6 +112,7 @@ type EnvelopeCreatePayload = {
 
 const FIELD_DEFAULTS: Record<FieldType, { width: number; height: number }> = {
   signature: { width: 240, height: 90 },
+  initials: { width: 120, height: 40 },
   text: { width: 200, height: 36 },
   date: { width: 140, height: 32 },
   checkbox: { width: 24, height: 24 },
@@ -119,12 +120,14 @@ const FIELD_DEFAULTS: Record<FieldType, { width: number; height: number }> = {
 
 const FIELD_LABELS: Record<FieldType, string> = {
   signature: 'Signature',
+  initials: 'Initials',
   text: 'Text',
   date: 'Date',
   checkbox: 'Checkbox',
 };
 const FIELD_ICONS: Record<FieldType, string> = {
   signature: '✍️',
+  initials: '✒️',
   text: '📝',
   date: '📅',
   checkbox: '☑️',
@@ -1402,7 +1405,7 @@ function RequestSignPageContent() {
                               ) : (
                                 <span>{field.name || FIELD_LABELS[field.type]}</span>
                               )}
-                              {['signature', 'text', 'date'].includes(field.type) && (
+                              {['signature', 'initials', 'text', 'date'].includes(field.type) && (
                                 <span
                                   style={{
                                     position: 'absolute',
